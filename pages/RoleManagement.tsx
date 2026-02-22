@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ICONS } from '../constants';
 import { Role, UserStatus } from '../types';
+import { roleService } from '../src/services/supabaseService';
 
 const INITIAL_ROLES: Role[] = [
   {
@@ -88,38 +89,84 @@ export const RoleManagement: React.FC = () => {
   const [editingRole, setEditingRole] = useState<Partial<Role> | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('ems_roles');
-    if (saved) {
-      setRoles(JSON.parse(saved));
-    } else {
-      setRoles(INITIAL_ROLES);
-      localStorage.setItem('ems_roles', JSON.stringify(INITIAL_ROLES));
-    }
+    const fetchRoles = async () => {
+      const roleList = await roleService.getRoles();
+      if (roleList.length > 0) {
+        // 转换数据格式以匹配前端类型
+        const formattedRoles = roleList.map(role => ({
+          id: role.id,
+          name: role.name,
+          description: role.description,
+          permissions: role.permissions,
+          status: role.status,
+          createTime: role.create_time ? new Date(role.create_time).toISOString().split('T')[0] : ''
+        }));
+        setRoles(formattedRoles);
+      } else {
+        // 使用默认角色数据作为备用
+        setRoles(INITIAL_ROLES);
+      }
+    };
+
+    fetchRoles();
   }, []);
 
-  const saveRoles = (newRoles: Role[]) => {
+  const saveRoles = async (newRoles: Role[]) => {
     setRoles(newRoles);
-    localStorage.setItem('ems_roles', JSON.stringify(newRoles));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRole?.name) return;
 
-    if (editingRole.id) {
-      saveRoles(roles.map(r => r.id === editingRole.id ? { ...r, ...editingRole } as Role : r));
-    } else {
-      const newRole: Role = {
-        ...editingRole,
-        id: `role-${Date.now()}`,
-        status: UserStatus.ENABLED,
-        createTime: new Date().toISOString().split('T')[0],
-        permissions: editingRole.permissions || {}
-      } as Role;
-      saveRoles([...roles, newRole]);
+    try {
+      if (editingRole.id) {
+        // 更新现有角色
+        const updatedRole = await roleService.updateRole(editingRole.id, {
+          name: editingRole.name,
+          description: editingRole.description,
+          permissions: editingRole.permissions || {},
+          status: editingRole.status || UserStatus.ENABLED
+        });
+        
+        if (updatedRole) {
+          saveRoles(roles.map(r => r.id === editingRole.id ? {
+            ...r,
+            name: updatedRole.name,
+            description: updatedRole.description,
+            permissions: updatedRole.permissions,
+            status: updatedRole.status
+          } as Role : r));
+        }
+      } else {
+        // 创建新角色
+        const newRoleData = {
+          name: editingRole.name,
+          description: editingRole.description,
+          permissions: editingRole.permissions || {},
+          status: UserStatus.ENABLED
+        };
+        
+        const newRole = await roleService.createRole(newRoleData);
+        
+        if (newRole) {
+          const formattedRole: Role = {
+            id: newRole.id,
+            name: newRole.name,
+            description: newRole.description,
+            permissions: newRole.permissions,
+            status: newRole.status,
+            createTime: newRole.create_time ? new Date(newRole.create_time).toISOString().split('T')[0] : ''
+          };
+          saveRoles([...roles, formattedRole]);
+        }
+      }
+      setIsModalOpen(false);
+      setEditingRole(null);
+    } catch (error) {
+      console.error('保存角色失败:', error);
+      alert('保存角色失败，请重试');
     }
-    setIsModalOpen(false);
-    setEditingRole(null);
   };
 
   const togglePermission = (key: string) => {
@@ -181,9 +228,14 @@ export const RoleManagement: React.FC = () => {
                   编辑权限
                 </button>
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     if (window.confirm('确定要删除该角色吗？')) {
-                      saveRoles(roles.filter(r => r.id !== role.id));
+                      const success = await roleService.deleteRole(role.id);
+                      if (success) {
+                        saveRoles(roles.filter(r => r.id !== role.id));
+                      } else {
+                        alert('删除角色失败，请重试');
+                      }
                     }
                   }}
                   className="text-rose-600 font-bold text-xs hover:underline"

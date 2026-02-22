@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SurveyForm, SurveyStatus, ReportStatus } from '../types';
 import { INDUSTRIES, REGIONS, SURVEY_TEMPLATES } from '../constants';
+import { surveyService } from '../src/services/supabaseService';
 
 export const SurveyCreate: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -18,25 +19,38 @@ export const SurveyCreate: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    const newForm: SurveyForm = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...formData,
-      status: SurveyStatus.DRAFT,
-      reportStatus: ReportStatus.NOT_GENERATED,
-      creator: '系统管理员',
-      createTime: new Date().toISOString(),
-      data: {}
-    };
+    try {
+      const surveyData = {
+        name: formData.name,
+        customer_name: formData.customerName,
+        project_name: formData.projectName,
+        industry: formData.industry,
+        region: formData.region,
+        template_id: formData.templateId,
+        status: SurveyStatus.DRAFT,
+        report_status: ReportStatus.NOT_GENERATED,
+        creator_id: 'user-1', // 需要根据实际登录用户获取
+        data: {}
+      };
 
-    const existing = JSON.parse(localStorage.getItem('ems_surveys') || '[]');
-    localStorage.setItem('ems_surveys', JSON.stringify([...existing, newForm]));
-    
-    setLoading(false);
-    navigate(`/surveys/fill/${newForm.id}`);
+      const newSurvey = await surveyService.createSurvey(surveyData);
+      
+      if (newSurvey) {
+        setLoading(false);
+        navigate(`/surveys/fill/${newSurvey.id}`);
+      } else {
+        setLoading(false);
+        alert('创建调研表单失败，请重试');
+      }
+    } catch (error) {
+      console.error('创建调研表单失败:', error);
+      setLoading(false);
+      alert('创建调研表单失败，请重试');
+    }
   };
 
   return (

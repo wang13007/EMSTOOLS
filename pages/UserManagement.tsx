@@ -3,14 +3,35 @@ import React, { useState, useEffect } from 'react';
 import { ICONS } from '../constants';
 import { User, UserType, UserStatus } from '../types';
 import { userService } from '../src/services/supabaseService';
+import supabase from '../src/config/supabase';
 
 export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   useEffect(() => {
+    // 从数据库获取角色列表
+    const fetchRoles = async () => {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('*');
+      
+      if (error) {
+        console.error('获取角色列表失败:', error);
+        // 使用默认角色数据作为备用
+        setRoles([
+          { id: 'role-1', name: '超级管理员' },
+          { id: 'role-2', name: '售前工程师' },
+          { id: 'role-3', name: '客户用户' }
+        ]);
+      } else {
+        setRoles(data);
+      }
+    };
+
     // 从数据库获取用户列表
     const fetchUsers = async () => {
       const userList = await userService.getUsers();
@@ -20,6 +41,7 @@ export const UserManagement: React.FC = () => {
         name: user.name,
         username: user.username,
         type: user.type,
+        role_id: user.role_id,
         role: user.role_id ? '已分配' : '未分配', // 需要根据role_id获取角色名称
         customer: user.customer,
         status: user.status,
@@ -28,7 +50,8 @@ export const UserManagement: React.FC = () => {
       setUsers(formattedUsers);
     };
 
-    fetchUsers();
+    // 先获取角色，再获取用户
+    fetchRoles().then(fetchUsers);
   }, []);
 
   const saveUsers = async (userData: any) => {
@@ -161,6 +184,12 @@ export const UserManagement: React.FC = () => {
                   >
                     {user.status === UserStatus.ENABLED ? '禁用' : '启用'}
                   </button>
+                  <button 
+                    onClick={() => handleDelete(user.id)}
+                    className="text-red-600 font-bold text-sm hover:underline"
+                  >
+                    删除
+                  </button>
                 </td>
               </tr>
             ))}
@@ -185,7 +214,7 @@ export const UserManagement: React.FC = () => {
                 username: formData.get('username') as string,
                 password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 'password'
                 type: formData.get('type') as UserType,
-                role_id: null, // 需要根据角色名称获取role_id
+                role_id: formData.get('role') as string,
                 customer: formData.get('customer') as string,
                 status: editingUser?.status || UserStatus.ENABLED
               };
@@ -195,6 +224,7 @@ export const UserManagement: React.FC = () => {
                   // 更新现有用户
                   const updatedUser = await userService.updateUser(editingUser.id, userData);
                   if (updatedUser) {
+                    const roleName = roles.find(r => r.id === userData.role_id)?.name || '未分配';
                     setUsers(users.map(u => {
                       if (u.id === editingUser.id) {
                         return {
@@ -202,6 +232,8 @@ export const UserManagement: React.FC = () => {
                           name: updatedUser.name,
                           username: updatedUser.username,
                           type: updatedUser.type,
+                          role_id: userData.role_id,
+                          role: roleName,
                           customer: updatedUser.customer,
                           status: updatedUser.status
                         };
@@ -213,15 +245,17 @@ export const UserManagement: React.FC = () => {
                   // 创建新用户
                   const newUser = await userService.createUser(userData);
                   if (newUser) {
+                    const roleName = roles.find(r => r.id === userData.role_id)?.name || '未分配';
                     setUsers([...users, {
                       id: newUser.id,
                       name: newUser.name,
                       username: newUser.username,
                       type: newUser.type,
-                      role: '未分配',
+                      role_id: userData.role_id,
+                      role: roleName,
                       customer: newUser.customer,
                       status: newUser.status,
-                      createTime: new Date(newUser.create_time).toISOString().split('T')[0]
+                      createTime: new Date().toISOString().split('T')[0]
                     }]);
                   }
                 }
@@ -250,7 +284,14 @@ export const UserManagement: React.FC = () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase">角色</label>
-                  <input name="role" required defaultValue={editingUser?.role} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <select name="role" required defaultValue={editingUser?.role_id} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="">请选择角色</option>
+                    {roles.map(role => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="space-y-1">

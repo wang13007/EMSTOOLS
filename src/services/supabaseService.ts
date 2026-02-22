@@ -308,8 +308,74 @@ export const messageService = {
   }
 };
 
+// 角色相关操作
+export const roleService = {
+  // 获取角色列表
+  async getRoles() {
+    const { data, error } = await supabase
+      .from('roles')
+      .select('*');
+    
+    if (error) {
+      console.error('获取角色列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  },
+
+  // 创建角色
+  async createRole(role: any) {
+    const { data, error } = await supabase
+      .from('roles')
+      .insert(role)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('创建角色失败:', error);
+      return null;
+    }
+    
+    return data;
+  },
+
+  // 更新角色
+  async updateRole(id: string, role: any) {
+    const { data, error } = await supabase
+      .from('roles')
+      .update(role)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('更新角色失败:', error);
+      return null;
+    }
+    
+    return data;
+  },
+
+  // 删除角色
+  async deleteRole(id: string) {
+    const { error } = await supabase
+      .from('roles')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('删除角色失败:', error);
+      return false;
+    }
+    
+    return true;
+  }
+};
+
 export default {
   userService,
+  roleService,
   surveyService,
   templateService,
   dictService,
