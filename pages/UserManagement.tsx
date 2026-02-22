@@ -1,0 +1,270 @@
+
+import React, { useState, useEffect } from 'react';
+import { ICONS } from '../constants';
+import { User, UserType, UserStatus } from '../types';
+import { userService } from '../src/services/supabaseService';
+
+export const UserManagement: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // 从数据库获取用户列表
+    const fetchUsers = async () => {
+      const userList = await userService.getUsers();
+      // 转换数据格式以匹配前端类型
+      const formattedUsers = userList.map(user => ({
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        type: user.type,
+        role: user.role_id ? '已分配' : '未分配', // 需要根据role_id获取角色名称
+        customer: user.customer,
+        status: user.status,
+        createTime: user.create_time ? new Date(user.create_time).toISOString().split('T')[0] : ''
+      }));
+      setUsers(formattedUsers);
+    };
+
+    fetchUsers();
+  }, []);
+
+  const saveUsers = async (userData: any) => {
+    // 这里可以添加创建/更新用户的逻辑
+    // 目前只更新本地状态，实际操作需要调用userService的相应方法
+    setUsers(prevUsers => {
+      if (userData.id) {
+        // 更新现有用户
+        return prevUsers.map(u => u.id === userData.id ? { ...u, ...userData } : u);
+      } else {
+        // 创建新用户
+        const newUser = {
+          id: Math.random().toString(36).substr(2, 9),
+          ...userData,
+          createTime: new Date().toISOString().split('T')[0]
+        };
+        return [...prevUsers, newUser];
+      }
+    });
+  };
+
+  const filteredUsers = users.filter(u => 
+    u.name.includes(searchTerm) || u.username.includes(searchTerm)
+  );
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('确定要删除该用户吗？')) {
+      const success = await userService.deleteUser(id);
+      if (success) {
+        setUsers(users.filter(u => u.id !== id));
+      }
+    }
+  };
+
+  const handleToggleStatus = async (id: string) => {
+    const user = users.find(u => u.id === id);
+    if (user) {
+      const newStatus = user.status === UserStatus.ENABLED ? UserStatus.DISABLED : UserStatus.ENABLED;
+      const success = await userService.updateUser(id, { status: newStatus });
+      if (success) {
+        setUsers(users.map(u => {
+          if (u.id === id) {
+            return { ...u, status: newStatus };
+          }
+          return u;
+        }));
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">用户管理</h2>
+          <p className="text-slate-500">维护系统登录用户信息，支持内部员工与外部客户账号管理。</p>
+        </div>
+        <div className="flex gap-3">
+          <div className="relative">
+            <input 
+              type="text"
+              placeholder="搜索用户姓名/账号..."
+              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="absolute left-3 top-2.5 text-slate-400">
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+          </div>
+          <button 
+            onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95"
+          >
+            <ICONS.Plus className="w-4 h-4" />
+            新增用户
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户姓名</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">账号/类型</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">角色/客户</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">状态</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">创建时间</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filteredUsers.map(user => (
+              <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-[10px]">
+                      {user.name.slice(0, 1)}
+                    </div>
+                    <span className="font-bold text-slate-900">{user.name}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-slate-900">{user.username}</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">{user.type}</div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm font-medium text-slate-700">{user.role}</div>
+                  {user.customer && <div className="text-xs text-blue-500">@{user.customer}</div>}
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                    {user.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-500">
+                  {user.createTime}
+                </td>
+                <td className="px-6 py-4 text-right space-x-3">
+                  <button 
+                    onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
+                    className="text-blue-600 font-bold text-sm hover:underline"
+                  >
+                    编辑
+                  </button>
+                  <button 
+                    onClick={() => handleToggleStatus(user.id)}
+                    className={`${user.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
+                  >
+                    {user.status === UserStatus.ENABLED ? '禁用' : '启用'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-slideUp">
+            <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-slate-900">{editingUser ? '编辑用户' : '新增用户'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <form className="p-8 space-y-4" onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const userData = {
+                name: formData.get('name') as string,
+                username: formData.get('username') as string,
+                password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 'password'
+                type: formData.get('type') as UserType,
+                role_id: null, // 需要根据角色名称获取role_id
+                customer: formData.get('customer') as string,
+                status: editingUser?.status || UserStatus.ENABLED
+              };
+              
+              try {
+                if (editingUser) {
+                  // 更新现有用户
+                  const updatedUser = await userService.updateUser(editingUser.id, userData);
+                  if (updatedUser) {
+                    setUsers(users.map(u => {
+                      if (u.id === editingUser.id) {
+                        return {
+                          ...u,
+                          name: updatedUser.name,
+                          username: updatedUser.username,
+                          type: updatedUser.type,
+                          customer: updatedUser.customer,
+                          status: updatedUser.status
+                        };
+                      }
+                      return u;
+                    }));
+                  }
+                } else {
+                  // 创建新用户
+                  const newUser = await userService.createUser(userData);
+                  if (newUser) {
+                    setUsers([...users, {
+                      id: newUser.id,
+                      name: newUser.name,
+                      username: newUser.username,
+                      type: newUser.type,
+                      role: '未分配',
+                      customer: newUser.customer,
+                      status: newUser.status,
+                      createTime: new Date(newUser.create_time).toISOString().split('T')[0]
+                    }]);
+                  }
+                }
+                setIsModalOpen(false);
+              } catch (error) {
+                console.error('保存用户失败:', error);
+                alert('保存用户失败，请重试');
+              }
+            }}>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">姓名</label>
+                  <input name="name" required defaultValue={editingUser?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">账号</label>
+                  <input name="username" required defaultValue={editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">类型</label>
+                  <select name="type" required defaultValue={editingUser?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    {Object.values(UserType).map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">角色</label>
+                  <input name="role" required defaultValue={editingUser?.role} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">所属客户 (可选)</label>
+                <input name="customer" defaultValue={editingUser?.customer} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div className="pt-4 flex justify-end gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
+                <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

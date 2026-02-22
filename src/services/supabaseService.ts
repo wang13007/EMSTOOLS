@@ -1,0 +1,318 @@
+// Supabase服务
+import supabase from '../config/supabase';
+import { User, SurveyForm, SurveyTemplate, DictType, DictItem, SystemLog, Message } from '../../types';
+
+// 用户相关操作
+export const userService = {
+  // 获取用户列表
+  async getUsers() {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*');
+    
+    if (error) {
+      console.error('获取用户列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  },
+
+  // 创建用户
+  async createUser(user: any) {
+    // 确保包含必要的数据库字段
+    const dbUser = {
+      ...user,
+      password_hash: user.password_hash || user.passwordHash,
+      role_id: user.role_id || user.roleId
+    };
+    
+    // 删除前端特有的字段
+    delete dbUser.passwordHash;
+    delete dbUser.roleId;
+    delete dbUser.role;
+    delete dbUser.createTime;
+    
+    const { data, error } = await supabase
+      .from('users')
+      .insert(dbUser)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('创建用户失败:', error);
+      return null;
+    }
+    
+    return data;
+  },
+
+  // 更新用户
+  async updateUser(id: string, user: any) {
+    // 转换前端字段名到数据库字段名
+    const dbUser = {
+      ...user,
+      password_hash: user.password_hash || user.passwordHash,
+      role_id: user.role_id || user.roleId
+    };
+    
+    // 删除前端特有的字段
+    delete dbUser.passwordHash;
+    delete dbUser.roleId;
+    delete dbUser.role;
+    delete dbUser.createTime;
+    
+    const { data, error } = await supabase
+      .from('users')
+      .update(dbUser)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('更新用户失败:', error);
+      return null;
+    }
+    
+    return data;
+  },
+
+  // 删除用户
+  async deleteUser(id: string) {
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('删除用户失败:', error);
+      return false;
+    }
+    
+    return true;
+  }
+};
+
+// 调研表单相关操作
+export const surveyService = {
+  // 获取表单列表
+  async getSurveys() {
+    const { data, error } = await supabase
+      .from('survey_forms')
+      .select('*');
+    
+    if (error) {
+      console.error('获取表单列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  },
+
+  // 创建表单
+  async createSurvey(survey: Omit<SurveyForm, 'id' | 'create_time'>) {
+    const { data, error } = await supabase
+      .from('survey_forms')
+      .insert(survey)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('创建表单失败:', error);
+      return null;
+    }
+    
+    return data;
+  },
+
+  // 更新表单
+  async updateSurvey(id: string, survey: any) {
+    // 转换前端字段名到数据库字段名
+    const dbSurvey = {
+      ...survey,
+      report_status: survey.reportStatus || survey.report_status,
+      customer_name: survey.customerName || survey.customer_name,
+      project_name: survey.projectName || survey.project_name,
+      pre_sales_responsible_id: survey.preSalesResponsibleId || survey.pre_sales_responsible_id
+    };
+    
+    // 删除前端特有的字段
+    delete dbSurvey.reportStatus;
+    delete dbSurvey.customerName;
+    delete dbSurvey.projectName;
+    delete dbSurvey.preSalesResponsibleId;
+    
+    const { data, error } = await supabase
+      .from('survey_forms')
+      .update(dbSurvey)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('更新表单失败:', error);
+      return null;
+    }
+    
+    return data;
+  },
+
+  // 删除表单
+  async deleteSurvey(id: string) {
+    const { error } = await supabase
+      .from('survey_forms')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('删除表单失败:', error);
+      return false;
+    }
+    
+    return true;
+  }
+};
+
+// 模板相关操作
+export const templateService = {
+  // 获取模板列表
+  async getTemplates() {
+    const { data, error } = await supabase
+      .from('survey_templates')
+      .select('*');
+    
+    if (error) {
+      console.error('获取模板列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  },
+
+  // 创建模板
+  async createTemplate(template: Omit<SurveyTemplate, 'id' | 'create_time'>) {
+    const { data, error } = await supabase
+      .from('survey_templates')
+      .insert(template)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('创建模板失败:', error);
+      return null;
+    }
+    
+    return data;
+  }
+};
+
+// 字典相关操作
+export const dictService = {
+  // 获取字典类型列表
+  async getDictTypes() {
+    const { data, error } = await supabase
+      .from('dict_types')
+      .select('*');
+    
+    if (error) {
+      console.error('获取字典类型列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  },
+
+  // 获取字典项列表
+  async getDictItems(typeId: string) {
+    const { data, error } = await supabase
+      .from('dict_items')
+      .select('*')
+      .eq('type_id', typeId);
+    
+    if (error) {
+      console.error('获取字典项列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  }
+};
+
+// 日志相关操作
+export const logService = {
+  // 创建日志
+  async createLog(log: Omit<SystemLog, 'id' | 'create_time'>) {
+    const { data, error } = await supabase
+      .from('system_logs')
+      .insert(log)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('创建日志失败:', error);
+      return null;
+    }
+    
+    return data;
+  },
+
+  // 获取日志列表
+  async getLogs() {
+    const { data, error } = await supabase
+      .from('system_logs')
+      .select('*')
+      .order('create_time', { ascending: false });
+    
+    if (error) {
+      console.error('获取日志列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  }
+};
+
+// 消息相关操作
+export const messageService = {
+  // 获取消息列表
+  async getMessages(userId: string) {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('target_user_id', userId)
+      .order('create_time', { ascending: false });
+    
+    if (error) {
+      console.error('获取消息列表失败:', error);
+      return [];
+    }
+    
+    return data;
+  },
+
+  // 标记消息为已读
+  async markAsRead(id: string) {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ read: true })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('标记消息为已读失败:', error);
+      return null;
+    }
+    
+    return data;
+  }
+};
+
+export default {
+  userService,
+  surveyService,
+  templateService,
+  dictService,
+  logService,
+  messageService
+};
