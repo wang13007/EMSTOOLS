@@ -255,7 +255,6 @@ export const UserManagement: React.FC = () => {
                 const defaultPassword = '123456';
                 
                 const userData = {
-                  id: editingUser?.id || `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                   name: formData.get('name') as string,
                   username: formData.get('username') as string,
                   email: formData.get('email') as string,
@@ -263,7 +262,7 @@ export const UserManagement: React.FC = () => {
                   password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
                   type: formData.get('type') as UserType,
                   role_ids: selectedRoles,
-                  customer: formData.get('customer') as string,
+                  customer: formData.get('customer') as string || undefined,
                   status: editingUser?.status || UserStatus.ENABLED
                 };
                 
@@ -316,33 +315,33 @@ export const UserManagement: React.FC = () => {
               }}>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">姓名</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">姓名 <span className="text-rose-600">*</span></label>
                     <input name="name" required defaultValue={editingUser?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">账号</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">账号 <span className="text-rose-600">*</span></label>
                     <input name="username" required defaultValue={editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱 <span className="text-rose-600">*</span></label>
                     <input name="email" type="email" required defaultValue={editingUser?.email} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">手机号</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">手机号 <span className="text-rose-600">*</span></label>
                     <input name="phone" required defaultValue={editingUser?.phone} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">类型</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">类型 <span className="text-rose-600">*</span></label>
                     <select name="type" required defaultValue={editingUser?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                       {Object.values(UserType).map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">角色 (多选)</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">角色 (多选) <span className="text-rose-600">*</span></label>
                     <div className="flex flex-wrap gap-2 border border-slate-200 rounded-lg p-2 min-h-[40px]">
                       {roles.map(role => (
                         <div key={role.id} className="flex items-center">
