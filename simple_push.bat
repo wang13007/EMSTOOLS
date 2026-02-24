@@ -1,12 +1,6 @@
 @echo off
-cd /d "E:\EMSTools\ems-售前调研工具"
-git init
-echo node_modules/ > .gitignore
-echo dist/ >> .gitignore
-echo .env.local >> .gitignore
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/wang13007/EMSTOOLS.git
-git push -u origin master --force
-echo Push completed.
-pause
+
+rem 直接运行git命令
+"C:\Program Files\Git\bin\git.exe" add .
+"C:\Program Files\Git\bin\git.exe" commit -m "修改用户管理功能"
+"C:\Program Files\Git\bin\git.exe" push origin master --force

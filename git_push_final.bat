@@ -2,10 +2,3 @@
 
 rem 直接运行git命令推送代码
 "C:\Program Files\Git\bin\git.exe" push origin master --force
-
-rem 检查结果
-if %ERRORLEVEL% equ 0 (
-    echo Push successful!
-) else (
-    echo Push failed!
-)

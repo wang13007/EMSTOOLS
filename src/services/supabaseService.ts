@@ -24,12 +24,15 @@ export const userService = {
     const dbUser = {
       ...user,
       password_hash: user.password_hash || user.passwordHash,
-      role_id: user.role_id || user.roleId
+      role_ids: user.role_ids || user.roleIds || [],
+      email: user.email,
+      phone: user.phone
     };
     
     // 删除前端特有的字段
     delete dbUser.passwordHash;
     delete dbUser.roleId;
+    delete dbUser.roleIds;
     delete dbUser.role;
     delete dbUser.createTime;
     
@@ -53,12 +56,15 @@ export const userService = {
     const dbUser = {
       ...user,
       password_hash: user.password_hash || user.passwordHash,
-      role_id: user.role_id || user.roleId
+      role_ids: user.role_ids || user.roleIds || [],
+      email: user.email,
+      phone: user.phone
     };
     
     // 删除前端特有的字段
     delete dbUser.passwordHash;
     delete dbUser.roleId;
+    delete dbUser.roleIds;
     delete dbUser.role;
     delete dbUser.createTime;
     

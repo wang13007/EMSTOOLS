@@ -11,6 +11,7 @@ export const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
   useEffect(() => {
     // 从数据库获取角色列表
@@ -36,23 +37,41 @@ export const UserManagement: React.FC = () => {
     const fetchUsers = async () => {
       const userList = await userService.getUsers();
       // 转换数据格式以匹配前端类型
-      const formattedUsers = userList.map(user => ({
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        type: user.type,
-        role_id: user.role_id,
-        role: user.role_id ? '已分配' : '未分配', // 需要根据role_id获取角色名称
-        customer: user.customer,
-        status: user.status,
-        createTime: user.create_time ? new Date(user.create_time).toISOString().split('T')[0] : ''
-      }));
+      const formattedUsers = userList.map(user => {
+        // 获取角色名称
+        let roleNames = '未分配';
+        if (user.role_ids && Array.isArray(user.role_ids) && user.role_ids.length > 0) {
+          roleNames = user.role_ids.map(roleId => {
+            const role = roles.find(r => r.id === roleId);
+            return role ? role.name : '未知角色';
+          }).join(', ');
+        } else if (user.role_id) {
+          // 兼容旧的单角色格式
+          const role = roles.find(r => r.id === user.role_id);
+          roleNames = role ? role.name : '未知角色';
+        }
+        
+        return {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          phone: user.phone,
+          type: user.type,
+          role_id: user.role_id,
+          role_ids: user.role_ids || [],
+          role: roleNames,
+          customer: user.customer,
+          status: user.status,
+          createTime: user.create_time ? new Date(user.create_time).toISOString().split('T')[0] : ''
+        };
+      });
       setUsers(formattedUsers);
     };
 
     // 先获取角色，再获取用户
     fetchRoles().then(fetchUsers);
-  }, []);
+  }, [roles]);
 
   const saveUsers = async (userData: any) => {
     // 这里可以添加创建/更新用户的逻辑
@@ -138,6 +157,7 @@ export const UserManagement: React.FC = () => {
             <tr>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户姓名</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">账号/类型</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">邮箱/手机</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">角色/客户</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">状态</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">创建时间</th>
@@ -160,6 +180,10 @@ export const UserManagement: React.FC = () => {
                   <div className="text-[10px] text-slate-400 font-bold uppercase">{user.type}</div>
                 </td>
                 <td className="px-6 py-4">
+                  <div className="text-sm text-slate-900">{user.email || '-'}</div>
+                  <div className="text-xs text-slate-500">{user.phone || '-'}</div>
+                </td>
+                <td className="px-6 py-4">
                   <div className="text-sm font-medium text-slate-700">{user.role}</div>
                   {user.customer && <div className="text-xs text-blue-500">@{user.customer}</div>}
                 </td>
@@ -173,7 +197,11 @@ export const UserManagement: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 text-right space-x-3">
                   <button 
-                    onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
+                    onClick={() => {
+                      setEditingUser(user);
+                      setSelectedRoles(user.role_ids || []);
+                      setIsModalOpen(true);
+                    }}
                     className="text-blue-600 font-bold text-sm hover:underline"
                   >
                     编辑
@@ -209,12 +237,19 @@ export const UserManagement: React.FC = () => {
             <form className="p-8 space-y-4" onSubmit={async (e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
+              
+              // 初始化密码为123456
+              const defaultPassword = '123456';
+              
               const userData = {
+                id: editingUser?.id || `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 name: formData.get('name') as string,
                 username: formData.get('username') as string,
-                password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 'password'
+                email: formData.get('email') as string,
+                phone: formData.get('phone') as string,
+                password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
                 type: formData.get('type') as UserType,
-                role_id: formData.get('role') as string,
+                role_ids: selectedRoles,
                 customer: formData.get('customer') as string,
                 status: editingUser?.status || UserStatus.ENABLED
               };
@@ -224,7 +259,7 @@ export const UserManagement: React.FC = () => {
                   // 更新现有用户
                   const updatedUser = await userService.updateUser(editingUser.id, userData);
                   if (updatedUser) {
-                    const roleName = roles.find(r => r.id === userData.role_id)?.name || '未分配';
+                    const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
                     setUsers(users.map(u => {
                       if (u.id === editingUser.id) {
                         return {
@@ -232,8 +267,8 @@ export const UserManagement: React.FC = () => {
                           name: updatedUser.name,
                           username: updatedUser.username,
                           type: updatedUser.type,
-                          role_id: userData.role_id,
-                          role: roleName,
+                          role_ids: selectedRoles,
+                          role: roleNames || '未分配',
                           customer: updatedUser.customer,
                           status: updatedUser.status
                         };
@@ -245,14 +280,14 @@ export const UserManagement: React.FC = () => {
                   // 创建新用户
                   const newUser = await userService.createUser(userData);
                   if (newUser) {
-                    const roleName = roles.find(r => r.id === userData.role_id)?.name || '未分配';
+                    const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
                     setUsers([...users, {
                       id: newUser.id,
                       name: newUser.name,
                       username: newUser.username,
                       type: newUser.type,
-                      role_id: userData.role_id,
-                      role: roleName,
+                      role_ids: selectedRoles,
+                      role: roleNames || '未分配',
                       customer: newUser.customer,
                       status: newUser.status,
                       createTime: new Date().toISOString().split('T')[0]
@@ -260,6 +295,7 @@ export const UserManagement: React.FC = () => {
                   }
                 }
                 setIsModalOpen(false);
+                setSelectedRoles([]);
               } catch (error) {
                 console.error('保存用户失败:', error);
                 alert('保存用户失败，请重试');
@@ -277,21 +313,43 @@ export const UserManagement: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">邮箱</label>
+                  <input name="email" type="email" required defaultValue={editingUser?.email} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">手机号</label>
+                  <input name="phone" required defaultValue={editingUser?.phone} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase">类型</label>
                   <select name="type" required defaultValue={editingUser?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     {Object.values(UserType).map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">角色</label>
-                  <select name="role" required defaultValue={editingUser?.role_id} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value="">请选择角色</option>
+                  <label className="text-xs font-bold text-slate-500 uppercase">角色 (多选)</label>
+                  <div className="flex flex-wrap gap-2 border border-slate-200 rounded-lg p-2 min-h-[40px]">
                     {roles.map(role => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
+                      <div key={role.id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`role-${role.id}`}
+                          checked={selectedRoles.includes(role.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRoles([...selectedRoles, role.id]);
+                            } else {
+                              setSelectedRoles(selectedRoles.filter(id => id !== role.id));
+                            }
+                          }}
+                          className="mr-1"
+                        />
+                        <label htmlFor={`role-${role.id}`} className="text-sm">{role.name}</label>
+                      </div>
                     ))}
-                  </select>
+                  </div>
                 </div>
               </div>
               <div className="space-y-1">
