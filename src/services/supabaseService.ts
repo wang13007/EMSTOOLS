@@ -36,8 +36,6 @@ export const userService = {
         ...user,
         password_hash: user.password_hash || user.passwordHash,
         role_ids: user.role_ids || user.roleIds || [],
-        email: user.email,
-        phone: user.phone,
         // 自动生成用户ID（用户名）
         username: user.username || `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
         // 确保状态字段存在
@@ -52,6 +50,8 @@ export const userService = {
       delete dbUser.roleIds;
       delete dbUser.role;
       delete dbUser.createTime;
+      delete dbUser.email;
+      delete dbUser.phone;
       
       console.log('处理后的数据库用户数据:', dbUser);
       
@@ -86,9 +86,7 @@ export const userService = {
     const dbUser = {
       ...user,
       password_hash: user.password_hash || user.passwordHash,
-      role_ids: user.role_ids || user.roleIds || [],
-      email: user.email,
-      phone: user.phone
+      role_ids: user.role_ids || user.roleIds || []
     };
     
     // 删除前端特有的字段
@@ -97,6 +95,8 @@ export const userService = {
     delete dbUser.roleIds;
     delete dbUser.role;
     delete dbUser.createTime;
+    delete dbUser.email;
+    delete dbUser.phone;
     
     const { data, error } = await supabase
       .from('users')
