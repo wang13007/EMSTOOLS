@@ -1,9 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
+import dotenv from 'dotenv';
 
-// 使用正确的 service key
-const supabaseUrl = 'https://hjehaiqxsekuiwwevpsi.supabase.co';
-const supabaseServiceKey = 'sb_secret_w6oGDxzLPfZGbPBtG_6mng_OM6E4-xA';
+// 加载环境变量
+dotenv.config();
+
+// 使用环境变量
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('错误: 请在.env文件中设置SUPABASE_URL和SUPABASE_SERVICE_ROLE_KEY');
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
