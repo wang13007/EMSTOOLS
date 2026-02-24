@@ -35,7 +35,6 @@ export const userService = {
       const dbUser = {
         ...user,
         password_hash: user.password_hash || user.passwordHash,
-        role_ids: user.role_ids || user.roleIds || [],
         // 自动生成用户ID（用户名）
         username: user.username || `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
         // 确保状态字段存在
@@ -48,6 +47,7 @@ export const userService = {
       delete dbUser.passwordHash;
       delete dbUser.roleId;
       delete dbUser.roleIds;
+      delete dbUser.role_ids;
       delete dbUser.role;
       delete dbUser.createTime;
       delete dbUser.email;
@@ -85,14 +85,14 @@ export const userService = {
     // 转换前端字段名到数据库字段名
     const dbUser = {
       ...user,
-      password_hash: user.password_hash || user.passwordHash,
-      role_ids: user.role_ids || user.roleIds || []
+      password_hash: user.password_hash || user.passwordHash
     };
     
     // 删除前端特有的字段
     delete dbUser.passwordHash;
     delete dbUser.roleId;
     delete dbUser.roleIds;
+    delete dbUser.role_ids;
     delete dbUser.role;
     delete dbUser.createTime;
     delete dbUser.email;
