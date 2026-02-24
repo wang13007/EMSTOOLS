@@ -1,34 +1,12 @@
 @echo off
 
-REM Final push script
-set GIT_EXE="C:\Program Files\Git\bin\git.exe"
+rem 使用完整路径
+set "GIT_EXE=C:\Program Files\Git\bin\git.exe"
 
-cd /d "E:\EMSTools\ems-售前调研工具"
+rem 切换到项目目录
+cd /d "e:\EMSTools\ems-售前调研工具"
 
-echo Final push attempt...
-echo Repository: https://github.com/wang13007/EMSTOOLS.git
-echo ------------------------
-
-REM Try git push
+rem 推送代码
+%GIT_EXE% add .
+%GIT_EXE% commit -m "修改用户管理功能，支持邮箱、手机号和多角色选择"
 %GIT_EXE% push origin master --force
-
-if %errorlevel% equ 0 (
-    echo ------------------------
-    echo SUCCESS! Push completed
-    echo ------------------------
-    echo Your code is now on GitHub
-    echo Visit: https://github.com/wang13007/EMSTOOLS.git
-) else (
-    echo ------------------------
-    echo FAILED! Push did not complete
-    echo ------------------------
-    echo Error code: %errorlevel%
-    echo Possible reasons:
-    echo 1. Network connection issue
-    echo 2. GitHub repository permissions
-    echo 3. Authentication required
-)
-
-echo ------------------------
-echo Press any key to exit...
-pause
