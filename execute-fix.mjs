@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // 使用环境变量
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('错误: 请在.env文件中设置SUPABASE_URL和SUPABASE_SERVICE_ROLE_KEY');

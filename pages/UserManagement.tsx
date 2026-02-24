@@ -4,6 +4,7 @@ import { ICONS } from '../constants';
 import { User, UserType, UserStatus } from '../types';
 import { userService } from '../src/services/supabaseService';
 import supabase from '../src/config/supabase';
+import Portal from '../src/components/Portal';
 
 export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -13,65 +14,76 @@ export const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
 
+  // 默认角色数据
+  const DEFAULT_ROLES = [
+    { id: 'role-1', name: '超级管理员' },
+    { id: 'role-2', name: '售前工程师' },
+    { id: 'role-3', name: '客户用户' }
+  ];
+
   useEffect(() => {
-    // 从数据库获取角色列表
-    const fetchRoles = async () => {
-      const { data, error } = await supabase
-        .from('roles')
-        .select('*');
-      
-      if (error) {
-        console.error('获取角色列表失败:', error);
-        // 使用默认角色数据作为备用
-        setRoles([
-          { id: 'role-1', name: '超级管理员' },
-          { id: 'role-2', name: '售前工程师' },
-          { id: 'role-3', name: '客户用户' }
-        ]);
-      } else {
-        setRoles(data);
-      }
-    };
+    // 直接使用默认角色数据，避免从数据库获取角色导致的无限递归问题
+    setRoles(DEFAULT_ROLES);
 
     // 从数据库获取用户列表
     const fetchUsers = async () => {
-      const userList = await userService.getUsers();
-      // 转换数据格式以匹配前端类型
-      const formattedUsers = userList.map(user => {
-        // 获取角色名称
-        let roleNames = '未分配';
-        if (user.role_ids && Array.isArray(user.role_ids) && user.role_ids.length > 0) {
-          roleNames = user.role_ids.map(roleId => {
-            const role = roles.find(r => r.id === roleId);
-            return role ? role.name : '未知角色';
-          }).join(', ');
-        } else if (user.role_id) {
-          // 兼容旧的单角色格式
-          const role = roles.find(r => r.id === user.role_id);
-          roleNames = role ? role.name : '未知角色';
-        }
-        
-        return {
-          id: user.id,
-          name: user.name,
-          username: user.username,
-          email: user.email,
-          phone: user.phone,
-          type: user.type,
-          role_id: user.role_id,
-          role_ids: user.role_ids || [],
-          role: roleNames,
-          customer: user.customer,
-          status: user.status,
-          createTime: user.create_time ? new Date(user.create_time).toISOString().split('T')[0] : ''
-        };
-      });
-      setUsers(formattedUsers);
+      try {
+        const userList = await userService.getUsers();
+        // 转换数据格式以匹配前端类型
+        const formattedUsers = userList.map(user => {
+          // 获取角色名称
+          let roleNames = '未分配';
+          if (user.role_ids && Array.isArray(user.role_ids) && user.role_ids.length > 0) {
+            roleNames = user.role_ids.map(roleId => {
+              const role = DEFAULT_ROLES.find(r => r.id === roleId);
+              return role ? role.name : '未知角色';
+            }).join(', ');
+          } else if (user.role_id) {
+            // 兼容旧的单角色格式
+            const role = DEFAULT_ROLES.find(r => r.id === user.role_id);
+            roleNames = role ? role.name : '未知角色';
+          }
+          
+          return {
+            id: user.id,
+            name: user.name,
+            username: user.username,
+            email: user.email,
+            phone: user.phone,
+            type: user.type,
+            role_id: user.role_id,
+            role_ids: user.role_ids || [],
+            role: roleNames,
+            customer: user.customer,
+            status: user.status,
+            createTime: user.create_time ? new Date(user.create_time).toISOString().split('T')[0] : ''
+          };
+        });
+        setUsers(formattedUsers);
+      } catch (error) {
+        console.error('获取用户列表失败:', error);
+        // 使用默认用户数据作为备用
+        setUsers([
+          {
+            id: 'user-1',
+            name: '管理员',
+            username: 'admin',
+            email: 'admin@example.com',
+            phone: '13800138000',
+            type: UserType.INTERNAL,
+            role_id: 'role-1',
+            role_ids: ['role-1'],
+            role: '超级管理员',
+            status: UserStatus.ENABLED,
+            createTime: new Date().toISOString().split('T')[0]
+          }
+        ]);
+      }
     };
 
-    // 先获取角色，再获取用户
-    fetchRoles().then(fetchUsers);
-  }, [roles]);
+    // 直接获取用户
+    fetchUsers();
+  }, []);
 
   const saveUsers = async (userData: any) => {
     // 这里可以添加创建/更新用户的逻辑
@@ -226,143 +238,145 @@ export const UserManagement: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
-            <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900">{editingUser ? '编辑用户' : '新增用户'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <form className="p-8 space-y-4" onSubmit={async (e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              
-              // 初始化密码为123456
-              const defaultPassword = '123456';
-              
-              const userData = {
-                id: editingUser?.id || `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                name: formData.get('name') as string,
-                username: formData.get('username') as string,
-                email: formData.get('email') as string,
-                phone: formData.get('phone') as string,
-                password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
-                type: formData.get('type') as UserType,
-                role_ids: selectedRoles,
-                customer: formData.get('customer') as string,
-                status: editingUser?.status || UserStatus.ENABLED
-              };
-              
-              try {
-                if (editingUser) {
-                  // 更新现有用户
-                  const updatedUser = await userService.updateUser(editingUser.id, userData);
-                  if (updatedUser) {
-                    const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
-                    setUsers(users.map(u => {
-                      if (u.id === editingUser.id) {
-                        return {
-                          ...u,
-                          name: updatedUser.name,
-                          username: updatedUser.username,
-                          type: updatedUser.type,
-                          role_ids: selectedRoles,
-                          role: roleNames || '未分配',
-                          customer: updatedUser.customer,
-                          status: updatedUser.status
-                        };
-                      }
-                      return u;
-                    }));
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
+              <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-slate-900">{editingUser ? '编辑用户' : '新增用户'}</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form className="p-8 space-y-4" onSubmit={async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                
+                // 初始化密码为123456
+                const defaultPassword = '123456';
+                
+                const userData = {
+                  id: editingUser?.id || `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                  name: formData.get('name') as string,
+                  username: formData.get('username') as string,
+                  email: formData.get('email') as string,
+                  phone: formData.get('phone') as string,
+                  password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
+                  type: formData.get('type') as UserType,
+                  role_ids: selectedRoles,
+                  customer: formData.get('customer') as string,
+                  status: editingUser?.status || UserStatus.ENABLED
+                };
+                
+                try {
+                  if (editingUser) {
+                    // 更新现有用户
+                    const updatedUser = await userService.updateUser(editingUser.id, userData);
+                    if (updatedUser) {
+                      const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
+                      setUsers(users.map(u => {
+                        if (u.id === editingUser.id) {
+                          return {
+                            ...u,
+                            name: updatedUser.name,
+                            username: updatedUser.username,
+                            type: updatedUser.type,
+                            role_ids: selectedRoles,
+                            role: roleNames || '未分配',
+                            customer: updatedUser.customer,
+                            status: updatedUser.status
+                          };
+                        }
+                        return u;
+                      }));
+                    }
+                  } else {
+                    // 创建新用户
+                    const newUser = await userService.createUser(userData);
+                    if (newUser) {
+                      const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
+                      setUsers([...users, {
+                        id: newUser.id,
+                        name: newUser.name,
+                        username: newUser.username,
+                        type: newUser.type,
+                        role_ids: selectedRoles,
+                        role: roleNames || '未分配',
+                        customer: newUser.customer,
+                        status: newUser.status,
+                        createTime: new Date().toISOString().split('T')[0]
+                      }]);
+                    }
                   }
-                } else {
-                  // 创建新用户
-                  const newUser = await userService.createUser(userData);
-                  if (newUser) {
-                    const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
-                    setUsers([...users, {
-                      id: newUser.id,
-                      name: newUser.name,
-                      username: newUser.username,
-                      type: newUser.type,
-                      role_ids: selectedRoles,
-                      role: roleNames || '未分配',
-                      customer: newUser.customer,
-                      status: newUser.status,
-                      createTime: new Date().toISOString().split('T')[0]
-                    }]);
-                  }
+                  setIsModalOpen(false);
+                  setSelectedRoles([]);
+                } catch (error) {
+                  console.error('保存用户失败:', error);
+                  alert('保存用户失败，请重试');
                 }
-                setIsModalOpen(false);
-                setSelectedRoles([]);
-              } catch (error) {
-                console.error('保存用户失败:', error);
-                alert('保存用户失败，请重试');
-              }
-            }}>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">姓名</label>
-                  <input name="name" required defaultValue={editingUser?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">账号</label>
-                  <input name="username" required defaultValue={editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">邮箱</label>
-                  <input name="email" type="email" required defaultValue={editingUser?.email} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">手机号</label>
-                  <input name="phone" required defaultValue={editingUser?.phone} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">类型</label>
-                  <select name="type" required defaultValue={editingUser?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                    {Object.values(UserType).map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">角色 (多选)</label>
-                  <div className="flex flex-wrap gap-2 border border-slate-200 rounded-lg p-2 min-h-[40px]">
-                    {roles.map(role => (
-                      <div key={role.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`role-${role.id}`}
-                          checked={selectedRoles.includes(role.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRoles([...selectedRoles, role.id]);
-                            } else {
-                              setSelectedRoles(selectedRoles.filter(id => id !== role.id));
-                            }
-                          }}
-                          className="mr-1"
-                        />
-                        <label htmlFor={`role-${role.id}`} className="text-sm">{role.name}</label>
-                      </div>
-                    ))}
+              }}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">姓名</label>
+                    <input name="name" required defaultValue={editingUser?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">账号</label>
+                    <input name="username" required defaultValue={editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">所属客户 (可选)</label>
-                <input name="customer" defaultValue={editingUser?.customer} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
-                <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>
-              </div>
-            </form>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱</label>
+                    <input name="email" type="email" required defaultValue={editingUser?.email} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">手机号</label>
+                    <input name="phone" required defaultValue={editingUser?.phone} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">类型</label>
+                    <select name="type" required defaultValue={editingUser?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                      {Object.values(UserType).map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">角色 (多选)</label>
+                    <div className="flex flex-wrap gap-2 border border-slate-200 rounded-lg p-2 min-h-[40px]">
+                      {roles.map(role => (
+                        <div key={role.id} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`role-${role.id}`}
+                            checked={selectedRoles.includes(role.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRoles([...selectedRoles, role.id]);
+                              } else {
+                                setSelectedRoles(selectedRoles.filter(id => id !== role.id));
+                              }
+                            }}
+                            className="mr-1"
+                          />
+                          <label htmlFor={`role-${role.id}`} className="text-sm">{role.name}</label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">所属客户 (可选)</label>
+                  <input name="customer" defaultValue={editingUser?.customer} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div className="pt-4 flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
+                  <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

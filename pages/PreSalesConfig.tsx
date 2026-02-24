@@ -7,6 +7,7 @@ import {
 } from '../types';
 import { INITIAL_REGIONS } from '../constants/regions';
 import { INITIAL_DICT_TYPES, INITIAL_DICT_ITEMS } from '../constants/dictionaries';
+import Portal from '../src/components/Portal';
 
 export const PreSalesConfig: React.FC = () => {
   const [regions, setRegions] = useState<PreSalesRegion[]>([]);
@@ -306,105 +307,107 @@ export const PreSalesConfig: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
-            <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900">
-                {editingItem ? '编辑' : '新增'}{modalType === 'region' ? '区域' : modalType === 'industry' ? '行业' : '分配'}
-              </h3>
-              <button onClick={() => { setIsModalOpen(false); setModalType(null); }} className="text-slate-400 hover:text-slate-600">
-                <ICONS.Plus className="w-6 h-6 rotate-45" />
-              </button>
-            </div>
-            <form className="p-8 space-y-6" onSubmit={handleSave}>
-              {modalType === 'assignment' ? (
-                <>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slideUp">
+              <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-slate-900">
+                  {editingItem ? '编辑' : '新增'}{modalType === 'region' ? '区域' : modalType === 'industry' ? '行业' : '分配'}
+                </h3>
+                <button onClick={() => { setIsModalOpen(false); setModalType(null); }} className="text-slate-400 hover:text-slate-600">
+                  <ICONS.Plus className="w-6 h-6 rotate-45" />
+                </button>
+              </div>
+              <form className="p-8 space-y-6" onSubmit={handleSave}>
+                {modalType === 'assignment' ? (
+                  <>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">选择售前人员</label>
+                      <select name="userId" required defaultValue={editingItem?.userId} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="">请选择人员</option>
+                        {users.filter(u => u.role.includes('售前')).map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase block">负责区域 (多选)</label>
+                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-3 border border-slate-100 rounded-xl bg-slate-50">
+                        {regions.map(r => (
+                          <label key={r.id} className="flex items-center gap-2 cursor-pointer group">
+                            <input 
+                              type="checkbox" 
+                              name="regionIds" 
+                              value={r.id} 
+                              defaultChecked={editingItem?.regionIds?.includes(r.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
+                            />
+                            <span className="text-xs text-slate-600 group-hover:text-blue-600 transition-colors">{r.name}</span>
+                          </label>
+                        ))}
+                        {regions.length === 0 && <p className="col-span-2 text-[10px] text-slate-400 italic">请先添加区域</p>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase block">负责行业 (多选)</label>
+                      <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-3 border border-slate-100 rounded-xl bg-slate-50">
+                        {industries.map(i => (
+                          <label key={i.id} className="flex items-center gap-2 cursor-pointer group">
+                            <input 
+                              type="checkbox" 
+                              name="industryIds" 
+                              value={i.id} 
+                              defaultChecked={editingItem?.industryIds?.includes(i.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" 
+                            />
+                            <span className="text-xs text-slate-600 group-hover:text-emerald-600 transition-colors">{i.name}</span>
+                          </label>
+                        ))}
+                        {industries.length === 0 && <p className="col-span-2 text-[10px] text-slate-400 italic">请先添加行业</p>}
+                      </div>
+                    </div>
+                  </>
+                ) : modalType === 'region' ? (
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">选择售前人员</label>
-                    <select name="userId" required defaultValue={editingItem?.userId} className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                      <option value="">请选择人员</option>
-                      {users.filter(u => u.role.includes('售前')).map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
+                    <label className="text-xs font-bold text-slate-500 uppercase">选择区域 (从字典)</label>
+                    <select 
+                      name="regionId" 
+                      required 
+                      defaultValue={editingItem?.id}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">请选择区域</option>
+                      {dictRegions.map(r => (
+                        <option key={r.regionId} value={r.regionId}>{r.regionName}</option>
                       ))}
                     </select>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase block">负责区域 (多选)</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-3 border border-slate-100 rounded-xl bg-slate-50">
-                      {regions.map(r => (
-                        <label key={r.id} className="flex items-center gap-2 cursor-pointer group">
-                          <input 
-                            type="checkbox" 
-                            name="regionIds" 
-                            value={r.id} 
-                            defaultChecked={editingItem?.regionIds?.includes(r.id)}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" 
-                          />
-                          <span className="text-xs text-slate-600 group-hover:text-blue-600 transition-colors">{r.name}</span>
-                        </label>
+                ) : (
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">选择行业 (从字典)</label>
+                    <select 
+                      name="industryId" 
+                      required 
+                      defaultValue={editingItem?.id}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="">请选择行业</option>
+                      {dictIndustries.map(i => (
+                        <option key={i.itemId} value={i.itemId}>{i.itemLabel}</option>
                       ))}
-                      {regions.length === 0 && <p className="col-span-2 text-[10px] text-slate-400 italic">请先添加区域</p>}
-                    </div>
+                    </select>
                   </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase block">负责行业 (多选)</label>
-                    <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-3 border border-slate-100 rounded-xl bg-slate-50">
-                      {industries.map(i => (
-                        <label key={i.id} className="flex items-center gap-2 cursor-pointer group">
-                          <input 
-                            type="checkbox" 
-                            name="industryIds" 
-                            value={i.id} 
-                            defaultChecked={editingItem?.industryIds?.includes(i.id)}
-                            className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" 
-                          />
-                          <span className="text-xs text-slate-600 group-hover:text-emerald-600 transition-colors">{i.name}</span>
-                        </label>
-                      ))}
-                      {industries.length === 0 && <p className="col-span-2 text-[10px] text-slate-400 italic">请先添加行业</p>}
-                    </div>
-                  </div>
-                </>
-              ) : modalType === 'region' ? (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">选择区域 (从字典)</label>
-                  <select 
-                    name="regionId" 
-                    required 
-                    defaultValue={editingItem?.id}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="">请选择区域</option>
-                    {dictRegions.map(r => (
-                      <option key={r.regionId} value={r.regionId}>{r.regionName}</option>
-                    ))}
-                  </select>
+                )}
+                <div className="pt-4 flex justify-end gap-3">
+                  <button type="button" onClick={() => { setIsModalOpen(false); setModalType(null); }} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
+                  <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>
                 </div>
-              ) : (
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">选择行业 (从字典)</label>
-                  <select 
-                    name="industryId" 
-                    required 
-                    defaultValue={editingItem?.id}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                  >
-                    <option value="">请选择行业</option>
-                    {dictIndustries.map(i => (
-                      <option key={i.itemId} value={i.itemId}>{i.itemLabel}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => { setIsModalOpen(false); setModalType(null); }} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
-                <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

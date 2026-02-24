@@ -5,6 +5,7 @@ import {
 } from '../types';
 import { ICONS } from '../constants';
 import { dictService } from '../src/services/supabaseService';
+import Portal from '../src/components/Portal';
 
 export const Dictionaries: React.FC = () => {
   const [selectedType, setSelectedType] = useState<DictType | null>(null);
@@ -372,139 +373,145 @@ export const Dictionaries: React.FC = () => {
 
       {/* Modals */}
       {isTypeModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scaleIn">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-xl font-bold text-slate-900">{editingType?.typeId ? '编辑字典类型' : '新增字典类型'}</h3>
-              <button onClick={() => setIsTypeModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scaleIn">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="text-xl font-bold text-slate-900">{editingType?.typeId ? '编辑字典类型' : '新增字典类型'}</h3>
+                <button onClick={() => setIsTypeModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form onSubmit={handleSaveType} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">类型名称</label>
+                  <input 
+                    type="text" required
+                    value={editingType?.typeName || ''}
+                    onChange={e => setEditingType({ ...editingType, typeName: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="如：行业分类"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">类型编码</label>
+                  <input 
+                    type="text" required
+                    value={editingType?.typeCode || ''}
+                    onChange={e => setEditingType({ ...editingType, typeCode: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    placeholder="如：industry"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">描述</label>
+                  <textarea 
+                    value={editingType?.description || ''}
+                    onChange={e => setEditingType({ ...editingType, description: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setIsTypeModalOpen(false)} className="flex-1 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">取消</button>
+                  <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">保存</button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handleSaveType} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">类型名称</label>
-                <input 
-                  type="text" required
-                  value={editingType?.typeName || ''}
-                  onChange={e => setEditingType({ ...editingType, typeName: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="如：行业分类"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">类型编码</label>
-                <input 
-                  type="text" required
-                  value={editingType?.typeCode || ''}
-                  onChange={e => setEditingType({ ...editingType, typeCode: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                  placeholder="如：industry"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">描述</label>
-                <textarea 
-                  value={editingType?.description || ''}
-                  onChange={e => setEditingType({ ...editingType, description: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsTypeModalOpen(false)} className="flex-1 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">取消</button>
-                <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">保存</button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {isItemModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scaleIn">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-xl font-bold text-slate-900">{editingItem?.itemId ? '编辑字典项' : '新增字典项'}</h3>
-              <button onClick={() => setIsItemModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scaleIn">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="text-xl font-bold text-slate-900">{editingItem?.itemId ? '编辑字典项' : '新增字典项'}</h3>
+                <button onClick={() => setIsItemModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form onSubmit={handleSaveItem} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">显示名称</label>
+                  <input 
+                    type="text" required
+                    value={editingItem?.itemLabel || ''}
+                    onChange={e => setEditingItem({ ...editingItem, itemLabel: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="如：制造业"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">枚举值</label>
+                  <input 
+                    type="text" required
+                    value={editingItem?.itemValue || ''}
+                    onChange={e => setEditingItem({ ...editingItem, itemValue: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                    placeholder="如：manufacturing"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setIsItemModalOpen(false)} className="flex-1 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">取消</button>
+                  <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">保存</button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handleSaveItem} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">显示名称</label>
-                <input 
-                  type="text" required
-                  value={editingItem?.itemLabel || ''}
-                  onChange={e => setEditingItem({ ...editingItem, itemLabel: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="如：制造业"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">枚举值</label>
-                <input 
-                  type="text" required
-                  value={editingItem?.itemValue || ''}
-                  onChange={e => setEditingItem({ ...editingItem, itemValue: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                  placeholder="如：manufacturing"
-                />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsItemModalOpen(false)} className="flex-1 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">取消</button>
-                <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">保存</button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
 
       {isRegionModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scaleIn">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-xl font-bold text-slate-900">{editingRegion?.regionId ? '编辑区域' : '新增区域'}</h3>
-              <button onClick={() => setIsRegionModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scaleIn">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h3 className="text-xl font-bold text-slate-900">{editingRegion?.regionId ? '编辑区域' : '新增区域'}</h3>
+                <button onClick={() => setIsRegionModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form onSubmit={handleSaveRegion} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">区域名称</label>
+                  <input 
+                    type="text" required
+                    value={editingRegion?.regionName || ''}
+                    onChange={e => setEditingRegion({ ...editingRegion, regionName: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">区域编码</label>
+                  <input 
+                    type="text" required
+                    value={editingRegion?.regionCode || ''}
+                    onChange={e => setEditingRegion({ ...editingRegion, regionCode: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">父级区域</label>
+                  <select 
+                    value={editingRegion?.parentId || ''}
+                    onChange={e => setEditingRegion({ ...editingRegion, parentId: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value="">顶级</option>
+                    {regions.filter(r => r.regionLevel < (editingRegion?.regionLevel || 4)).map(r => (
+                      <option key={r.regionId} value={r.regionId}>{r.regionName}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setIsRegionModalOpen(false)} className="flex-1 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">取消</button>
+                  <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">保存</button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handleSaveRegion} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">区域名称</label>
-                <input 
-                  type="text" required
-                  value={editingRegion?.regionName || ''}
-                  onChange={e => setEditingRegion({ ...editingRegion, regionName: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">区域编码</label>
-                <input 
-                  type="text" required
-                  value={editingRegion?.regionCode || ''}
-                  onChange={e => setEditingRegion({ ...editingRegion, regionCode: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">父级区域</label>
-                <select 
-                  value={editingRegion?.parentId || ''}
-                  onChange={e => setEditingRegion({ ...editingRegion, parentId: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value="">顶级</option>
-                  {regions.filter(r => r.regionLevel < (editingRegion?.regionLevel || 4)).map(r => (
-                    <option key={r.regionId} value={r.regionId}>{r.regionName}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsRegionModalOpen(false)} className="flex-1 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50">取消</button>
-                <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100">保存</button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

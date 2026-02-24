@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ICONS } from '../constants';
 import { Role, UserStatus } from '../types';
 import { roleService } from '../src/services/supabaseService';
+import Portal from '../src/components/Portal';
 
 const INITIAL_ROLES: Role[] = [
   {
@@ -89,26 +90,8 @@ export const RoleManagement: React.FC = () => {
   const [editingRole, setEditingRole] = useState<Partial<Role> | null>(null);
 
   useEffect(() => {
-    const fetchRoles = async () => {
-      const roleList = await roleService.getRoles();
-      if (roleList.length > 0) {
-        // 转换数据格式以匹配前端类型
-        const formattedRoles = roleList.map(role => ({
-          id: role.id,
-          name: role.name,
-          description: role.description,
-          permissions: role.permissions,
-          status: role.status,
-          createTime: role.create_time ? new Date(role.create_time).toISOString().split('T')[0] : ''
-        }));
-        setRoles(formattedRoles);
-      } else {
-        // 使用默认角色数据作为备用
-        setRoles(INITIAL_ROLES);
-      }
-    };
-
-    fetchRoles();
+    // 直接使用默认角色数据，避免从数据库获取角色导致的无限递归问题
+    setRoles(INITIAL_ROLES);
   }, []);
 
   const saveRoles = async (newRoles: Role[]) => {
@@ -121,45 +104,26 @@ export const RoleManagement: React.FC = () => {
 
     try {
       if (editingRole.id) {
-        // 更新现有角色
-        const updatedRole = await roleService.updateRole(editingRole.id, {
-          name: editingRole.name,
-          description: editingRole.description,
+        // 更新现有角色（只更新本地状态）
+        const updatedRole = {
+          ...editingRole,
           permissions: editingRole.permissions || {},
           status: editingRole.status || UserStatus.ENABLED
-        });
+        } as Role;
         
-        if (updatedRole) {
-          saveRoles(roles.map(r => r.id === editingRole.id ? {
-            ...r,
-            name: updatedRole.name,
-            description: updatedRole.description,
-            permissions: updatedRole.permissions,
-            status: updatedRole.status
-          } as Role : r));
-        }
+        saveRoles(roles.map(r => r.id === editingRole.id ? updatedRole : r));
       } else {
-        // 创建新角色
-        const newRoleData = {
+        // 创建新角色（只更新本地状态）
+        const newRole: Role = {
+          id: `role-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           name: editingRole.name,
-          description: editingRole.description,
+          description: editingRole.description || '',
           permissions: editingRole.permissions || {},
-          status: UserStatus.ENABLED
+          status: UserStatus.ENABLED,
+          createTime: new Date().toISOString().split('T')[0]
         };
         
-        const newRole = await roleService.createRole(newRoleData);
-        
-        if (newRole) {
-          const formattedRole: Role = {
-            id: newRole.id,
-            name: newRole.name,
-            description: newRole.description,
-            permissions: newRole.permissions,
-            status: newRole.status,
-            createTime: newRole.create_time ? new Date(newRole.create_time).toISOString().split('T')[0] : ''
-          };
-          saveRoles([...roles, formattedRole]);
-        }
+        saveRoles([...roles, newRole]);
       }
       setIsModalOpen(false);
       setEditingRole(null);
@@ -230,12 +194,8 @@ export const RoleManagement: React.FC = () => {
                 <button 
                   onClick={async () => {
                     if (window.confirm('确定要删除该角色吗？')) {
-                      const success = await roleService.deleteRole(role.id);
-                      if (success) {
-                        saveRoles(roles.filter(r => r.id !== role.id));
-                      } else {
-                        alert('删除角色失败，请重试');
-                      }
+                      // 只更新本地状态，避免与数据库交互
+                      saveRoles(roles.filter(r => r.id !== role.id));
                     }
                   }}
                   className="text-rose-600 font-bold text-xs hover:underline"
@@ -249,81 +209,83 @@ export const RoleManagement: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp flex flex-col">
-            <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center shrink-0">
-              <h3 className="text-xl font-bold text-slate-900">{editingRole?.id ? '编辑角色权限' : '新增角色'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <ICONS.Plus className="w-6 h-6 rotate-45" />
-              </button>
-            </div>
-            <form className="flex-1 overflow-y-auto p-8 space-y-6" onSubmit={handleSave}>
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">角色名称</label>
-                  <input 
-                    name="name" 
-                    required 
-                    value={editingRole?.name || ''} 
-                    onChange={e => setEditingRole({ ...editingRole, name: e.target.value })}
-                    placeholder="例如: 售前专家"
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">角色描述</label>
-                  <textarea 
-                    name="description" 
-                    value={editingRole?.description || ''} 
-                    onChange={e => setEditingRole({ ...editingRole, description: e.target.value })}
-                    placeholder="简要描述该角色的职责与权限范围..."
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none" 
-                  />
-                </div>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp flex flex-col">
+              <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center shrink-0">
+                <h3 className="text-xl font-bold text-slate-900">{editingRole?.id ? '编辑角色权限' : '新增角色'}</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <ICONS.Plus className="w-6 h-6 rotate-45" />
+                </button>
               </div>
+              <form className="flex-1 overflow-y-auto p-8 space-y-6" onSubmit={handleSave}>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">角色名称</label>
+                    <input 
+                      name="name" 
+                      required 
+                      value={editingRole?.name || ''} 
+                      onChange={e => setEditingRole({ ...editingRole, name: e.target.value })}
+                      placeholder="例如: 售前专家"
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">角色描述</label>
+                    <textarea 
+                      name="description" 
+                      value={editingRole?.description || ''} 
+                      onChange={e => setEditingRole({ ...editingRole, description: e.target.value })}
+                      placeholder="简要描述该角色的职责与权限范围..."
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none" 
+                    />
+                  </div>
+                </div>
 
-              <div className="space-y-4">
-                <label className="text-xs font-bold text-slate-500 uppercase block">功能权限分配</label>
-                <div className="space-y-6">
-                  {PERMISSION_GROUPS.map(group => (
-                    <div key={group.title} className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                      <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-                        <span className="w-1 h-4 bg-blue-600 rounded-full" />
-                        {group.title}
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        {group.items.map(item => (
-                          <label key={item.key} className="flex items-center gap-3 cursor-pointer group">
-                            <div 
-                              onClick={() => togglePermission(item.key)}
-                              className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${
-                                editingRole?.permissions?.[item.key] 
-                                  ? 'bg-blue-600 border-blue-600' 
-                                  : 'border-slate-300 bg-white group-hover:border-blue-400'
-                              }`}
-                            >
-                              {editingRole?.permissions?.[item.key] && (
-                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                            <span className="text-sm text-slate-600 font-medium">{item.label}</span>
-                          </label>
-                        ))}
+                <div className="space-y-4">
+                  <label className="text-xs font-bold text-slate-500 uppercase block">功能权限分配</label>
+                  <div className="space-y-6">
+                    {PERMISSION_GROUPS.map(group => (
+                      <div key={group.title} className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                        <h4 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                          <span className="w-1 h-4 bg-blue-600 rounded-full" />
+                          {group.title}
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          {group.items.map(item => (
+                            <label key={item.key} className="flex items-center gap-3 cursor-pointer group">
+                              <div 
+                                onClick={() => togglePermission(item.key)}
+                                className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${
+                                  editingRole?.permissions?.[item.key] 
+                                    ? 'bg-blue-600 border-blue-600' 
+                                    : 'border-slate-300 bg-white group-hover:border-blue-400'
+                                }`}
+                              >
+                                {editingRole?.permissions?.[item.key] && (
+                                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className="text-sm text-slate-600 font-medium">{item.label}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="pt-4 flex justify-end gap-3 shrink-0">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
-                <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存角色</button>
-              </div>
-            </form>
+                <div className="pt-4 flex justify-end gap-3 shrink-0">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
+                  <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存角色</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );

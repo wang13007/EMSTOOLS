@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ICONS } from '../constants';
 import { ProductCapability, ProductType } from '../types';
+import Portal from '../src/components/Portal';
 
 // 暂时使用模拟服务，后续可从数据库获取
 export const productService = {
@@ -150,62 +151,64 @@ export const ProductCapabilities: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-slideUp">
-            <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900">{editingProduct ? '编辑产品能力' : '新增产品能力'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-slideUp">
+              <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-slate-900">{editingProduct ? '编辑产品能力' : '新增产品能力'}</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form className="p-8 space-y-4" onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const product: ProductCapability = {
+                  id: editingProduct?.id || Math.random().toString(36).substr(2, 9),
+                  name: formData.get('name') as string,
+                  type: formData.get('type') as ProductType,
+                  industries: (formData.get('industries') as string).split(',').map(s => s.trim()),
+                  scenarios: (formData.get('scenarios') as string).split(',').map(s => s.trim()),
+                  description: formData.get('description') as string,
+                  createTime: editingProduct?.createTime || new Date().toISOString()
+                };
+                if (editingProduct) {
+                  setProducts(products.map(p => p.id === product.id ? product : p));
+                } else {
+                  setProducts([...products, product]);
+                }
+                setIsModalOpen(false);
+              }}>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">产品名称</label>
+                  <input name="name" required defaultValue={editingProduct?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">产品类型</label>
+                  <select name="type" required defaultValue={editingProduct?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    {Object.values(ProductType).map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">适用行业 (逗号分隔)</label>
+                  <input name="industries" required defaultValue={editingProduct?.industries.join(', ')} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">典型场景 (逗号分隔)</label>
+                  <input name="scenarios" required defaultValue={editingProduct?.scenarios.join(', ')} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase">产品描述</label>
+                  <textarea name="description" required rows={3} defaultValue={editingProduct?.description} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                </div>
+                <div className="pt-4 flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
+                  <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>
+                </div>
+              </form>
             </div>
-            <form className="p-8 space-y-4" onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              const product: ProductCapability = {
-                id: editingProduct?.id || Math.random().toString(36).substr(2, 9),
-                name: formData.get('name') as string,
-                type: formData.get('type') as ProductType,
-                industries: (formData.get('industries') as string).split(',').map(s => s.trim()),
-                scenarios: (formData.get('scenarios') as string).split(',').map(s => s.trim()),
-                description: formData.get('description') as string,
-                createTime: editingProduct?.createTime || new Date().toISOString()
-              };
-              if (editingProduct) {
-                setProducts(products.map(p => p.id === product.id ? product : p));
-              } else {
-                setProducts([...products, product]);
-              }
-              setIsModalOpen(false);
-            }}>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">产品名称</label>
-                <input name="name" required defaultValue={editingProduct?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">产品类型</label>
-                <select name="type" required defaultValue={editingProduct?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                  {Object.values(ProductType).map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">适用行业 (逗号分隔)</label>
-                <input name="industries" required defaultValue={editingProduct?.industries.join(', ')} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">典型场景 (逗号分隔)</label>
-                <input name="scenarios" required defaultValue={editingProduct?.scenarios.join(', ')} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">产品描述</label>
-                <textarea name="description" required rows={3} defaultValue={editingProduct?.description} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
-                <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>
-              </div>
-            </form>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );
