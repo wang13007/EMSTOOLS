@@ -267,9 +267,63 @@ export const UserManagement: React.FC = () => {
                 };
                 
                 try {
+                  console.log('用户数据:', userData);
+                  console.log('选中的角色:', selectedRoles);
+                  
+                  // 数据验证
+                  if (!userData.name || userData.name.trim() === '') {
+                    console.error('姓名不能为空');
+                    alert('请输入姓名');
+                    return;
+                  }
+                  
+                  if (!userData.username || userData.username.trim() === '') {
+                    console.error('账号不能为空');
+                    alert('请输入账号');
+                    return;
+                  }
+                  
+                  if (!userData.email || userData.email.trim() === '') {
+                    console.error('邮箱不能为空');
+                    alert('请输入邮箱');
+                    return;
+                  }
+                  
+                  if (!userData.email.includes('@')) {
+                    console.error('邮箱格式不正确');
+                    alert('请输入正确的邮箱地址');
+                    return;
+                  }
+                  
+                  if (!userData.phone || userData.phone.trim() === '') {
+                    console.error('手机号不能为空');
+                    alert('请输入手机号');
+                    return;
+                  }
+                  
+                  if (userData.phone.length < 11) {
+                    console.error('手机号格式不正确');
+                    alert('请输入正确的手机号');
+                    return;
+                  }
+                  
+                  if (!userData.type) {
+                    console.error('用户类型不能为空');
+                    alert('请选择用户类型');
+                    return;
+                  }
+                  
+                  if (!Array.isArray(selectedRoles) || selectedRoles.length === 0) {
+                    console.error('至少选择一个角色');
+                    alert('请至少选择一个角色');
+                    return;
+                  }
+                  
                   if (editingUser) {
                     // 更新现有用户
+                    console.log('更新用户 ID:', editingUser.id);
                     const updatedUser = await userService.updateUser(editingUser.id, userData);
+                    console.log('更新用户结果:', updatedUser);
                     if (updatedUser) {
                       const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
                       setUsers(users.map(u => {
@@ -287,10 +341,16 @@ export const UserManagement: React.FC = () => {
                         }
                         return u;
                       }));
+                      setIsModalOpen(false);
+                      setSelectedRoles([]);
+                    } else {
+                      alert('更新用户失败，请检查控制台错误信息');
                     }
                   } else {
                     // 创建新用户
+                    console.log('创建新用户');
                     const newUser = await userService.createUser(userData);
+                    console.log('创建用户结果:', newUser);
                     if (newUser) {
                       const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
                       setUsers([...users, {
@@ -304,13 +364,16 @@ export const UserManagement: React.FC = () => {
                         status: newUser.status,
                         createTime: new Date().toISOString().split('T')[0]
                       }]);
+                      setIsModalOpen(false);
+                      setSelectedRoles([]);
+                    } else {
+                      alert('创建用户失败，请检查控制台错误信息');
                     }
                   }
-                  setIsModalOpen(false);
-                  setSelectedRoles([]);
                 } catch (error) {
                   console.error('保存用户失败:', error);
-                  alert('保存用户失败，请重试');
+                  console.error('错误详情:', JSON.stringify(error, null, 2));
+                  alert('保存用户失败，请检查控制台错误信息');
                 }
               }}>
                 <div className="grid grid-cols-2 gap-4">

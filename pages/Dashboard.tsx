@@ -172,7 +172,7 @@ export const Dashboard: React.FC = () => {
             <span className="w-1.5 h-6 bg-blue-600 rounded-full" />
             行业分类占比
           </h3>
-          <div className="h-72">
+          <div className="h-72 min-h-[288px] min-w-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -203,7 +203,7 @@ export const Dashboard: React.FC = () => {
             <span className="w-1.5 h-6 bg-emerald-500 rounded-full" />
             项目区域占比
           </h3>
-          <div className="h-72">
+          <div className="h-72 min-h-[288px] min-w-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -233,7 +233,7 @@ export const Dashboard: React.FC = () => {
           <span className="w-1.5 h-6 bg-amber-500 rounded-full" />
           客户需求排行榜
         </h3>
-        <div className="h-80">
+        <div className="h-80 min-h-[320px] min-w-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart layout="vertical" data={demandRanking} margin={{ left: 40, right: 40 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
@@ -275,7 +275,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 h-96 relative">
+          <div className="lg:col-span-2 h-96 min-h-[384px] min-w-[300px] relative">
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-full h-px bg-slate-200" />
               <div className="h-full w-px bg-slate-200" />

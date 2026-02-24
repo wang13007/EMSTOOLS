@@ -180,25 +180,25 @@ export const ProductCapabilities: React.FC = () => {
                 setIsModalOpen(false);
               }}>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">产品名称</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase">产品名称 <span className="text-rose-600">*</span></label>
                   <input name="name" required defaultValue={editingProduct?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">产品类型</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase">产品类型 <span className="text-rose-600">*</span></label>
                   <select name="type" required defaultValue={editingProduct?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     {Object.values(ProductType).map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">适用行业 (逗号分隔)</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase">适用行业 (逗号分隔) <span className="text-rose-600">*</span></label>
                   <input name="industries" required defaultValue={editingProduct?.industries.join(', ')} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">典型场景 (逗号分隔)</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase">典型场景 (逗号分隔) <span className="text-rose-600">*</span></label>
                   <input name="scenarios" required defaultValue={editingProduct?.scenarios.join(', ')} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">产品描述</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase">产品描述 <span className="text-rose-600">*</span></label>
                   <textarea name="description" required rows={3} defaultValue={editingProduct?.description} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div className="pt-4 flex justify-end gap-3">

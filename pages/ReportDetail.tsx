@@ -155,7 +155,7 @@ export const ReportDetail: React.FC = () => {
           {/* Maturity Score */}
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center">
             <h3 className="text-lg font-bold mb-2 text-slate-800">能效成熟度评分</h3>
-            <div className="w-full h-48 relative">
+            <div className="w-full h-48 min-h-[192px] min-w-[300px] relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie

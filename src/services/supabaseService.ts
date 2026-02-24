@@ -6,48 +6,78 @@ import { User, SurveyForm, SurveyTemplate, DictType, DictItem, SystemLog, Messag
 export const userService = {
   // 获取用户列表
   async getUsers() {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*');
-    
-    if (error) {
-      console.error('获取用户列表失败:', error);
+    try {
+      console.log('开始获取用户列表');
+      const { data, error } = await supabase
+        .from('users')
+        .select('*');
+      
+      if (error) {
+        console.error('获取用户列表失败:', error);
+        console.error('错误详情:', JSON.stringify(error, null, 2));
+        return [];
+      }
+      
+      console.log('获取用户列表成功，用户数量:', data.length);
+      return data;
+    } catch (error) {
+      console.error('获取用户列表过程中发生异常:', error);
       return [];
     }
-    
-    return data;
   },
 
   // 创建用户
   async createUser(user: any) {
-    // 确保包含必要的数据库字段
-    const dbUser = {
-      ...user,
-      password_hash: user.password_hash || user.passwordHash,
-      role_ids: user.role_ids || user.roleIds || [],
-      email: user.email,
-      phone: user.phone
-    };
-    
-    // 删除前端特有的字段
-    delete dbUser.passwordHash;
-    delete dbUser.roleId;
-    delete dbUser.roleIds;
-    delete dbUser.role;
-    delete dbUser.createTime;
-    
-    const { data, error } = await supabase
-      .from('users')
-      .insert(dbUser)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('创建用户失败:', error);
+    try {
+      console.log('开始创建用户，用户数据:', user);
+      
+      // 确保包含必要的数据库字段
+      const dbUser = {
+        ...user,
+        password_hash: user.password_hash || user.passwordHash,
+        role_ids: user.role_ids || user.roleIds || [],
+        email: user.email,
+        phone: user.phone,
+        // 自动生成用户ID（用户名）
+        username: user.username || `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        // 确保状态字段存在
+        status: user.status || 'ENABLED',
+        // 确保类型字段存在
+        type: user.type || 'INTERNAL'
+      };
+      
+      // 删除前端特有的字段
+      delete dbUser.passwordHash;
+      delete dbUser.roleId;
+      delete dbUser.roleIds;
+      delete dbUser.role;
+      delete dbUser.createTime;
+      
+      console.log('处理后的数据库用户数据:', dbUser);
+      
+      const { data, error } = await supabase
+        .from('users')
+        .insert(dbUser)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('创建用户失败:', error);
+        console.error('错误详情:', JSON.stringify(error, null, 2));
+        console.error('错误代码:', error.code);
+        console.error('错误消息:', error.message);
+        console.error('错误提示:', error.hint);
+        console.error('错误详情:', error.details);
+        return null;
+      }
+      
+      console.log('创建用户成功:', data);
+      return data;
+    } catch (error) {
+      console.error('创建用户过程中发生异常:', error);
+      console.error('异常详情:', JSON.stringify(error, null, 2));
       return null;
     }
-    
-    return data;
   },
 
   // 更新用户

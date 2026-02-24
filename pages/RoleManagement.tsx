@@ -221,7 +221,7 @@ export const RoleManagement: React.FC = () => {
               <form className="flex-1 overflow-y-auto p-8 space-y-6" onSubmit={handleSave}>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">角色名称</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">角色名称 <span className="text-rose-600">*</span></label>
                     <input 
                       name="name" 
                       required 

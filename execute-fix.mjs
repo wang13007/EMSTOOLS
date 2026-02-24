@@ -21,38 +21,52 @@ async function executeFix() {
   
   try {
     // 读取 SQL 文件内容
+    console.log('读取 SQL 文件...');
     const sqlContent = fs.readFileSync('supabase-fix.sql', 'utf8');
     console.log('读取 SQL 文件成功，共', sqlContent.length, '字符');
     
-    // 执行 SQL 语句
-    console.log('\n执行 SQL 语句...');
-    const { data, error } = await supabase
-      .rpc('execute_sql', {
-        sql: sqlContent
-      });
-    
-    if (error) {
-      console.error('执行 SQL 失败:', error);
-    } else {
-      console.log('执行 SQL 成功:', data);
-    }
-    
     // 测试连接
     console.log('\n测试连接...');
-    const { data: testData, error: testError } = await supabase
-      .from('roles')
-      .select('*')
-      .limit(1);
+    try {
+      const { data: testData, error: testError } = await supabase
+        .from('roles')
+        .select('*')
+        .limit(1);
+      
+      if (testError) {
+        console.error('测试连接失败:', testError);
+        console.error('错误详情:', JSON.stringify(testError, null, 2));
+      } else {
+        console.log('测试连接成功:', testData);
+      }
+    } catch (error) {
+      console.error('测试连接过程中发生异常:', error);
+    }
     
-    if (testError) {
-      console.error('测试连接失败:', testError);
-    } else {
-      console.log('测试连接成功:', testData);
+    // 尝试直接执行简单的 SQL 语句来测试
+    console.log('\n尝试直接执行简单的 SQL 语句...');
+    try {
+      // 注意：在 Supabase 中，直接执行 SQL 需要通过 RPC 或使用服务端 SDK
+      // 这里我们只是测试连接和基本操作
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .limit(1);
+      
+      if (usersError) {
+        console.error('获取用户列表失败:', usersError);
+        console.error('错误详情:', JSON.stringify(usersError, null, 2));
+      } else {
+        console.log('获取用户列表成功:', usersData);
+      }
+    } catch (error) {
+      console.error('执行简单 SQL 过程中发生异常:', error);
     }
     
     console.log('\n修复完成');
   } catch (error) {
     console.error('执行过程中发生错误:', error);
+    console.error('错误详情:', JSON.stringify(error, null, 2));
   }
 }
 
