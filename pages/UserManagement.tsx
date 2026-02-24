@@ -257,8 +257,6 @@ export const UserManagement: React.FC = () => {
                 const userData = {
                   name: formData.get('name') as string,
                   username: formData.get('username') as string,
-                  email: formData.get('email') as string,
-                  phone: formData.get('phone') as string,
                   password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
                   type: formData.get('type') as UserType,
                   role_ids: selectedRoles,
@@ -280,30 +278,6 @@ export const UserManagement: React.FC = () => {
                   if (!userData.username || userData.username.trim() === '') {
                     console.error('账号不能为空');
                     alert('请输入账号');
-                    return;
-                  }
-                  
-                  if (!userData.email || userData.email.trim() === '') {
-                    console.error('邮箱不能为空');
-                    alert('请输入邮箱');
-                    return;
-                  }
-                  
-                  if (!userData.email.includes('@')) {
-                    console.error('邮箱格式不正确');
-                    alert('请输入正确的邮箱地址');
-                    return;
-                  }
-                  
-                  if (!userData.phone || userData.phone.trim() === '') {
-                    console.error('手机号不能为空');
-                    alert('请输入手机号');
-                    return;
-                  }
-                  
-                  if (userData.phone.length < 11) {
-                    console.error('手机号格式不正确');
-                    alert('请输入正确的手机号');
                     return;
                   }
                   
@@ -384,16 +358,6 @@ export const UserManagement: React.FC = () => {
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">账号 <span className="text-rose-600">*</span></label>
                     <input name="username" required defaultValue={editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱 <span className="text-rose-600">*</span></label>
-                    <input name="email" type="email" required defaultValue={editingUser?.email} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">手机号 <span className="text-rose-600">*</span></label>
-                    <input name="phone" required defaultValue={editingUser?.phone} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
