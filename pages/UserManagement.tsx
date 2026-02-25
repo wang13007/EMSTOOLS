@@ -47,8 +47,8 @@ export const UserManagement: React.FC = () => {
             
             return {
               id: user.id,
-              username: user.username,
-              name: user.name || user.username,
+              user_name: user.user_name,
+              name: user.name || user.user_name,
               type: user.type,
               role_id: user.role_id,
               role_ids: [user.role_id] || [],
@@ -65,7 +65,7 @@ export const UserManagement: React.FC = () => {
           setUsers([
             {
               id: 'user-1',
-              username: 'admin',
+              user_name: 'admin',
               phone: '13800138000',
               email: 'admin@example.com',
               type: UserType.INTERNAL,
@@ -110,7 +110,7 @@ export const UserManagement: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u => 
-    u.username.includes(searchTerm) || u.id.includes(searchTerm)
+    u.user_name.includes(searchTerm) || u.id.includes(searchTerm)
   );
 
   const handleDelete = async (id: string) => {
@@ -191,9 +191,9 @@ export const UserManagement: React.FC = () => {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-[10px]">
-                      {user.username.slice(0, 1)}
+                      {user.user_name.slice(0, 1)}
                     </div>
-                    <span className="font-bold text-slate-900">{user.username}</span>
+                    <span className="font-bold text-slate-900">{user.user_name}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-500">{user.name || '-'}</td>
@@ -258,8 +258,8 @@ export const UserManagement: React.FC = () => {
                 const defaultPassword = '123456';
                 
                 const userData = {
-                  name: formData.get('username') as string,
-                  username: formData.get('username') as string,
+                  name: formData.get('user_name') as string,
+                  user_name: formData.get('user_name') as string,
                   password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
                   type: formData.get('type') as UserType,
                   role_id: selectedRoles[0], // 使用第一个选中的角色作为role_id
@@ -277,19 +277,19 @@ export const UserManagement: React.FC = () => {
                     return;
                   }
                   
-                  if (!userData.user_type) {
+                  if (!userData.type) {
                     console.error('用户类型不能为空');
                     alert('请选择用户类型');
                     return;
                   }
                   
-                  if (!userData.phone || userData.phone.trim() === '') {
+                  if (!formData.get('phone') || (formData.get('phone') as string).trim() === '') {
                     console.error('手机号不能为空');
                     alert('请输入手机号');
                     return;
                   }
                   
-                  if (!userData.email || userData.email.trim() === '') {
+                  if (!formData.get('email') || (formData.get('email') as string).trim() === '') {
                     console.error('邮箱不能为空');
                     alert('请输入邮箱');
                     return;
@@ -318,8 +318,8 @@ export const UserManagement: React.FC = () => {
                         if (u.id === editingUser.id) {
                           return {
                             ...u,
-                            username: updatedUser.username,
-                            name: updatedUser.name || updatedUser.username,
+                            user_name: updatedUser.user_name,
+                            name: updatedUser.name || updatedUser.user_name,
                             type: updatedUser.type,
                             role_id: selectedRoles[0],
                             role_ids: selectedRoles,
@@ -343,8 +343,8 @@ export const UserManagement: React.FC = () => {
                       const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
                       setUsers([...users, {
                         id: newUser.id,
-                        username: newUser.username,
-                        name: newUser.name || newUser.username,
+                        user_name: newUser.user_name,
+                        name: newUser.name || newUser.user_name,
                         type: newUser.type,
                         role_id: selectedRoles[0],
                         role_ids: selectedRoles,
@@ -368,7 +368,7 @@ export const UserManagement: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">用户名 <span className="text-rose-600">*</span></label>
-                    <input name="username" required defaultValue={editingUser?.username || editingUser?.user_name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                    <input name="user_name" required defaultValue={editingUser?.user_name || editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">姓名</label>

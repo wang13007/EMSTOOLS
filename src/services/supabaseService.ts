@@ -24,8 +24,7 @@ export const userService = {
       const users = data.map(user => ({
         id: user.user_id || user.id,
         user_id: user.user_id,
-        user_name: user.user_name || user.name,
-        username: user.username || user.user_name,
+        user_name: user.user_name,
         phone: user.phone,
         email: user.email,
         type: user.user_type || user.type,
@@ -114,9 +113,8 @@ export const userService = {
       const dbUser = {
         // 基本字段
         user_id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // 生成唯一用户ID
-        name: user.user_name || user.name || user.username, // 添加 name 字段，确保非空
-        user_name: user.user_name || user.name || user.username, // 用户名
-        username: user.username || user.user_name, // 登录账号
+        name: user.user_name || user.name, // 添加 name 字段，确保非空
+        user_name: user.user_name || user.name, // 用户名
         password_hash: user.password_hash || user.password, // 密码哈希字段，确保非空
         user_type: user.type || user.user_type || 'external', // 用户类型
         status: user.status || 'enabled', // 用户状态
@@ -172,9 +170,6 @@ export const userService = {
       // 可选字段
       if (user.user_name) {
         dbUser.user_name = user.user_name;
-      }
-      if (user.username) {
-        dbUser.username = user.username;
       }
       if (user.password || user.password_hash) {
         dbUser.password_hash = user.password || user.password_hash;
