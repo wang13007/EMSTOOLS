@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
+import { authService } from '../src/services/authService';
 import { userService } from '../src/services/supabaseService';
 
 export const Login: React.FC = () => {
@@ -24,98 +25,29 @@ export const Login: React.FC = () => {
     setError('');
 
     try {
-      // 模拟登录验证
       console.log('登录请求:', formData);
       
-      // 基本密码校验逻辑
-      const isValidLogin = validateLogin(formData.username, formData.password);
+      // 调用认证服务进行登录
+      const loginResult = await authService.login(formData);
+      console.log('登录成功:', loginResult);
       
-      if (!isValidLogin) {
-        throw new Error('账号或密码错误');
-      }
-      
-      // 获取所有用户
-      const users = await userService.getUsers();
-      console.log('数据库用户列表:', users);
-      
-      // 查找当前用户
-      let currentUser = users.find(u => u.username === formData.username);
-      
-      if (!currentUser) {
-        // 如果用户不存在，创建新用户
-        console.log('用户不存在，创建新用户:', formData.username);
-        const newUser = {
-          name: formData.username === 'admin' ? '系统管理员' : formData.username,
-          username: formData.username,
-          password_hash: formData.password,
-          type: formData.username === 'admin' ? 'INTERNAL' : 'EXTERNAL',
-          status: 'ENABLED'
-        };
-        
-        const createdUser = await userService.createUser(newUser);
-        console.log('创建用户结果:', createdUser);
-        
-        if (createdUser) {
-          currentUser = {
-            ...createdUser,
-            name: newUser.name,
-            role: formData.username === 'admin' ? '管理员' : '外部客户'
-          };
-        }
-      } else {
-        // 补充用户信息
-        currentUser = {
-          ...currentUser,
-          name: currentUser.name || formData.username,
-          role: formData.username === 'admin' ? '管理员' : '外部客户'
-        };
-      }
-      
-      setLoading(false);
       // 保存登录状态到localStorage
-      localStorage.setItem('ems_user', JSON.stringify({
-        id: currentUser.id || `user_${Date.now()}`,
-        username: currentUser.username,
-        name: currentUser.name || formData.username,
-        type: currentUser.type || (formData.username === 'admin' ? 'internal' : 'external'),
-        role: currentUser.role || (formData.username === 'admin' ? '管理员' : '外部客户')
-      }));
-      localStorage.setItem('ems_token', `mock_token_${Date.now()}`);
+      localStorage.setItem('ems_user', JSON.stringify(loginResult.user));
+      localStorage.setItem('ems_token', loginResult.token);
       
       // 跳转到首页
       navigate('/');
     } catch (err) {
       setLoading(false);
-      setError('登录失败，请检查账号和密码');
+      const errorMessage = err instanceof Error ? err.message : '登录失败，请检查账号和密码';
+      setError(errorMessage);
       console.error('登录失败:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 验证登录逻辑
-  const validateLogin = (username: string, password: string): boolean => {
-    // 预设的测试账号和密码
-    const testAccounts = {
-      'admin': 'admin123',      // 管理员账号
-      'user1': 'user123',        // 测试用户账号
-      'customer': 'customer123'  // 外部客户账号
-    };
-    
-    // 检查是否为预设账号
-    if (testAccounts[username]) {
-      return password === testAccounts[username];
-    }
-    
-    // 对于其他账号，要求：
-    // 1. 用户名长度至少4位
-    // 2. 密码长度至少4位
-    // 3. 密码不能是简单的弱密码
-    // 注：允许密码与用户名相同（适用于手机号登录）
-    return (
-      username.length >= 4 &&
-      password.length >= 4 &&
-      !['123456', 'password', '123456789', '1234', '12345', '1234567', '12345678', '1234567890', '000000', '111111'].includes(password)
-    );
-  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">

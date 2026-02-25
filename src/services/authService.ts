@@ -47,29 +47,50 @@ export const authService = {
     try {
       console.log('登录请求:', data);
       
-      // 模拟登录成功响应，避免调用数据库，防止触发角色表的策略检查
-      const mockResponse = {
-        user: {
-          id: `user_${Date.now()}`,
-          username: data.username,
-          name: data.username === 'admin' ? '系统管理员' : '测试用户',
-          type: data.username === 'admin' ? 'internal' : 'external',
-          role: data.username === 'admin' ? '管理员' : '外部客户',
-          email: `${data.username}@example.com`,
-          phone: '13800138000'
-        },
-        token: `mock_token_${Date.now()}`
+      // 调用 supabaseService 进行真实登录
+      const { userService } = await import('../services/supabaseService');
+      
+      // 获取所有用户
+      const users = await userService.getUsers();
+      console.log('数据库用户列表:', users);
+      
+      // 查找当前用户
+      const currentUser = users.find(u => u.username === data.username);
+      
+      if (!currentUser) {
+        throw new Error('用户不存在');
+      }
+      
+      // 验证密码（这里应该使用真实的密码验证，暂时简化处理）
+      // 注意：实际生产环境中应该使用 bcrypt 等库进行密码验证
+      if (currentUser.password_hash !== data.password) {
+        throw new Error('账号或密码错误');
+      }
+      
+      // 构建用户信息
+      const userInfo: UserInfo = {
+        id: currentUser.id,
+        username: currentUser.username,
+        name: currentUser.name || currentUser.username,
+        type: currentUser.type,
+        role: currentUser.role || '外部客户',
+        email: currentUser.email,
+        phone: currentUser.phone
       };
       
-      // 保存用户信息到本地存储
-      localStorage.setItem('ems_user', JSON.stringify(mockResponse.user));
-      localStorage.setItem('ems_token', mockResponse.token);
+      // 生成 token
+      const token = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      console.log('登录成功:', mockResponse);
-      return mockResponse;
+      // 保存用户信息到本地存储
+      localStorage.setItem('ems_user', JSON.stringify(userInfo));
+      localStorage.setItem('ems_token', token);
+      
+      console.log('登录成功:', { user: userInfo, token });
+      return { user: userInfo, token };
     } catch (error) {
       console.error('登录失败:', error);
-      throw new Error('登录失败，请检查账号和密码');
+      const errorMessage = error instanceof Error ? error.message : '登录失败，请检查账号和密码';
+      throw new Error(errorMessage);
     }
   },
 
@@ -78,29 +99,59 @@ export const authService = {
     try {
       console.log('注册请求:', data);
       
-      // 模拟注册成功响应，避免调用数据库，防止触发角色表的策略检查
-      const mockResponse = {
-        user: {
-          id: `user_${Date.now()}`,
-          username: data.username,
-          name: data.user_name,
-          type: 'external',
-          role: '外部客户',
-          email: data.email || `${data.username}@example.com`,
-          phone: data.phone
-        },
-        token: `mock_token_${Date.now()}`
+      // 调用 supabaseService 进行真实注册
+      const { userService } = await import('../services/supabaseService');
+      
+      // 检查用户是否已存在
+      const users = await userService.getUsers();
+      const existingUser = users.find(u => u.username === data.username);
+      
+      if (existingUser) {
+        throw new Error('用户名已存在');
+      }
+      
+      // 创建用户数据
+      const userData = {
+        user_name: data.user_name,
+        username: data.username,
+        password_hash: data.password, // 注意：实际生产环境中应该使用 bcrypt 等库对密码进行哈希处理
+        type: 'external', // 外部客户
+        status: 'enabled', // 启用状态
+        email: data.email,
+        phone: data.phone
       };
       
-      // 保存用户信息到本地存储
-      localStorage.setItem('ems_user', JSON.stringify(mockResponse.user));
-      localStorage.setItem('ems_token', mockResponse.token);
+      // 创建用户
+      const createdUser = await userService.createUser(userData);
       
-      console.log('注册成功:', mockResponse);
-      return mockResponse;
+      if (!createdUser) {
+        throw new Error('用户创建失败');
+      }
+      
+      // 构建用户信息
+      const userInfo: UserInfo = {
+        id: createdUser.id,
+        username: createdUser.username,
+        name: data.user_name,
+        type: 'external',
+        role: '外部客户',
+        email: data.email,
+        phone: data.phone
+      };
+      
+      // 生成 token
+      const token = `token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 保存用户信息到本地存储
+      localStorage.setItem('ems_user', JSON.stringify(userInfo));
+      localStorage.setItem('ems_token', token);
+      
+      console.log('注册成功:', { user: userInfo, token });
+      return { user: userInfo, token };
     } catch (error) {
       console.error('注册失败:', error);
-      throw new Error('注册失败，请稍后重试');
+      const errorMessage = error instanceof Error ? error.message : '注册失败，请稍后重试';
+      throw new Error(errorMessage);
     }
   },
 

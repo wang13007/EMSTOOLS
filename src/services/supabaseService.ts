@@ -10,7 +10,8 @@ export const userService = {
       console.log('开始获取用户列表');
       const { data, error } = await supabase
         .from('users')
-        .select('*');
+        .select('*')
+        .eq('is_deleted', false); // 只获取未删除的用户
       
       if (error) {
         console.error('获取用户列表失败:', error);
@@ -19,7 +20,26 @@ export const userService = {
       }
       
       console.log('获取用户列表成功，用户数量:', data.length);
-      return data;
+      
+      // 转换用户数据格式，确保与前端接口一致
+      const users = data.map(user => ({
+        id: user.user_id || user.id,
+        user_id: user.user_id,
+        user_name: user.user_name,
+        username: user.username || user.user_name,
+        phone: user.phone,
+        email: user.email,
+        type: user.user_type || user.type,
+        user_type: user.user_type,
+        role_id: user.role_id,
+        status: user.status,
+        last_login_time: user.last_login_time,
+        create_time: user.create_time,
+        creator: user.creator,
+        is_deleted: user.is_deleted
+      }));
+      
+      return users;
     } catch (error) {
       console.error('获取用户列表过程中发生异常:', error);
       return [];
@@ -92,40 +112,30 @@ export const userService = {
     try {
       console.log('开始创建用户，用户数据:', user);
       
-      // 暂时不验证用户类型和角色是否匹配，避免触发角色表的策略检查
-      // if (user.role_id) {
-      //   await this.validateUserRoles(null, user.type, [user.role_id]);
-      // }
-      
-      // 确保包含必要的数据库字段，只使用数据库中实际存在的字段
-      // 暂时不设置role_id字段，避免触发角色表的策略检查
+      // 构建数据库用户对象，确保与数据表结构一致
       const dbUser = {
         // 基本字段
-        name: user.user_name || user.name || user.username,
-        username: user.user_name || user.username,
-        // 确保密码被哈希存储，使用默认的哈希值作为示例
-        password_hash: user.password_hash || '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
-        type: user.type || 'internal',
-        // 暂时不设置role_id字段，避免触发角色表的策略检查
-        // role_id: user.role_id,
-        // 可选字段
-        customer: user.customer,
-        status: user.status || 'enabled',
-        create_time: user.create_time || new Date().toISOString()
+        user_id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // 生成唯一用户ID
+        user_name: user.user_name || user.name || user.username, // 用户名
+        username: user.username || user.user_name, // 登录账号
+        password: user.password_hash || user.password, // 密码（暂时直接存储，实际应使用bcrypt哈希）
+        user_type: user.type || user.user_type || 'external', // 用户类型
+        status: user.status || 'enabled', // 用户状态
+        create_time: new Date().toISOString(), // 创建时间
+        creator: 'system', // 创建人
+        is_deleted: false // 删除标识
       };
       
-      // 删除前端特有的字段和数据库中不存在的字段
-      const fieldsToDelete = [
-        'role_ids', 'role', 'createTime', 'last_login_time', 'creator',
-        'user_id', 'user_name', 'phone', 'email', 'create_by', 'is_deleted',
-        'userType', 'user_type', 'roleId', 'createBy', 'isDeleted',
-        'role_id', // 确保删除role_id字段，避免触发角色表的策略检查
-        'password' // 确保删除明文密码字段，避免明文存储
-      ];
-      
-      fieldsToDelete.forEach(field => {
-        delete dbUser[field];
-      });
+      // 可选字段
+      if (user.phone) {
+        dbUser.phone = user.phone;
+      }
+      if (user.email) {
+        dbUser.email = user.email;
+      }
+      if (user.role_id) {
+        dbUser.role_id = user.role_id;
+      }
       
       console.log('处理后的数据库用户数据:', dbUser);
       
@@ -157,51 +167,62 @@ export const userService = {
   // 更新用户
   async updateUser(id: string, user: any) {
     try {
-      // 暂时不验证用户类型和角色是否匹配，避免触发角色表的策略检查
-      // if (user.role_id) {
-      //   await this.validateUserRoles(id, user.type, [user.role_id]);
-      // }
-      
-      // 转换前端字段名到数据库字段名，只使用数据库中实际存在的字段
-      const dbUser = {
-        // 基本字段
-        name: user.user_name || user.name || user.username,
-        username: user.user_name || user.username,
-        // 确保密码被哈希存储，使用默认的哈希值作为示例
-        password_hash: user.password_hash || '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
-        type: user.type || 'internal',
-        // 暂时不设置role_id字段，避免触发角色表的策略检查
-        // role_id: user.role_id,
-        // 可选字段
-        customer: user.customer,
-        status: user.status || 'enabled'
+      // 构建数据库用户对象，确保与数据表结构一致
+      const dbUser: any = {
+        status: user.status || 'enabled' // 用户状态
       };
       
-      // 删除前端特有的字段和数据库中不存在的字段
-      const fieldsToDelete = [
-        'role_ids', 'role', 'createTime', 'last_login_time', 'creator',
-        'user_id', 'user_name', 'phone', 'email', 'create_by', 'is_deleted',
-        'userType', 'user_type', 'roleId', 'createBy', 'isDeleted',
-        'create_time',
-        'role_id' // 确保删除role_id字段，避免触发角色表的策略检查
-      ];
-      
-      fieldsToDelete.forEach(field => {
-        delete dbUser[field];
-      });
+      // 可选字段
+      if (user.user_name) {
+        dbUser.user_name = user.user_name;
+      }
+      if (user.username) {
+        dbUser.username = user.username;
+      }
+      if (user.password || user.password_hash) {
+        dbUser.password = user.password || user.password_hash;
+      }
+      if (user.user_type || user.type) {
+        dbUser.user_type = user.user_type || user.type;
+      }
+      if (user.phone) {
+        dbUser.phone = user.phone;
+      }
+      if (user.email) {
+        dbUser.email = user.email;
+      }
+      if (user.role_id) {
+        dbUser.role_id = user.role_id;
+      }
+      if (user.last_login_time) {
+        dbUser.last_login_time = user.last_login_time;
+      }
       
       console.log('处理后的数据库用户数据:', dbUser);
       
+      // 执行更新操作，使用 user_id 作为主键
       const { data, error } = await supabase
         .from('users')
         .update(dbUser)
-        .eq('id', id)
+        .eq('user_id', id)
         .select()
         .single();
       
       if (error) {
-        console.error('更新用户失败:', error);
-        return null;
+        // 如果使用 user_id 更新失败，尝试使用 id 更新
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('users')
+          .update(dbUser)
+          .eq('id', id)
+          .select()
+          .single();
+        
+        if (fallbackError) {
+          console.error('更新用户失败:', fallbackError);
+          return null;
+        }
+        
+        return fallbackData;
       }
       
       return data;
@@ -213,17 +234,31 @@ export const userService = {
 
   // 删除用户
   async deleteUser(id: string) {
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      console.error('删除用户失败:', error);
+    try {
+      // 执行软删除，更新 is_deleted 字段
+      const { error } = await supabase
+        .from('users')
+        .update({ is_deleted: true })
+        .eq('user_id', id);
+      
+      if (error) {
+        // 如果使用 user_id 删除失败，尝试使用 id 删除
+        const { error: fallbackError } = await supabase
+          .from('users')
+          .update({ is_deleted: true })
+          .eq('id', id);
+        
+        if (fallbackError) {
+          console.error('删除用户失败:', fallbackError);
+          return false;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('删除用户过程中发生异常:', error);
       return false;
     }
-    
-    return true;
   }
 };
 
