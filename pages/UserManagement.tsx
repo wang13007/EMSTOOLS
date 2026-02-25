@@ -109,9 +109,11 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.user_name.includes(searchTerm) || u.id.includes(searchTerm)
-  );
+  const filteredUsers = users.filter(u => {
+    const userName = u.user_name || '';
+    const userId = u.id || '';
+    return userName.includes(searchTerm) || userId.includes(searchTerm);
+  });
 
   const handleDelete = async (id: string) => {
     if (window.confirm('确定要删除该用户吗？')) {
@@ -191,9 +193,9 @@ export const UserManagement: React.FC = () => {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-[10px]">
-                      {user.user_name.slice(0, 1)}
+                      {(user.user_name || 'U').slice(0, 1)}
                     </div>
-                    <span className="font-bold text-slate-900">{user.user_name}</span>
+                    <span className="font-bold text-slate-900">{user.user_name || '-'}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-500">{user.name || '-'}</td>
