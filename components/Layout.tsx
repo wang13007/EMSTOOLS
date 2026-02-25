@@ -178,10 +178,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-2">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : '未'}
+                {currentUser?.name || currentUser?.username ? (currentUser.name || currentUser.username).charAt(0).toUpperCase() : '未'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.name || '未知用户'}</p>
+                <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.name || currentUser?.username || '未知用户'}</p>
                 <p className="text-[10px] text-slate-500 truncate">{currentUser?.username || '未知账号'}</p>
               </div>
             </div>
@@ -213,11 +213,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="h-8 w-px bg-slate-200"></div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-900">{currentUser?.name || '未知用户'}</p>
+                <p className="text-xs font-bold text-slate-900">{currentUser?.name || currentUser?.username || '未知用户'}</p>
                 <p className="text-[10px] text-slate-400">{currentUser?.role || currentUser?.type || '普通用户'}</p>
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-blue-600 shadow-inner">
-                {currentUser?.name ? currentUser.name.charAt(0) : '未'}
+                {currentUser?.name || currentUser?.username ? (currentUser.name || currentUser.username).charAt(0) : '未'}
               </div>
             </div>
           </div>

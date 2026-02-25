@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ICONS } from '../constants';
-import { Role, UserStatus } from '../types';
+import { Role, UserStatus, UserType } from '../types';
 import { roleService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
 
@@ -10,6 +10,7 @@ const INITIAL_ROLES: Role[] = [
     id: 'role-1',
     name: '超级管理员',
     description: '拥有系统所有模块的完全访问权限，包括系统设置、用户管理和数据删除。',
+    type: UserType.INTERNAL,
     status: UserStatus.ENABLED,
     createTime: '2023-01-01',
     permissions: {
@@ -29,6 +30,7 @@ const INITIAL_ROLES: Role[] = [
     id: 'role-2',
     name: '售前工程师',
     description: '负责现场调研、表单填写和报告生成。无法访问系统管理模块。',
+    type: UserType.INTERNAL,
     status: UserStatus.ENABLED,
     createTime: '2023-05-12',
     permissions: {
@@ -44,6 +46,7 @@ const INITIAL_ROLES: Role[] = [
     id: 'role-3',
     name: '外部客户',
     description: '仅能查看与其关联的调研表单和生成的评估报告。',
+    type: UserType.EXTERNAL,
     status: UserStatus.ENABLED,
     createTime: '2024-02-15',
     permissions: {
@@ -118,6 +121,7 @@ export const RoleManagement: React.FC = () => {
           id: `role-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           name: editingRole.name,
           description: editingRole.description || '',
+          type: editingRole.type || UserType.INTERNAL,
           permissions: editingRole.permissions || {},
           status: UserStatus.ENABLED,
           createTime: new Date().toISOString().split('T')[0]
@@ -162,9 +166,14 @@ export const RoleManagement: React.FC = () => {
             <div className="p-6 border-b border-slate-100">
               <div className="flex justify-between items-start mb-2">
                 <h3 className="text-lg font-bold text-slate-900">{role.name}</h3>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                  {role.status === UserStatus.ENABLED ? '启用' : '禁用'}
-                </span>
+                <div className="flex gap-2">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.type === UserType.INTERNAL ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                    {role.type === UserType.INTERNAL ? '内部' : '外部'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                    {role.status === UserStatus.ENABLED ? '启用' : '禁用'}
+                  </span>
+                </div>
               </div>
               <p className="text-sm text-slate-500 line-clamp-2 h-10">{role.description}</p>
             </div>
@@ -240,6 +249,19 @@ export const RoleManagement: React.FC = () => {
                       placeholder="简要描述该角色的职责与权限范围..."
                       className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none" 
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">类型 <span className="text-rose-600">*</span></label>
+                    <select 
+                      name="type" 
+                      required 
+                      value={editingRole?.type || UserType.INTERNAL} 
+                      onChange={e => setEditingRole({ ...editingRole, type: e.target.value as UserType })}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" 
+                    >
+                      <option value={UserType.INTERNAL}>内部用户</option>
+                      <option value={UserType.EXTERNAL}>外部客户</option>
+                    </select>
                   </div>
                 </div>
 

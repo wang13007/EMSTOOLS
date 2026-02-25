@@ -50,8 +50,6 @@ export const userService = {
       delete dbUser.role_ids;
       delete dbUser.role;
       delete dbUser.createTime;
-      delete dbUser.email;
-      delete dbUser.phone;
       
       console.log('处理后的数据库用户数据:', dbUser);
       
@@ -95,8 +93,6 @@ export const userService = {
     delete dbUser.role_ids;
     delete dbUser.role;
     delete dbUser.createTime;
-    delete dbUser.email;
-    delete dbUser.phone;
     
     const { data, error } = await supabase
       .from('users')

@@ -101,6 +101,7 @@ export interface Role {
   id: string;
   name: string;
   description: string;
+  type: UserType;
   permissions: Record<string, boolean>;
   status: UserStatus;
   createTime: string;

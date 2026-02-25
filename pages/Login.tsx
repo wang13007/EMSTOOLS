@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
+import { userService } from '../src/services/supabaseService';
 
 export const Login: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -33,25 +34,56 @@ export const Login: React.FC = () => {
         throw new Error('账号或密码错误');
       }
       
-      // 这里应该调用真实的登录API
-      // const response = await authService.login(formData);
+      // 获取所有用户
+      const users = await userService.getUsers();
+      console.log('数据库用户列表:', users);
       
-      // 模拟登录成功
-      setTimeout(() => {
-        setLoading(false);
-        // 保存登录状态到localStorage
-        localStorage.setItem('ems_user', JSON.stringify({
-          id: `user_${Date.now()}`,
+      // 查找当前用户
+      let currentUser = users.find(u => u.username === formData.username);
+      
+      if (!currentUser) {
+        // 如果用户不存在，创建新用户
+        console.log('用户不存在，创建新用户:', formData.username);
+        const newUser = {
+          name: formData.username === 'admin' ? '系统管理员' : formData.username,
           username: formData.username,
-          name: formData.username === 'admin' ? '系统管理员' : '测试用户',
-          type: formData.username === 'admin' ? 'internal' : 'external',
-          role: formData.username === 'admin' ? '管理员' : '外部客户'
-        }));
-        localStorage.setItem('ems_token', `mock_token_${Date.now()}`);
+          password_hash: formData.password,
+          type: formData.username === 'admin' ? 'INTERNAL' : 'EXTERNAL',
+          status: 'ENABLED'
+        };
         
-        // 跳转到首页
-        navigate('/');
-      }, 1000);
+        const createdUser = await userService.createUser(newUser);
+        console.log('创建用户结果:', createdUser);
+        
+        if (createdUser) {
+          currentUser = {
+            ...createdUser,
+            name: newUser.name,
+            role: formData.username === 'admin' ? '管理员' : '外部客户'
+          };
+        }
+      } else {
+        // 补充用户信息
+        currentUser = {
+          ...currentUser,
+          name: currentUser.name || formData.username,
+          role: formData.username === 'admin' ? '管理员' : '外部客户'
+        };
+      }
+      
+      setLoading(false);
+      // 保存登录状态到localStorage
+      localStorage.setItem('ems_user', JSON.stringify({
+        id: currentUser.id || `user_${Date.now()}`,
+        username: currentUser.username,
+        name: currentUser.name || formData.username,
+        type: currentUser.type || (formData.username === 'admin' ? 'internal' : 'external'),
+        role: currentUser.role || (formData.username === 'admin' ? '管理员' : '外部客户')
+      }));
+      localStorage.setItem('ems_token', `mock_token_${Date.now()}`);
+      
+      // 跳转到首页
+      navigate('/');
     } catch (err) {
       setLoading(false);
       setError('登录失败，请检查账号和密码');

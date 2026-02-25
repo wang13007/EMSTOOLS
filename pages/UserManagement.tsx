@@ -86,22 +86,28 @@ export const UserManagement: React.FC = () => {
   }, []);
 
   const saveUsers = async (userData: any) => {
-    // 这里可以添加创建/更新用户的逻辑
-    // 目前只更新本地状态，实际操作需要调用userService的相应方法
-    setUsers(prevUsers => {
+    try {
       if (userData.id) {
         // 更新现有用户
-        return prevUsers.map(u => u.id === userData.id ? { ...u, ...userData } : u);
+        const updatedUser = await userService.updateUser(userData.id, userData);
+        if (updatedUser) {
+          setUsers(prevUsers => prevUsers.map(u => u.id === userData.id ? { ...u, ...userData } : u));
+        }
       } else {
         // 创建新用户
-        const newUser = {
-          id: Math.random().toString(36).substr(2, 9),
-          ...userData,
-          createTime: new Date().toISOString().split('T')[0]
-        };
-        return [...prevUsers, newUser];
+        const createdUser = await userService.createUser(userData);
+        if (createdUser) {
+          const newUser = {
+            id: createdUser.id,
+            ...userData,
+            createTime: new Date().toISOString().split('T')[0]
+          };
+          setUsers(prevUsers => [...prevUsers, newUser]);
+        }
       }
-    });
+    } catch (error) {
+      console.error('保存用户失败:', error);
+    }
   };
 
   const filteredUsers = users.filter(u => 
@@ -189,7 +195,7 @@ export const UserManagement: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm text-slate-900">{user.username}</div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">{user.type}</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">{user.type === UserType.INTERNAL ? '内部用户' : '外部客户'}</div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm text-slate-900">{user.email || '-'}</div>
@@ -364,7 +370,8 @@ export const UserManagement: React.FC = () => {
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">类型 <span className="text-rose-600">*</span></label>
                     <select name="type" required defaultValue={editingUser?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-                      {Object.values(UserType).map(t => <option key={t} value={t}>{t}</option>)}
+                      <option value={UserType.INTERNAL}>内部用户</option>
+                      <option value={UserType.EXTERNAL}>外部客户</option>
                     </select>
                   </div>
                   <div className="space-y-1">
