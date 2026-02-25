@@ -104,18 +104,16 @@ export const userService = {
         create_time: user.create_time || new Date().toISOString()
       };
       
-      // 删除前端特有的字段
-      delete dbUser.role_ids;
-      delete dbUser.role;
-      delete dbUser.createTime;
-      delete dbUser.last_login_time;
-      delete dbUser.creator;
-      delete dbUser.user_id;
-      delete dbUser.user_name;
-      delete dbUser.phone;
-      delete dbUser.email;
-      delete dbUser.create_by;
-      delete dbUser.is_deleted;
+      // 删除前端特有的字段和数据库中不存在的字段
+      const fieldsToDelete = [
+        'role_ids', 'role', 'createTime', 'last_login_time', 'creator',
+        'user_id', 'user_name', 'phone', 'email', 'create_by', 'is_deleted',
+        'userType', 'user_type', 'roleId', 'createBy', 'isDeleted'
+      ];
+      
+      fieldsToDelete.forEach(field => {
+        delete dbUser[field];
+      });
       
       console.log('处理后的数据库用户数据:', dbUser);
       
@@ -165,19 +163,19 @@ export const userService = {
         status: user.status || 'enabled'
       };
       
-      // 删除前端特有的字段
-      delete dbUser.role_ids;
-      delete dbUser.role;
-      delete dbUser.createTime;
-      delete dbUser.last_login_time;
-      delete dbUser.creator;
-      delete dbUser.user_id;
-      delete dbUser.user_name;
-      delete dbUser.phone;
-      delete dbUser.email;
-      delete dbUser.create_by;
-      delete dbUser.is_deleted;
-      delete dbUser.create_time;
+      // 删除前端特有的字段和数据库中不存在的字段
+      const fieldsToDelete = [
+        'role_ids', 'role', 'createTime', 'last_login_time', 'creator',
+        'user_id', 'user_name', 'phone', 'email', 'create_by', 'is_deleted',
+        'userType', 'user_type', 'roleId', 'createBy', 'isDeleted',
+        'create_time'
+      ];
+      
+      fieldsToDelete.forEach(field => {
+        delete dbUser[field];
+      });
+      
+      console.log('处理后的数据库用户数据:', dbUser);
       
       const { data, error } = await supabase
         .from('users')
