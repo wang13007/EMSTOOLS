@@ -155,7 +155,7 @@ export const Login: React.FC = () => {
                   记住我
                 </label>
               </div>
-              <Link to="#" className="text-blue-600 hover:text-blue-800 font-medium">
+              <Link to="/forgot-password" className="text-blue-600 hover:text-blue-800 font-medium">
                 忘记密码?
               </Link>
             </div>
