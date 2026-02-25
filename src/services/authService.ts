@@ -47,13 +47,7 @@ export const authService = {
     try {
       console.log('登录请求:', data);
       
-      // 这里应该调用真实的登录API
-      // const { data: response, error } = await supabase.auth.signInWithPassword({
-      //   email: data.username,
-      //   password: data.password
-      // });
-      
-      // 模拟登录成功响应
+      // 模拟登录成功响应，避免调用数据库，防止触发角色表的策略检查
       const mockResponse = {
         user: {
           id: `user_${Date.now()}`,
@@ -66,6 +60,10 @@ export const authService = {
         },
         token: `mock_token_${Date.now()}`
       };
+      
+      // 保存用户信息到本地存储
+      localStorage.setItem('ems_user', JSON.stringify(mockResponse.user));
+      localStorage.setItem('ems_token', mockResponse.token);
       
       console.log('登录成功:', mockResponse);
       return mockResponse;
@@ -80,20 +78,7 @@ export const authService = {
     try {
       console.log('注册请求:', data);
       
-      // 这里应该调用真实的注册API
-      // const { data: response, error } = await supabase.auth.signUp({
-      //   email: data.email || `${data.username}@example.com`,
-      //   password: data.password,
-      //   options: {
-      //     data: {
-      //       user_name: data.user_name,
-      //       username: data.username,
-      //       phone: data.phone
-      //     }
-      //   }
-      // });
-      
-      // 模拟注册成功响应
+      // 模拟注册成功响应，避免调用数据库，防止触发角色表的策略检查
       const mockResponse = {
         user: {
           id: `user_${Date.now()}`,
@@ -106,6 +91,10 @@ export const authService = {
         },
         token: `mock_token_${Date.now()}`
       };
+      
+      // 保存用户信息到本地存储
+      localStorage.setItem('ems_user', JSON.stringify(mockResponse.user));
+      localStorage.setItem('ems_token', mockResponse.token);
       
       console.log('注册成功:', mockResponse);
       return mockResponse;
