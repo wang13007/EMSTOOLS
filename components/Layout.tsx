@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 
 interface LayoutProps {
@@ -53,7 +53,17 @@ const SubItem = ({ to, label }: { to: string; label: string }) => {
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [openMenus, setOpenMenus] = useState<string[]>(['survey', 'product', 'settings']);
+
+  // 退出登录函数
+  const handleLogout = () => {
+    // 清除登录状态
+    localStorage.removeItem('ems_user');
+    localStorage.removeItem('ems_token');
+    // 跳转到登录页面
+    navigate('/login');
+  };
 
   const toggleMenu = (menu: string) => {
     setOpenMenus(prev => 
@@ -138,14 +148,25 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </nav>
 
         <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-3 p-2">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-              AD
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-2">
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                AD
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-slate-900 truncate">Admin User</p>
+                <p className="text-[10px] text-slate-500 truncate">admin@ems-pro.com</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-slate-900 truncate">Admin User</p>
-              <p className="text-[10px] text-slate-500 truncate">admin@ems-pro.com</p>
-            </div>
+            <button 
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 px-2 py-2 text-xs text-red-600 font-medium hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+              退出登录
+            </button>
           </div>
         </div>
       </aside>

@@ -15,6 +15,8 @@ import { ProductCapabilities } from './pages/ProductCapabilities';
 import { MessageCenter } from './pages/MessageCenter';
 import { LogManagement } from './pages/LogManagement';
 import { Dictionaries } from './pages/Dictionaries';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20 animate-fadeIn">
@@ -26,41 +28,133 @@ const PlaceholderPage = ({ title }: { title: string }) => (
   </div>
 );
 
+// 路由保护组件
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isLoggedIn = !!localStorage.getItem('ems_token');
+  return isLoggedIn ? <>{children}</> : <Navigate to="/login" replace />;
+};
+
+// 公共路由组件（不需要登录）
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const isLoggedIn = !!localStorage.getItem('ems_token');
+  return isLoggedIn ? <Navigate to="/" replace /> : <>{children}</>;
+};
+
 const App: React.FC = () => {
   return (
     <Router>
-      <Layout>
-        <Routes>
-          {/* 一级菜单: 售前综合看板 */}
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Navigate to="/" replace />} />
+      <Routes>
+        {/* 公共路由 */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-          {/* 一级菜单: 客户调研管理 */}
-          <Route path="/customer-survey/list" element={<SurveyList />} />
-          <Route path="/customer-survey/templates" element={<SurveyTemplates />} />
-          
-          {/* 调研功能扩展路径 */}
-          <Route path="/surveys/new" element={<SurveyCreate />} />
-          <Route path="/surveys/fill/:id" element={<SurveyFill />} />
-          
-          {/* 一级菜单: 产品方案管理 */}
-          <Route path="/product-solution/capabilities" element={<ProductCapabilities />} />
-          
-          {/* 报告详情 */}
-          <Route path="/reports/:id" element={<ReportDetail />} />
+        {/* 受保护的路由 */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
-          {/* 一级菜单: 系统设置 */}
-          <Route path="/settings/users" element={<UserManagement />} />
-          <Route path="/settings/roles" element={<RoleManagement />} />
-          <Route path="/settings/pre-sales" element={<PreSalesConfig />} />
-          <Route path="/settings/dictionaries" element={<Dictionaries />} />
-          <Route path="/settings/messages" element={<MessageCenter />} />
-          <Route path="/settings/logs" element={<LogManagement />} />
+        {/* 一级菜单: 客户调研管理 */}
+        <Route path="/customer-survey/list" element={
+          <ProtectedRoute>
+            <Layout>
+              <SurveyList />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/customer-survey/templates" element={
+          <ProtectedRoute>
+            <Layout>
+              <SurveyTemplates />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        
+        {/* 调研功能扩展路径 */}
+        <Route path="/surveys/new" element={
+          <ProtectedRoute>
+            <Layout>
+              <SurveyCreate />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/surveys/fill/:id" element={
+          <ProtectedRoute>
+            <Layout>
+              <SurveyFill />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        
+        {/* 一级菜单: 产品方案管理 */}
+        <Route path="/product-solution/capabilities" element={
+          <ProtectedRoute>
+            <Layout>
+              <ProductCapabilities />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        
+        {/* 报告详情 */}
+        <Route path="/reports/:id" element={
+          <ProtectedRoute>
+            <Layout>
+              <ReportDetail />
+            </Layout>
+          </ProtectedRoute>
+        } />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+        {/* 一级菜单: 系统设置 */}
+        <Route path="/settings/users" element={
+          <ProtectedRoute>
+            <Layout>
+              <UserManagement />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/settings/roles" element={
+          <ProtectedRoute>
+            <Layout>
+              <RoleManagement />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/settings/pre-sales" element={
+          <ProtectedRoute>
+            <Layout>
+              <PreSalesConfig />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/settings/dictionaries" element={
+          <ProtectedRoute>
+            <Layout>
+              <Dictionaries />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/settings/messages" element={
+          <ProtectedRoute>
+            <Layout>
+              <MessageCenter />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/settings/logs" element={
+          <ProtectedRoute>
+            <Layout>
+              <LogManagement />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
     </Router>
   );
 };
