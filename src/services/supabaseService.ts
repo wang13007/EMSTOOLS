@@ -10,8 +10,7 @@ export const userService = {
       console.log('开始获取用户列表');
       const { data, error } = await supabase
         .from('users')
-        .select('*')
-        .eq('is_deleted', false); // 只获取未删除的用户
+        .select('*'); // 只获取所有用户，不使用 is_deleted 字段
       
       if (error) {
         console.error('获取用户列表失败:', error);
@@ -34,9 +33,7 @@ export const userService = {
         role_id: user.role_id,
         status: user.status,
         last_login_time: user.last_login_time,
-        create_time: user.create_time,
-        creator: user.creator,
-        is_deleted: user.is_deleted
+        create_time: user.create_time
       }));
       
       return users;
@@ -121,9 +118,7 @@ export const userService = {
         password: user.password_hash || user.password, // 密码（暂时直接存储，实际应使用bcrypt哈希）
         user_type: user.type || user.user_type || 'external', // 用户类型
         status: user.status || 'enabled', // 用户状态
-        create_time: new Date().toISOString(), // 创建时间
-        creator: 'system', // 创建人
-        is_deleted: false // 删除标识
+        create_time: new Date().toISOString() // 创建时间
       };
       
       // 可选字段
@@ -235,17 +230,17 @@ export const userService = {
   // 删除用户
   async deleteUser(id: string) {
     try {
-      // 执行软删除，更新 is_deleted 字段
+      // 执行硬删除，直接从数据库中删除用户
       const { error } = await supabase
         .from('users')
-        .update({ is_deleted: true })
+        .delete()
         .eq('user_id', id);
       
       if (error) {
         // 如果使用 user_id 删除失败，尝试使用 id 删除
         const { error: fallbackError } = await supabase
           .from('users')
-          .update({ is_deleted: true })
+          .delete()
           .eq('id', id);
         
         if (fallbackError) {
