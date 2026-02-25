@@ -1,50 +1,46 @@
+// 执行Supabase SQL脚本，修复RLS策略问题
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// 从环境变量或配置文件中获取 Supabase 配置
-const supabaseUrl = 'https://hjehaiqxsekuiwwevpsi.supabase.co';
-const supabaseServiceKey = 'sb_service_24x8ootw'; // 使用 service key 以获得管理员权限
+// 获取当前文件路径
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// 创建 Supabase 客户端
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// 从环境变量获取Supabase连接信息
+const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://hjehaiqxsekuiwwevpsi.supabase.co';
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'sb_publishable_uMjNKMcl2FYKnYz52bBqAw_24x8ootw';
 
-// 读取 SQL 文件内容
-const sqlContent = fs.readFileSync('supabase-init.sql', 'utf8');
+// 创建Supabase客户端
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// 执行 SQL 命令
-async function executeSql() {
+// 读取SQL文件
+const sqlPath = path.join(__dirname, 'fix-rls-policy.sql');
+const sqlContent = fs.readFileSync(sqlPath, 'utf8');
+
+console.log('开始执行SQL脚本...');
+console.log('SQL内容:', sqlContent);
+
+// 执行SQL脚本
+async function executeSQL() {
   try {
-    console.log('开始执行 SQL 脚本...');
+    // 执行SQL语句
+    const { data, error } = await supabase
+      .rpc('execute_sql', { sql: sqlContent });
     
-    // 分割 SQL 语句
-    const sqlStatements = sqlContent
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0);
-    
-    console.log(`共 ${sqlStatements.length} 条 SQL 语句`);
-    
-    // 执行每条 SQL 语句
-    for (let i = 0; i < sqlStatements.length; i++) {
-      const statement = sqlStatements[i];
-      console.log(`执行语句 ${i + 1}/${sqlStatements.length}...`);
-      
-      try {
-        const { data, error } = await supabase.rpc('execute_sql', { sql: statement });
-        if (error) {
-          console.error(`执行语句 ${i + 1} 失败:`, error.message);
-        } else {
-          console.log(`执行语句 ${i + 1} 成功`);
-        }
-      } catch (err) {
-        console.error(`执行语句 ${i + 1} 异常:`, err.message);
-      }
+    if (error) {
+      console.error('执行SQL失败:', error);
+      return;
     }
     
-    console.log('SQL 脚本执行完成');
+    console.log('执行SQL成功:', data);
+    console.log('RLS策略修复完成');
   } catch (error) {
-    console.error('执行过程中发生错误:', error);
+    console.error('执行SQL过程中发生异常:', error);
+    console.error('注意：如果rpc方法不可用，请直接在Supabase SQL Editor中执行fix-rls-policy.sql文件的内容');
   }
 }
 
-executeSql();
+// 执行SQL
+executeSQL();
