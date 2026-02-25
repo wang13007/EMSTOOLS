@@ -112,7 +112,7 @@ export const UserManagement: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u => 
-    u.name.includes(searchTerm) || u.username.includes(searchTerm)
+    u.username.includes(searchTerm) || u.id.includes(searchTerm)
   );
 
   const handleDelete = async (id: string) => {
@@ -151,7 +151,7 @@ export const UserManagement: React.FC = () => {
           <div className="relative">
             <input 
               type="text"
-              placeholder="搜索用户姓名/账号..."
+              placeholder="搜索用户名/用户ID..."
               className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -174,46 +174,41 @@ export const UserManagement: React.FC = () => {
         <table className="w-full text-left">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户姓名</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">账号/类型</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">邮箱/手机</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">角色/客户</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户ID</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户名</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户类型</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">手机号</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">邮箱</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">状态</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">创建时间</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">上次登录时间</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredUsers.map(user => (
               <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-6 py-4 text-sm text-slate-900 font-medium">{user.id}</td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-[10px]">
-                      {user.name.slice(0, 1)}
+                      {user.username.slice(0, 1)}
                     </div>
-                    <span className="font-bold text-slate-900">{user.name}</span>
+                    <span className="font-bold text-slate-900">{user.username}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-sm text-slate-900">{user.username}</div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">{user.type === UserType.INTERNAL ? '内部用户' : '外部客户'}</div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">{user.type === UserType.INTERNAL ? '内部用户' : '外部客户'}</span>
                 </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-slate-900">{user.email || '-'}</div>
-                  <div className="text-xs text-slate-500">{user.phone || '-'}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-slate-700">{user.role}</div>
-                  {user.customer && <div className="text-xs text-blue-500">@{user.customer}</div>}
-                </td>
+                <td className="px-6 py-4 text-sm text-slate-500">{user.phone || '-'}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{user.email || '-'}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                     {user.status}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-500">
-                  {user.createTime}
-                </td>
+                <td className="px-6 py-4 text-sm text-slate-500">{user.createTime}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{user.last_login_time || '-'}</td>
                 <td className="px-6 py-4 text-right space-x-3">
                   <button 
                     onClick={() => {
