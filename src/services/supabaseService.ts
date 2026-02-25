@@ -87,7 +87,7 @@ export const userService = {
       
       // 验证用户类型和角色是否匹配
       if (user.role_id) {
-        await this.validateUserRoles(null, user.user_type, [user.role_id]);
+        await this.validateUserRoles(null, user.type, [user.role_id]);
       }
       
       // 确保包含必要的数据库字段
@@ -96,9 +96,11 @@ export const userService = {
         // 确保状态字段存在
         status: user.status || 'enabled',
         // 确保类型字段存在
-        user_type: user.user_type || 'internal',
+        type: user.type || 'internal',
         // 确保创建时间存在
         create_time: user.create_time || new Date().toISOString(),
+        // 确保创建人存在
+        create_by: user.create_by || 'system',
         // 确保删除标识存在
         is_deleted: user.is_deleted || false
       };
@@ -108,6 +110,7 @@ export const userService = {
       delete dbUser.role;
       delete dbUser.createTime;
       delete dbUser.last_login_time;
+      delete dbUser.creator;
       
       console.log('处理后的数据库用户数据:', dbUser);
       
@@ -141,7 +144,7 @@ export const userService = {
     try {
       // 验证用户类型和角色是否匹配
       if (user.role_id) {
-        await this.validateUserRoles(id, user.user_type, [user.role_id]);
+        await this.validateUserRoles(id, user.type, [user.role_id]);
       }
       
       // 转换前端字段名到数据库字段名
@@ -150,7 +153,11 @@ export const userService = {
         // 确保状态字段存在
         status: user.status || 'enabled',
         // 确保类型字段存在
-        user_type: user.user_type || 'internal'
+        type: user.type || 'internal',
+        // 确保创建人存在
+        create_by: user.create_by || 'system',
+        // 确保删除标识存在
+        is_deleted: user.is_deleted || false
       };
       
       // 删除前端特有的字段
@@ -158,11 +165,12 @@ export const userService = {
       delete dbUser.role;
       delete dbUser.createTime;
       delete dbUser.last_login_time;
+      delete dbUser.creator;
       
       const { data, error } = await supabase
         .from('users')
         .update(dbUser)
-        .eq('user_id', id)
+        .eq('id', id)
         .select()
         .single();
       
@@ -183,7 +191,7 @@ export const userService = {
     const { error } = await supabase
       .from('users')
       .delete()
-      .eq('user_id', id);
+      .eq('id', id);
     
     if (error) {
       console.error('删除用户失败:', error);

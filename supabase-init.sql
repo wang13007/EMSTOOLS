@@ -19,14 +19,19 @@ CREATE TABLE IF NOT EXISTS roles (
 -- 创建用户表
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) NOT NULL,
-  username VARCHAR(50) UNIQUE NOT NULL,
+  user_id UUID DEFAULT gen_random_uuid(),
+  user_name VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(50),
   password_hash VARCHAR(255) NOT NULL,
   type VARCHAR(20) NOT NULL CHECK (type IN ('internal', 'external')),
   role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-  customer VARCHAR(100),
+  phone VARCHAR(20),
+  email VARCHAR(100),
   status VARCHAR(20) NOT NULL CHECK (status IN ('enabled', 'disabled')),
+  last_login_time TIMESTAMP WITH TIME ZONE,
   create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  create_by VARCHAR(100),
+  is_deleted BOOLEAN DEFAULT false,
   update_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
