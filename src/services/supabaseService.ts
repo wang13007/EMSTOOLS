@@ -26,10 +26,53 @@ export const userService = {
     }
   },
 
+  // 验证用户类型和角色类型是否匹配
+  async validateUserRoles(userId: string | null, userType: string, roleIds: string[]) {
+    try {
+      // 获取所有角色信息
+      const { data: roles, error: roleError } = await supabase
+        .from('roles')
+        .select('*');
+      
+      if (roleError) {
+        console.error('获取角色列表失败:', roleError);
+        throw new Error('获取角色信息失败');
+      }
+      
+      // 验证每个角色是否与用户类型匹配
+      for (const roleId of roleIds) {
+        const role = roles.find(r => r.id === roleId);
+        if (!role) {
+          throw new Error(`角色 ${roleId} 不存在`);
+        }
+        
+        // 确保角色有类型字段
+        if (!role.type) {
+          throw new Error(`角色 ${role.name} 缺少类型信息`);
+        }
+        
+        // 验证角色类型是否与用户类型匹配
+        if (role.type !== userType) {
+          throw new Error(`角色 ${role.name} 的类型与用户类型不匹配`);
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('验证用户角色失败:', error);
+      throw error;
+    }
+  },
+
   // 创建用户
   async createUser(user: any) {
     try {
       console.log('开始创建用户，用户数据:', user);
+      
+      // 验证用户类型和角色是否匹配
+      if (user.role_ids && Array.isArray(user.role_ids) && user.role_ids.length > 0) {
+        await this.validateUserRoles(null, user.type, user.role_ids);
+      }
       
       // 确保包含必要的数据库字段
       const dbUser = {
@@ -80,33 +123,43 @@ export const userService = {
 
   // 更新用户
   async updateUser(id: string, user: any) {
-    // 转换前端字段名到数据库字段名
-    const dbUser = {
-      ...user,
-      password_hash: user.password_hash || user.passwordHash
-    };
-    
-    // 删除前端特有的字段
-    delete dbUser.passwordHash;
-    delete dbUser.roleId;
-    delete dbUser.roleIds;
-    delete dbUser.role_ids;
-    delete dbUser.role;
-    delete dbUser.createTime;
-    
-    const { data, error } = await supabase
-      .from('users')
-      .update(dbUser)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('更新用户失败:', error);
+    try {
+      // 验证用户类型和角色是否匹配
+      if (user.role_ids && Array.isArray(user.role_ids) && user.role_ids.length > 0) {
+        await this.validateUserRoles(id, user.type, user.role_ids);
+      }
+      
+      // 转换前端字段名到数据库字段名
+      const dbUser = {
+        ...user,
+        password_hash: user.password_hash || user.passwordHash
+      };
+      
+      // 删除前端特有的字段
+      delete dbUser.passwordHash;
+      delete dbUser.roleId;
+      delete dbUser.roleIds;
+      delete dbUser.role_ids;
+      delete dbUser.role;
+      delete dbUser.createTime;
+      
+      const { data, error } = await supabase
+        .from('users')
+        .update(dbUser)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('更新用户失败:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('更新用户过程中发生异常:', error);
       return null;
     }
-    
-    return data;
   },
 
   // 删除用户

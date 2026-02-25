@@ -13,12 +13,13 @@ export const UserManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedUserType, setSelectedUserType] = useState<UserType>(UserType.INTERNAL);
 
   // 默认角色数据
   const DEFAULT_ROLES = [
-    { id: 'role-1', name: '超级管理员' },
-    { id: 'role-2', name: '售前工程师' },
-    { id: 'role-3', name: '客户用户' }
+    { id: 'role-1', name: '超级管理员', type: UserType.INTERNAL },
+    { id: 'role-2', name: '售前工程师', type: UserType.INTERNAL },
+    { id: 'role-3', name: '客户用户', type: UserType.EXTERNAL }
   ];
 
   useEffect(() => {
@@ -160,7 +161,7 @@ export const UserManagement: React.FC = () => {
             </div>
           </div>
           <button 
-            onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+            onClick={() => { setEditingUser(null); setSelectedUserType(UserType.INTERNAL); setSelectedRoles([]); setIsModalOpen(true); }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95"
           >
             <ICONS.Plus className="w-4 h-4" />
@@ -217,6 +218,7 @@ export const UserManagement: React.FC = () => {
                   <button 
                     onClick={() => {
                       setEditingUser(user);
+                      setSelectedUserType(user.type);
                       setSelectedRoles(user.role_ids || []);
                       setIsModalOpen(true);
                     }}
@@ -369,7 +371,18 @@ export const UserManagement: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">类型 <span className="text-rose-600">*</span></label>
-                    <select name="type" required defaultValue={editingUser?.type} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <select 
+                      name="type" 
+                      required 
+                      defaultValue={editingUser?.type || UserType.INTERNAL} 
+                      onChange={(e) => {
+                        const newType = e.target.value as UserType;
+                        setSelectedUserType(newType);
+                        // 清空已选择的角色，因为类型改变后可用角色会不同
+                        setSelectedRoles([]);
+                      }}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
                       <option value={UserType.INTERNAL}>内部用户</option>
                       <option value={UserType.EXTERNAL}>外部客户</option>
                     </select>
@@ -377,24 +390,34 @@ export const UserManagement: React.FC = () => {
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">角色 (多选) <span className="text-rose-600">*</span></label>
                     <div className="flex flex-wrap gap-2 border border-slate-200 rounded-lg p-2 min-h-[40px]">
-                      {roles.map(role => (
-                        <div key={role.id} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`role-${role.id}`}
-                            checked={selectedRoles.includes(role.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedRoles([...selectedRoles, role.id]);
-                              } else {
-                                setSelectedRoles(selectedRoles.filter(id => id !== role.id));
-                              }
-                            }}
-                            className="mr-1"
-                          />
-                          <label htmlFor={`role-${role.id}`} className="text-sm">{role.name}</label>
-                        </div>
-                      ))}
+                      {roles.map(role => {
+                        const isDisabled = role.type !== selectedUserType;
+                        return (
+                          <div key={role.id} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              id={`role-${role.id}`}
+                              checked={selectedRoles.includes(role.id)}
+                              onChange={(e) => {
+                                if (isDisabled) return;
+                                if (e.target.checked) {
+                                  setSelectedRoles([...selectedRoles, role.id]);
+                                } else {
+                                  setSelectedRoles(selectedRoles.filter(id => id !== role.id));
+                                }
+                              }}
+                              disabled={isDisabled}
+                              className={`mr-1 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            />
+                            <label 
+                              htmlFor={`role-${role.id}`} 
+                              className={`text-sm ${isDisabled ? 'text-slate-400 cursor-not-allowed' : 'text-slate-600'}`}
+                            >
+                              {role.name}
+                            </label>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
