@@ -88,13 +88,23 @@ export interface RegionDict {
 
 export interface User {
   id: string;
-  name: string;
+  user_id?: string;
+  user_name?: string;
   username: string;
+  phone?: string;
+  email?: string;
   type: UserType;
+  user_type?: UserType;
   role: string;
+  role_id?: string;
+  role_ids?: string[];
   customer?: string;
   status: UserStatus;
+  last_login_time?: string;
+  create_time?: string;
   createTime: string;
+  creator?: string;
+  is_deleted?: boolean;
 }
 
 export interface Role {

@@ -46,17 +46,16 @@ export const UserManagement: React.FC = () => {
           }
           
           return {
-            id: user.id,
-            name: user.name,
-            username: user.username,
-            email: user.email,
+            id: user.user_id || user.id,
+            username: user.user_name || user.username,
             phone: user.phone,
-            type: user.type,
+            email: user.email,
+            type: user.user_type || user.type,
             role_id: user.role_id,
-            role_ids: user.role_ids || [],
+            role_ids: [user.role_id] || [],
             role: roleNames,
-            customer: user.customer,
             status: user.status,
+            last_login_time: user.last_login_time,
             createTime: user.create_time ? new Date(user.create_time).toISOString().split('T')[0] : ''
           };
         });
@@ -67,15 +66,15 @@ export const UserManagement: React.FC = () => {
         setUsers([
           {
             id: 'user-1',
-            name: '管理员',
             username: 'admin',
-            email: 'admin@example.com',
             phone: '13800138000',
+            email: 'admin@example.com',
             type: UserType.INTERNAL,
             role_id: 'role-1',
             role_ids: ['role-1'],
             role: '超级管理员',
             status: UserStatus.ENABLED,
+            last_login_time: null,
             createTime: new Date().toISOString().split('T')[0]
           }
         ]);
@@ -258,13 +257,17 @@ export const UserManagement: React.FC = () => {
                 const defaultPassword = '123456';
                 
                 const userData = {
-                  name: formData.get('name') as string,
-                  username: formData.get('username') as string,
-                  password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
-                  type: formData.get('type') as UserType,
-                  role_ids: selectedRoles,
-                  customer: formData.get('customer') as string || undefined,
-                  status: editingUser?.status || UserStatus.ENABLED
+                  user_id: `user-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // 生成用户ID
+                  user_name: formData.get('username') as string,
+                  password: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
+                  user_type: formData.get('type') as UserType,
+                  role_id: selectedRoles[0], // 使用第一个选中的角色作为role_id
+                  phone: formData.get('phone') as string || '',
+                  email: formData.get('email') as string || '',
+                  status: editingUser?.status || UserStatus.ENABLED,
+                  creator: 'system', // 默认为系统创建
+                  is_deleted: false, // 默认未删除
+                  create_time: new Date().toISOString() // 创建时间
                 };
                 
                 try {
@@ -272,27 +275,39 @@ export const UserManagement: React.FC = () => {
                   console.log('选中的角色:', selectedRoles);
                   
                   // 数据验证
-                  if (!userData.name || userData.name.trim() === '') {
-                    console.error('姓名不能为空');
-                    alert('请输入姓名');
+                  if (!userData.user_name || userData.user_name.trim() === '') {
+                    console.error('用户名不能为空');
+                    alert('请输入用户名');
                     return;
                   }
                   
-                  if (!userData.username || userData.username.trim() === '') {
-                    console.error('账号不能为空');
-                    alert('请输入账号');
-                    return;
-                  }
-                  
-                  if (!userData.type) {
+                  if (!userData.user_type) {
                     console.error('用户类型不能为空');
                     alert('请选择用户类型');
+                    return;
+                  }
+                  
+                  if (!userData.phone || userData.phone.trim() === '') {
+                    console.error('手机号不能为空');
+                    alert('请输入手机号');
+                    return;
+                  }
+                  
+                  if (!userData.email || userData.email.trim() === '') {
+                    console.error('邮箱不能为空');
+                    alert('请输入邮箱');
                     return;
                   }
                   
                   if (!Array.isArray(selectedRoles) || selectedRoles.length === 0) {
                     console.error('至少选择一个角色');
                     alert('请至少选择一个角色');
+                    return;
+                  }
+                  
+                  if (!userData.role_id) {
+                    console.error('角色ID不能为空');
+                    alert('请选择一个角色');
                     return;
                   }
                   
@@ -307,12 +322,13 @@ export const UserManagement: React.FC = () => {
                         if (u.id === editingUser.id) {
                           return {
                             ...u,
-                            name: updatedUser.name,
-                            username: updatedUser.username,
-                            type: updatedUser.type,
+                            username: updatedUser.user_name || updatedUser.username,
+                            phone: updatedUser.phone,
+                            email: updatedUser.email,
+                            type: updatedUser.user_type || updatedUser.type,
+                            role_id: selectedRoles[0],
                             role_ids: selectedRoles,
                             role: roleNames || '未分配',
-                            customer: updatedUser.customer,
                             status: updatedUser.status
                           };
                         }
@@ -331,14 +347,16 @@ export const UserManagement: React.FC = () => {
                     if (newUser) {
                       const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
                       setUsers([...users, {
-                        id: newUser.id,
-                        name: newUser.name,
-                        username: newUser.username,
-                        type: newUser.type,
+                        id: newUser.user_id || newUser.id,
+                        username: newUser.user_name || newUser.username,
+                        phone: newUser.phone,
+                        email: newUser.email,
+                        type: newUser.user_type || newUser.type,
+                        role_id: selectedRoles[0],
                         role_ids: selectedRoles,
                         role: roleNames || '未分配',
-                        customer: newUser.customer,
                         status: newUser.status,
+                        last_login_time: newUser.last_login_time,
                         createTime: new Date().toISOString().split('T')[0]
                       }]);
                       setIsModalOpen(false);
@@ -355,17 +373,11 @@ export const UserManagement: React.FC = () => {
               }}>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">姓名 <span className="text-rose-600">*</span></label>
-                    <input name="name" required defaultValue={editingUser?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">账号 <span className="text-rose-600">*</span></label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">用户名 <span className="text-rose-600">*</span></label>
                     <input name="username" required defaultValue={editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">类型 <span className="text-rose-600">*</span></label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">用户类型 <span className="text-rose-600">*</span></label>
                     <select 
                       name="type" 
                       required 
@@ -382,6 +394,18 @@ export const UserManagement: React.FC = () => {
                       <option value={UserType.EXTERNAL}>外部客户</option>
                     </select>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">手机号 <span className="text-rose-600">*</span></label>
+                    <input name="phone" required defaultValue={editingUser?.phone} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入手机号" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱 <span className="text-rose-600">*</span></label>
+                    <input name="email" required defaultValue={editingUser?.email} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入邮箱" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">角色 (多选) <span className="text-rose-600">*</span></label>
                     <div className="flex flex-wrap gap-2 border border-slate-200 rounded-lg p-2 min-h-[40px]">
@@ -415,11 +439,12 @@ export const UserManagement: React.FC = () => {
                       })}
                     </div>
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">所属客户 (可选)</label>
+                    <input name="customer" defaultValue={editingUser?.customer} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">所属客户 (可选)</label>
-                  <input name="customer" defaultValue={editingUser?.customer} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
+
                 <div className="pt-4 flex justify-end gap-3">
                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">取消</button>
                   <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">保存</button>

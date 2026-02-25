@@ -86,29 +86,28 @@ export const userService = {
       console.log('开始创建用户，用户数据:', user);
       
       // 验证用户类型和角色是否匹配
-      if (user.role_ids && Array.isArray(user.role_ids) && user.role_ids.length > 0) {
-        await this.validateUserRoles(null, user.type, user.role_ids);
+      if (user.role_id) {
+        await this.validateUserRoles(null, user.user_type, [user.role_id]);
       }
       
       // 确保包含必要的数据库字段
       const dbUser = {
         ...user,
-        password_hash: user.password_hash || user.passwordHash,
-        // 自动生成用户ID（用户名）
-        username: user.username || `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
         // 确保状态字段存在
-        status: user.status || 'ENABLED',
+        status: user.status || 'enabled',
         // 确保类型字段存在
-        type: user.type || 'INTERNAL'
+        user_type: user.user_type || 'internal',
+        // 确保创建时间存在
+        create_time: user.create_time || new Date().toISOString(),
+        // 确保删除标识存在
+        is_deleted: user.is_deleted || false
       };
       
       // 删除前端特有的字段
-      delete dbUser.passwordHash;
-      delete dbUser.roleId;
-      delete dbUser.roleIds;
       delete dbUser.role_ids;
       delete dbUser.role;
       delete dbUser.createTime;
+      delete dbUser.last_login_time;
       
       console.log('处理后的数据库用户数据:', dbUser);
       
@@ -141,28 +140,29 @@ export const userService = {
   async updateUser(id: string, user: any) {
     try {
       // 验证用户类型和角色是否匹配
-      if (user.role_ids && Array.isArray(user.role_ids) && user.role_ids.length > 0) {
-        await this.validateUserRoles(id, user.type, user.role_ids);
+      if (user.role_id) {
+        await this.validateUserRoles(id, user.user_type, [user.role_id]);
       }
       
       // 转换前端字段名到数据库字段名
       const dbUser = {
         ...user,
-        password_hash: user.password_hash || user.passwordHash
+        // 确保状态字段存在
+        status: user.status || 'enabled',
+        // 确保类型字段存在
+        user_type: user.user_type || 'internal'
       };
       
       // 删除前端特有的字段
-      delete dbUser.passwordHash;
-      delete dbUser.roleId;
-      delete dbUser.roleIds;
       delete dbUser.role_ids;
       delete dbUser.role;
       delete dbUser.createTime;
+      delete dbUser.last_login_time;
       
       const { data, error } = await supabase
         .from('users')
         .update(dbUser)
-        .eq('id', id)
+        .eq('user_id', id)
         .select()
         .single();
       
@@ -183,7 +183,7 @@ export const userService = {
     const { error } = await supabase
       .from('users')
       .delete()
-      .eq('id', id);
+      .eq('user_id', id);
     
     if (error) {
       console.error('删除用户失败:', error);
