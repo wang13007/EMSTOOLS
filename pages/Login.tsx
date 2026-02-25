@@ -26,6 +26,13 @@ export const Login: React.FC = () => {
       // 模拟登录验证
       console.log('登录请求:', formData);
       
+      // 基本密码校验逻辑
+      const isValidLogin = validateLogin(formData.username, formData.password);
+      
+      if (!isValidLogin) {
+        throw new Error('账号或密码错误');
+      }
+      
       // 这里应该调用真实的登录API
       // const response = await authService.login(formData);
       
@@ -34,13 +41,13 @@ export const Login: React.FC = () => {
         setLoading(false);
         // 保存登录状态到localStorage
         localStorage.setItem('ems_user', JSON.stringify({
-          id: 'user_123',
+          id: `user_${Date.now()}`,
           username: formData.username,
-          name: '测试用户',
-          type: 'internal',
-          role: '管理员'
+          name: formData.username === 'admin' ? '系统管理员' : '测试用户',
+          type: formData.username === 'admin' ? 'internal' : 'external',
+          role: formData.username === 'admin' ? '管理员' : '外部客户'
         }));
-        localStorage.setItem('ems_token', 'mock_token_123');
+        localStorage.setItem('ems_token', `mock_token_${Date.now()}`);
         
         // 跳转到首页
         navigate('/');
@@ -50,6 +57,24 @@ export const Login: React.FC = () => {
       setError('登录失败，请检查账号和密码');
       console.error('登录失败:', err);
     }
+  };
+
+  // 验证登录逻辑
+  const validateLogin = (username: string, password: string): boolean => {
+    // 预设的测试账号和密码
+    const testAccounts = {
+      'admin': 'admin123',      // 管理员账号
+      'user1': 'user123',        // 测试用户账号
+      'customer': 'customer123'  // 外部客户账号
+    };
+    
+    // 检查是否为预设账号
+    if (testAccounts[username]) {
+      return password === testAccounts[username];
+    }
+    
+    // 对于其他账号，要求密码至少4位，且不能与用户名相同
+    return password.length >= 4 && password !== username;
   };
 
   return (
