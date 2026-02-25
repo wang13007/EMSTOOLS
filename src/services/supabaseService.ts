@@ -90,19 +90,18 @@ export const userService = {
         await this.validateUserRoles(null, user.type, [user.role_id]);
       }
       
-      // 确保包含必要的数据库字段
+      // 确保包含必要的数据库字段，只使用数据库中实际存在的字段
       const dbUser = {
-        ...user,
-        // 确保状态字段存在
-        status: user.status || 'enabled',
-        // 确保类型字段存在
+        // 基本字段
+        name: user.user_name || user.name || user.username,
+        username: user.user_name || user.username,
+        password_hash: user.password_hash || user.password,
         type: user.type || 'internal',
-        // 确保创建时间存在
-        create_time: user.create_time || new Date().toISOString(),
-        // 确保创建人存在
-        create_by: user.create_by || 'system',
-        // 确保删除标识存在
-        is_deleted: user.is_deleted || false
+        role_id: user.role_id,
+        // 可选字段
+        customer: user.customer,
+        status: user.status || 'enabled',
+        create_time: user.create_time || new Date().toISOString()
       };
       
       // 删除前端特有的字段
@@ -111,6 +110,12 @@ export const userService = {
       delete dbUser.createTime;
       delete dbUser.last_login_time;
       delete dbUser.creator;
+      delete dbUser.user_id;
+      delete dbUser.user_name;
+      delete dbUser.phone;
+      delete dbUser.email;
+      delete dbUser.create_by;
+      delete dbUser.is_deleted;
       
       console.log('处理后的数据库用户数据:', dbUser);
       
@@ -147,17 +152,17 @@ export const userService = {
         await this.validateUserRoles(id, user.type, [user.role_id]);
       }
       
-      // 转换前端字段名到数据库字段名
+      // 转换前端字段名到数据库字段名，只使用数据库中实际存在的字段
       const dbUser = {
-        ...user,
-        // 确保状态字段存在
-        status: user.status || 'enabled',
-        // 确保类型字段存在
+        // 基本字段
+        name: user.user_name || user.name || user.username,
+        username: user.user_name || user.username,
+        password_hash: user.password_hash || user.password,
         type: user.type || 'internal',
-        // 确保创建人存在
-        create_by: user.create_by || 'system',
-        // 确保删除标识存在
-        is_deleted: user.is_deleted || false
+        role_id: user.role_id,
+        // 可选字段
+        customer: user.customer,
+        status: user.status || 'enabled'
       };
       
       // 删除前端特有的字段
@@ -166,6 +171,13 @@ export const userService = {
       delete dbUser.createTime;
       delete dbUser.last_login_time;
       delete dbUser.creator;
+      delete dbUser.user_id;
+      delete dbUser.user_name;
+      delete dbUser.phone;
+      delete dbUser.email;
+      delete dbUser.create_by;
+      delete dbUser.is_deleted;
+      delete dbUser.create_time;
       
       const { data, error } = await supabase
         .from('users')
