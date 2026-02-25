@@ -113,6 +113,7 @@ export const userService = {
       const dbUser = {
         // 基本字段
         user_id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // 生成唯一用户ID
+        name: user.user_name || user.name || user.username, // 添加 name 字段，确保非空
         user_name: user.user_name || user.name || user.username, // 用户名
         username: user.username || user.user_name, // 登录账号
         password: user.password_hash || user.password, // 密码（暂时直接存储，实际应使用bcrypt哈希）
