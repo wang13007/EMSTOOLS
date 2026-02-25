@@ -68,13 +68,8 @@ export const Login: React.FC = () => {
       'customer': 'customer123'  // 外部客户账号
     };
     
-    // 检查是否为预设账号
-    if (testAccounts[username]) {
-      return password === testAccounts[username];
-    }
-    
-    // 对于其他账号，要求密码至少4位，且不能与用户名相同
-    return password.length >= 4 && password !== username;
+    // 只允许预设账号登录，确保密码严格匹配
+    return testAccounts[username] === password;
   };
 
   return (
