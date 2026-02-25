@@ -55,12 +55,39 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [openMenus, setOpenMenus] = useState<string[]>(['survey', 'product', 'settings']);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // 获取当前登录用户信息
+  useEffect(() => {
+    const fetchCurrentUser = () => {
+      const userStr = localStorage.getItem('ems_user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          setCurrentUser(user);
+        } catch (error) {
+          console.error('解析用户信息失败:', error);
+        }
+      }
+    };
+
+    fetchCurrentUser();
+
+    // 监听 localStorage 变化
+    const handleStorageChange = () => {
+      fetchCurrentUser();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // 退出登录函数
   const handleLogout = () => {
     // 清除登录状态
     localStorage.removeItem('ems_user');
     localStorage.removeItem('ems_token');
+    setCurrentUser(null);
     // 跳转到登录页面
     navigate('/login');
   };
@@ -151,11 +178,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-2">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                AD
+                {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : '未'}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-slate-900 truncate">Admin User</p>
-                <p className="text-[10px] text-slate-500 truncate">admin@ems-pro.com</p>
+                <p className="text-xs font-bold text-slate-900 truncate">{currentUser?.name || '未知用户'}</p>
+                <p className="text-[10px] text-slate-500 truncate">{currentUser?.username || '未知账号'}</p>
               </div>
             </div>
             <button 
@@ -186,11 +213,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="h-8 w-px bg-slate-200"></div>
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-900">高级售前工程师</p>
-                <p className="text-[10px] text-slate-400">数字化转型事业部</p>
+                <p className="text-xs font-bold text-slate-900">{currentUser?.name || '未知用户'}</p>
+                <p className="text-[10px] text-slate-400">{currentUser?.role || currentUser?.type || '普通用户'}</p>
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-blue-600 shadow-inner">
-                李
+                {currentUser?.name ? currentUser.name.charAt(0) : '未'}
               </div>
             </div>
           </div>
