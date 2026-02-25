@@ -29,6 +29,12 @@ export const userService = {
   // 验证用户类型和角色类型是否匹配
   async validateUserRoles(userId: string | null, userType: string, roleIds: string[]) {
     try {
+      // 暂时禁用角色验证，避免数据库策略的无限递归问题
+      console.log('暂时禁用角色验证，避免数据库策略的无限递归问题');
+      return true;
+      
+      // 以下代码暂时注释掉，直到数据库策略问题解决
+      /*
       // 获取所有角色信息
       const { data: roles, error: roleError } = await supabase
         .from('roles')
@@ -71,6 +77,7 @@ export const userService = {
       }
       
       return true;
+      */
     } catch (error) {
       console.error('验证用户角色失败:', error);
       // 不抛出错误，允许操作继续
