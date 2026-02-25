@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
+import { userService } from '../src/services/supabaseService';
 
 export const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -72,11 +73,24 @@ export const Register: React.FC = () => {
       // 模拟注册验证
       console.log('注册请求:', formData);
       
-      // 这里应该调用真实的注册API
-      // const response = await authService.register(formData);
+      // 创建用户数据
+      const userData = {
+        name: formData.user_name,
+        username: formData.username,
+        password_hash: formData.password, // 注意：在实际生产环境中，这里应该使用bcrypt等库对密码进行哈希处理
+        type: 'EXTERNAL', // 外部客户
+        status: 'ENABLED', // 启用状态
+        email: formData.email,
+        phone: formData.phone
+      };
       
-      // 模拟注册成功
-      setTimeout(() => {
+      // 调用用户服务创建用户
+      const createdUser = await userService.createUser(userData);
+      
+      if (createdUser) {
+        console.log('用户创建成功:', createdUser);
+        
+        // 注册成功
         setLoading(false);
         setSuccess('注册成功！正在跳转到登录页面...');
         
@@ -84,7 +98,9 @@ export const Register: React.FC = () => {
         setTimeout(() => {
           navigate('/login');
         }, 3000);
-      }, 1500);
+      } else {
+        throw new Error('用户创建失败');
+      }
     } catch (err) {
       setLoading(false);
       setError('注册失败，请稍后重试');
