@@ -24,7 +24,7 @@ export const userService = {
       const users = data.map(user => ({
         id: user.user_id || user.id,
         user_id: user.user_id,
-        user_name: user.user_name,
+        user_name: user.user_name || user.name,
         username: user.username || user.user_name,
         phone: user.phone,
         email: user.email,
@@ -33,7 +33,8 @@ export const userService = {
         role_id: user.role_id,
         status: user.status,
         last_login_time: user.last_login_time,
-        create_time: user.create_time
+        create_time: user.create_time,
+        password_hash: user.password_hash
       }));
       
       return users;
@@ -116,7 +117,7 @@ export const userService = {
         name: user.user_name || user.name || user.username, // 添加 name 字段，确保非空
         user_name: user.user_name || user.name || user.username, // 用户名
         username: user.username || user.user_name, // 登录账号
-        password: user.password_hash || user.password, // 密码（暂时直接存储，实际应使用bcrypt哈希）
+        password_hash: user.password_hash || user.password, // 密码哈希字段，确保非空
         user_type: user.type || user.user_type || 'external', // 用户类型
         status: user.status || 'enabled', // 用户状态
         create_time: new Date().toISOString() // 创建时间
@@ -176,7 +177,7 @@ export const userService = {
         dbUser.username = user.username;
       }
       if (user.password || user.password_hash) {
-        dbUser.password = user.password || user.password_hash;
+        dbUser.password_hash = user.password || user.password_hash;
       }
       if (user.user_type || user.type) {
         dbUser.user_type = user.user_type || user.type;
