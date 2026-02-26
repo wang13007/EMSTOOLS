@@ -48,7 +48,8 @@ export const UserManagement: React.FC = () => {
             return {
               id: user.id,
               user_name: user.user_name,
-              name: user.name || user.user_name,
+              username: user.username,
+              name: user.name || user.user_name || user.username,
               type: user.type,
               role_id: user.role_id,
               role_ids: [user.role_id] || [],
@@ -110,7 +111,7 @@ export const UserManagement: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u => {
-    const userName = u.user_name || '';
+    const userName = u.username || u.user_name || '';
     const userId = u.id || '';
     return userName.includes(searchTerm) || userId.includes(searchTerm);
   });
@@ -193,9 +194,9 @@ export const UserManagement: React.FC = () => {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-[10px]">
-                      {(user.user_name || 'U').slice(0, 1)}
+                      {(user.username || user.user_name || 'U').slice(0, 1)}
                     </div>
-                    <span className="font-bold text-slate-900">{user.user_name || '-'}</span>
+                    <span className="font-bold text-slate-900">{user.username || user.user_name || '-'}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-500">{user.name || '-'}</td>
@@ -260,7 +261,7 @@ export const UserManagement: React.FC = () => {
                 const defaultPassword = '123456';
                 
                 const userData = {
-                  user_name: formData.get('user_name') as string,
+                  username: formData.get('user_name') as string,
                   password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
                   type: formData.get('type') as UserType,
                   role_id: selectedRoles[0], // 使用第一个选中的角色作为role_id
@@ -272,7 +273,7 @@ export const UserManagement: React.FC = () => {
                   console.log('选中的角色:', selectedRoles);
                   
                   // 数据验证
-                  if (!userData.user_name || userData.user_name.trim() === '') {
+                  if (!userData.username || userData.username.trim() === '') {
                     console.error('用户名不能为空');
                     alert('请输入用户名');
                     return;
@@ -319,8 +320,9 @@ export const UserManagement: React.FC = () => {
                           if (u.id === editingUser.id) {
                             return {
                               ...u,
-                              user_name: updatedUser.user_name,
-                              name: updatedUser.user_name,
+                              user_name: updatedUser.username,
+                              username: updatedUser.username,
+                              name: updatedUser.username,
                               type: updatedUser.type,
                               role_id: selectedRoles[0],
                               role_ids: selectedRoles,
@@ -344,8 +346,9 @@ export const UserManagement: React.FC = () => {
                       const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
                       setUsers([...users, {
                         id: newUser.id,
-                        user_name: newUser.user_name,
-                        name: newUser.user_name,
+                        user_name: newUser.username,
+                        username: newUser.username,
+                        name: newUser.username,
                         type: newUser.type,
                         role_id: selectedRoles[0],
                         role_ids: selectedRoles,
@@ -369,7 +372,7 @@ export const UserManagement: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">用户名 <span className="text-rose-600">*</span></label>
-                    <input name="user_name" required defaultValue={editingUser?.user_name || editingUser?.username} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
+                    <input name="user_name" required defaultValue={editingUser?.username || editingUser?.user_name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">姓名</label>

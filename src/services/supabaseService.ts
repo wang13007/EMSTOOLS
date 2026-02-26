@@ -24,11 +24,12 @@ export const userService = {
       const users = data.map(user => ({
         id: user.user_id || user.id,
         user_id: user.user_id,
-        user_name: user.user_name,
+        user_name: user.username,
+        username: user.username,
         phone: user.phone,
         email: user.email,
-        type: user.user_type || user.type,
-        user_type: user.user_type,
+        type: user.type,
+        user_type: user.type,
         role_id: user.role_id,
         status: user.status,
         last_login_time: user.last_login_time,
@@ -113,9 +114,9 @@ export const userService = {
       const dbUser = {
         // 基本字段
         user_id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // 生成唯一用户ID
-        user_name: user.user_name, // 用户名
+        username: user.username || user.user_name, // 用户名
         password_hash: user.password_hash || user.password, // 密码哈希字段，确保非空
-        user_type: user.type || user.user_type || 'external', // 用户类型
+        type: user.type || user.user_type || 'external', // 用户类型
         status: user.status || 'enabled', // 用户状态
         create_time: new Date().toISOString() // 创建时间
       };
@@ -167,14 +168,14 @@ export const userService = {
       };
       
       // 可选字段
-      if (user.user_name) {
-        dbUser.user_name = user.user_name;
+      if (user.username || user.user_name) {
+        dbUser.username = user.username || user.user_name;
       }
       if (user.password || user.password_hash) {
         dbUser.password_hash = user.password || user.password_hash;
       }
-      if (user.user_type || user.type) {
-        dbUser.user_type = user.user_type || user.type;
+      if (user.type || user.user_type) {
+        dbUser.type = user.type || user.user_type;
       }
       if (user.phone) {
         dbUser.phone = user.phone;
