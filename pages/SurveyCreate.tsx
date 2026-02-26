@@ -116,13 +116,16 @@ export const SurveyCreate: React.FC = () => {
         project_name: formData.projectName,
         industry: formData.industry,
         region: formData.region,
-        template_id: presetTemplate.id,
+        // survey_forms.template_id is UUID FK; local preset id is a business key.
+        template_id: isUuid(presetTemplate.id) ? presetTemplate.id : null,
         status: SurveyStatus.DRAFT,
         report_status: ReportStatus.NOT_GENERATED,
         creator_id: currentUserId,
         submitter_id: currentUserId,
         pre_sales_responsible_id: formData.preSalesResponsibleId,
-        data: {},
+        data: {
+          template_key: presetTemplate.id,
+        },
       };
 
       const newSurvey = await surveyService.createSurvey(surveyData);
