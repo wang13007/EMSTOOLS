@@ -28,8 +28,8 @@ export const userService = {
         username: user.username,
         phone: user.phone,
         email: user.email,
-        type: user.type,
-        user_type: user.type,
+        type: user.user_type,
+        user_type: user.user_type,
         role_id: user.role_id,
         status: user.status,
         last_login_time: user.last_login_time,
@@ -116,7 +116,7 @@ export const userService = {
         user_id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // 生成唯一用户ID
         username: user.username || user.user_name, // 用户名
         password_hash: user.password_hash || user.password, // 密码哈希字段，确保非空
-        type: user.type || user.user_type || 'external', // 用户类型
+        user_type: user.user_type || user.type || 'external', // 用户类型
         status: user.status || 'enabled', // 用户状态
         create_time: new Date().toISOString() // 创建时间
       };
@@ -174,8 +174,8 @@ export const userService = {
       if (user.password || user.password_hash) {
         dbUser.password_hash = user.password || user.password_hash;
       }
-      if (user.type || user.user_type) {
-        dbUser.type = user.type || user.user_type;
+      if (user.user_type || user.type) {
+        dbUser.user_type = user.user_type || user.type;
       }
       if (user.phone) {
         dbUser.phone = user.phone;
