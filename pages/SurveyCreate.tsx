@@ -16,10 +16,13 @@ const isUuid = (value: string | undefined | null) => Boolean(value && UUID_REGEX
 
 const isPreSalesRole = (role: any) => {
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
-  if (source.includes('售前负责人')) return true;
-  if (source.includes('售前') && source.includes('负责人')) return true;
-  if (source.includes('pre-sales') || source.includes('presales')) return true;
-  return false;
+  const keywords = [
+    '\u552e\u524d', // ??
+    'presales',
+    'pre-sales',
+    'pre sales',
+  ];
+  return keywords.some((keyword) => source.includes(keyword));
 };
 
 const getCurrentUserId = () => {
@@ -53,7 +56,15 @@ export const SurveyCreate: React.FC = () => {
       setLoadingUsers(true);
       try {
         const [roles, users] = await Promise.all([roleService.getRoles(), userService.getUsers()]);
-        const preSalesRoleIds = new Set((roles || []).filter(isPreSalesRole).map((role: any) => role.id));
+        const preSalesRoles = (roles || []).filter(isPreSalesRole);
+        // Fallback: if no role keyword match, allow common "???" role names.
+        const fallbackRoles = preSalesRoles.length
+          ? preSalesRoles
+          : (roles || []).filter((role: any) => {
+              const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
+              return (role?.status || 'enabled') === 'enabled' && source.includes('\u5de5\u7a0b\u5e08');
+            });
+        const preSalesRoleIds = new Set(fallbackRoles.map((role: any) => role.id));
 
         const options = (users || [])
           .filter((user: any) => (user.status || 'enabled') === 'enabled')
