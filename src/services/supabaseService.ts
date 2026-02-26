@@ -28,8 +28,8 @@ export const userService = {
         username: user.username,
         phone: user.phone,
         email: user.email,
-        type: user.user_type,
-        user_type: user.user_type,
+        type: user.type,
+        user_type: user.type,
         role_id: user.role_id,
         status: user.status,
         last_login_time: user.last_login_time,
@@ -110,12 +110,53 @@ export const userService = {
     try {
       console.log('开始创建用户，用户数据:', user);
       
+      // 首先获取角色列表，以便提供默认角色
+      const { data: roles, error: rolesError } = await supabase
+        .from('roles')
+        .select('*');
+      
+      if (rolesError) {
+        console.error('获取角色列表失败:', rolesError);
+      }
+      
+      // 确定使用的 role_id
+      let roleId = user.role_id;
+      
+      // 如果没有提供 role_id，尝试获取默认角色
+      if (!roleId && roles && roles.length > 0) {
+        // 根据用户类型选择默认角色
+        const userType = user.type || user.user_type || 'external';
+        if (userType === 'external') {
+          // 外部用户默认使用客户用户角色
+          const customerRole = roles.find(r => r.name === '客户用户' || r.name === '外部客户');
+          if (customerRole) {
+            roleId = customerRole.id;
+          }
+        } else {
+          // 内部用户默认使用售前工程师角色
+          const engineerRole = roles.find(r => r.name === '售前工程师');
+          if (engineerRole) {
+            roleId = engineerRole.id;
+          }
+        }
+        
+        // 如果还是没有找到，使用第一个角色
+        if (!roleId) {
+          roleId = roles[0].id;
+        }
+      }
+      
+      if (!roleId) {
+        throw new Error('无法确定用户角色，请先创建角色');
+      }
+      
       // 构建数据库用户对象，确保与数据表结构一致
       const dbUser = {
         // 基本字段 - 不手动生成user_id，让数据库自动生成UUID
         username: user.username || user.user_name, // 用户名
         password_hash: user.password_hash || user.password, // 密码哈希字段，确保非空
-        user_type: user.user_type || user.type || 'external', // 用户类型
+        type: user.type || user.user_type || 'external', // 用户类型（使用type字段）
+        role_id: roleId, // 角色ID（不能为空）
         status: user.status || 'enabled', // 用户状态
         create_time: new Date().toISOString() // 创建时间
       };
@@ -126,9 +167,6 @@ export const userService = {
       }
       if (user.email) {
         dbUser.email = user.email;
-      }
-      if (user.role_id) {
-        dbUser.role_id = user.role_id;
       }
       
       console.log('处理后的数据库用户数据:', dbUser);
@@ -173,8 +211,8 @@ export const userService = {
       if (user.password || user.password_hash) {
         dbUser.password_hash = user.password || user.password_hash;
       }
-      if (user.user_type || user.type) {
-        dbUser.user_type = user.user_type || user.type;
+      if (user.type || user.user_type) {
+        dbUser.type = user.type || user.user_type;
       }
       if (user.phone) {
         dbUser.phone = user.phone;
