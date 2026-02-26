@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { SurveyForm, SurveyStatus, ReportStatus } from '../types';
-import { surveyService } from '../src/services/supabaseService';
+import { surveyService, userService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
 
 export const SurveyList: React.FC = () => {
@@ -14,10 +14,16 @@ export const SurveyList: React.FC = () => {
   const [surveys, setSurveys] = useState<SurveyForm[]>([]);
 
   useEffect(() => {
-    // 从数据库获取调研表单列表
     const fetchSurveys = async () => {
-      const surveyList = await surveyService.getSurveys();
-      // 转换数据格式以匹配前端类型
+      const [surveyList, users] = await Promise.all([surveyService.getSurveys(), userService.getUsers()]);
+      const userNameMap: Record<string, string> = {};
+
+      (users || []).forEach((user: any) => {
+        const displayName = user.user_name || user.name || user.username || user.id;
+        if (user.id) userNameMap[user.id] = displayName;
+        if (user.user_id) userNameMap[user.user_id] = displayName;
+      });
+
       const formattedSurveys = surveyList.map(survey => ({
         id: survey.id,
         name: survey.name,
@@ -34,10 +40,9 @@ export const SurveyList: React.FC = () => {
         data: survey.data,
         createTime: survey.create_time,
         updateTime: survey.update_time,
-        // 前端需要的其他字段
-        creator: '系统用户', // 需要根据creator_id获取用户名
-        submitter: '系统用户', // 需要根据submitter_id获取用户名
-        preSalesResponsible: '系统用户' // 需要根据pre_sales_responsible_id获取用户名
+        creator: userNameMap[survey.creator_id] || '-',
+        submitter: userNameMap[survey.submitter_id] || '-',
+        preSalesResponsible: userNameMap[survey.pre_sales_responsible_id] || '-'
       }));
       setSurveys(formattedSurveys);
     };
