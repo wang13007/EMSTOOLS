@@ -260,7 +260,6 @@ export const UserManagement: React.FC = () => {
                 const defaultPassword = '123456';
                 
                 const userData = {
-                  name: formData.get('user_name') as string,
                   user_name: formData.get('user_name') as string,
                   password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', // 默认密码为 '123456'
                   type: formData.get('type') as UserType,
@@ -315,22 +314,22 @@ export const UserManagement: React.FC = () => {
                     const updatedUser = await userService.updateUser(editingUser.id, userData);
                     console.log('更新用户结果:', updatedUser);
                     if (updatedUser) {
-                      const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
-                      setUsers(users.map(u => {
-                        if (u.id === editingUser.id) {
-                          return {
-                            ...u,
-                            user_name: updatedUser.user_name,
-                            name: updatedUser.name || updatedUser.user_name,
-                            type: updatedUser.type,
-                            role_id: selectedRoles[0],
-                            role_ids: selectedRoles,
-                            role: roleNames || '未分配',
-                            status: updatedUser.status
-                          };
-                        }
-                        return u;
-                      }));
+                        const roleNames = selectedRoles.map(roleId => roles.find(r => r.id === roleId)?.name || '未知').join(', ');
+                        setUsers(users.map(u => {
+                          if (u.id === editingUser.id) {
+                            return {
+                              ...u,
+                              user_name: updatedUser.user_name,
+                              name: updatedUser.user_name,
+                              type: updatedUser.type,
+                              role_id: selectedRoles[0],
+                              role_ids: selectedRoles,
+                              role: roleNames || '未分配',
+                              status: updatedUser.status
+                            };
+                          }
+                          return u;
+                        }));
                       setIsModalOpen(false);
                       setSelectedRoles([]);
                     } else {
@@ -346,7 +345,7 @@ export const UserManagement: React.FC = () => {
                       setUsers([...users, {
                         id: newUser.id,
                         user_name: newUser.user_name,
-                        name: newUser.name || newUser.user_name,
+                        name: newUser.user_name,
                         type: newUser.type,
                         role_id: selectedRoles[0],
                         role_ids: selectedRoles,
