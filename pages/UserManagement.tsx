@@ -1,450 +1,309 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { User, UserStatus, UserType } from '../types';
+import { roleService, userService } from '../src/services/supabaseService';
 
-import React, { useState, useEffect } from 'react';
-import { ICONS } from '../constants';
-import { User, UserType, UserStatus } from '../types';
-import { userService } from '../src/services/supabaseService';
-import Portal from '../src/components/Portal';
+type RoleLite = {
+  id: string;
+  name: string;
+  type?: UserType;
+};
 
-export const UserManagement: React.FC = () =&gt; {
-  const [users, setUsers] = useState&lt;User[]&gt;([]);
-  const [roles, setRoles] = useState&lt;any[]&gt;([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState&lt;User | null&gt;(null);
-  const [selectedRoles, setSelectedRoles] = useState&lt;string[]&gt;([]);
-  const [selectedUserType, setSelectedUserType] = useState&lt;UserType&gt;(UserType.INTERNAL);
+type FormState = {
+  username: string;
+  password: string;
+  phone: string;
+  email: string;
+  type: UserType;
+  role_id: string;
+};
 
-  const DEFAULT_ROLES = [
-    { id: 'role-1', name: '超级管理员', type: UserType.INTERNAL },
-    { id: 'role-2', name: '售前工程师', type: UserType.INTERNAL },
-    { id: 'role-3', name: '客户用户', type: UserType.EXTERNAL }
-  ];
+const defaultForm: FormState = {
+  username: '',
+  password: '',
+  phone: '',
+  email: '',
+  type: UserType.EXTERNAL,
+  role_id: '',
+};
 
-  useEffect(() =&gt; {
-    const fetchData = async () =&gt; {
-      try {
-        const roleList = await userService.getRoles();
-        if (roleList &amp;&amp; roleList.length &gt; 0) {
-          setRoles(roleList);
-        } else {
-          setRoles(DEFAULT_ROLES);
-        }
+export const UserManagement: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<RoleLite[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState<FormState>(defaultForm);
+  const [error, setError] = useState('');
 
-        const userList = await userService.getUsers();
-        const formattedUsers = userList.map(user =&gt; {
-          let roleNames = '未分配';
-          const currentRoles = roleList.length &gt; 0 ? roleList : DEFAULT_ROLES;
-          
-          if (user.role_ids &amp;&amp; Array.isArray(user.role_ids) &amp;&amp; user.role_ids.length &gt; 0) {
-            roleNames = user.role_ids.map(roleId =&gt; {
-              const role = currentRoles.find(r =&gt; r.id === roleId);
-              return role ? role.name : '未知角色';
-            }).join(', ');
-          } else if (user.role_id) {
-            const role = currentRoles.find(r =&gt; r.id === user.role_id);
-            roleNames = role ? role.name : '未知角色';
-          }
-          
-          return {
-            id: user.user_id || user.id,
-            user_id: user.user_id,
-            user_name: user.user_name,
-            username: user.username,
-            name: user.name || user.user_name || user.username,
-            type: user.type,
-            role_id: user.role_id,
-            role_ids: [user.role_id] || [],
-            role: roleNames,
-            status: user.status,
-            last_login_time: user.last_login_time,
-            createTime: user.create_time ? new Date(user.create_time).toISOString().split('T')[0] : ''
-          };
-        });
-        setUsers(formattedUsers);
-      } catch (error) {
-        console.error('获取数据失败:', error);
-        setRoles(DEFAULT_ROLES);
-        setUsers([
-          {
-            id: 'user-1',
-            user_name: 'admin',
-            phone: '13800138000',
-            email: 'admin@example.com',
-            type: UserType.INTERNAL,
-            role_id: 'role-1',
-            role_ids: ['role-1'],
-            role: '超级管理员',
-            status: UserStatus.ENABLED,
-            last_login_time: null,
-            createTime: new Date().toISOString().split('T')[0]
-          }
-        ]);
-      }
-    };
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [roleList, userList] = await Promise.all([
+        roleService.getRoles(),
+        userService.getUsers(),
+      ]);
 
-    fetchData();
+      setRoles((roleList || []).map((r: any) => ({ id: r.id, name: r.name, type: r.type })));
+
+      const normalizedUsers: User[] = (userList || []).map((u: any) => ({
+        id: u.user_id || u.id,
+        user_id: u.user_id,
+        user_name: u.user_name || u.username,
+        username: u.username,
+        phone: u.phone || '',
+        email: u.email || '',
+        type: (u.type || u.user_type || UserType.EXTERNAL) as UserType,
+        user_type: (u.type || u.user_type || UserType.EXTERNAL) as UserType,
+        role: '',
+        role_id: u.role_id,
+        role_ids: u.role_id ? [u.role_id] : [],
+        status: (u.status || UserStatus.ENABLED) as UserStatus,
+        last_login_time: u.last_login_time || '',
+        create_time: u.create_time || '',
+        createTime: u.create_time ? new Date(u.create_time).toISOString().split('T')[0] : '',
+      }));
+
+      setUsers(normalizedUsers);
+    } catch (e) {
+      console.error('加载用户数据失败:', e);
+      setError('加载用户数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
-  const saveUsers = async (userData: any) =&gt; {
+  const roleNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const r of roles) map[r.id] = r.name;
+    return map;
+  }, [roles]);
+
+  const visibleUsers = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return users;
+    return users.filter((u) => {
+      return (
+        (u.username || '').toLowerCase().includes(keyword) ||
+        (u.user_name || '').toLowerCase().includes(keyword) ||
+        (u.email || '').toLowerCase().includes(keyword) ||
+        (u.phone || '').toLowerCase().includes(keyword)
+      );
+    });
+  }, [users, search]);
+
+  const filteredRoles = useMemo(() => {
+    return roles.filter((r) => !r.type || r.type === form.type);
+  }, [roles, form.type]);
+
+  useEffect(() => {
+    if (!filteredRoles.find((r) => r.id === form.role_id)) {
+      setForm((prev) => ({ ...prev, role_id: filteredRoles[0]?.id || '' }));
+    }
+  }, [filteredRoles, form.role_id]);
+
+  const onCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
     try {
-      if (userData.id) {
-        const updatedUser = await userService.updateUser(userData.id, userData);
-        if (updatedUser) {
-          setUsers(prevUsers =&gt; prevUsers.map(u =&gt; u.id === userData.id ? { ...u, ...userData } : u));
-        }
-      } else {
-        const createdUser = await userService.createUser(userData);
-        if (createdUser) {
-          const newUser = {
-            id: createdUser.id,
-            ...userData,
-            createTime: new Date().toISOString().split('T')[0]
-          };
-          setUsers(prevUsers =&gt; [...prevUsers, newUser]);
-        }
+      if (!form.username.trim()) {
+        throw new Error('用户名不能为空');
       }
-    } catch (error) {
-      console.error('保存用户失败:', error);
+      if (!form.password.trim()) {
+        throw new Error('密码不能为空');
+      }
+      if (!form.role_id) {
+        throw new Error('请先选择角色');
+      }
+
+      const payload = {
+        user_name: form.username.trim(),
+        username: form.username.trim(),
+        password_hash: form.password,
+        type: form.type,
+        user_type: form.type,
+        role_id: form.role_id,
+        phone: form.phone.trim() || undefined,
+        email: form.email.trim() || undefined,
+        status: UserStatus.ENABLED,
+      };
+
+      const created = await userService.createUser(payload);
+      if (!created) throw new Error('创建用户失败');
+
+      setForm(defaultForm);
+      await loadData();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '创建用户失败';
+      setError(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const filteredUsers = users.filter(u =&gt; {
-    const userName = u.username || u.user_name || '';
-    const userId = u.id || '';
-    return userName.includes(searchTerm) || userId.includes(searchTerm);
-  });
-
-  const handleDelete = async (id: string) =&gt; {
-    if (window.confirm('确定要删除该用户吗？')) {
-      const success = await userService.deleteUser(id);
-      if (success) {
-        setUsers(users.filter(u =&gt; u.id !== id));
-      }
+  const onToggleStatus = async (u: User) => {
+    const nextStatus = u.status === UserStatus.ENABLED ? UserStatus.DISABLED : UserStatus.ENABLED;
+    const ok = await userService.updateUser(u.id, { status: nextStatus });
+    if (ok) {
+      setUsers((prev) => prev.map((item) => (item.id === u.id ? { ...item, status: nextStatus } : item)));
     }
   };
 
-  const handleToggleStatus = async (id: string) =&gt; {
-    const user = users.find(u =&gt; u.id === id);
-    if (user) {
-      const newStatus = user.status === UserStatus.ENABLED ? UserStatus.DISABLED : UserStatus.ENABLED;
-      const success = await userService.updateUser(id, { status: newStatus });
-      if (success) {
-        setUsers(users.map(u =&gt; {
-          if (u.id === id) {
-            return { ...u, status: newStatus };
-          }
-          return u;
-        }));
-      }
+  const onDeleteUser = async (u: User) => {
+    if (!window.confirm(`确认删除用户 ${u.username} 吗？`)) return;
+    const ok = await userService.deleteUser(u.id);
+    if (ok) {
+      setUsers((prev) => prev.filter((item) => item.id !== u.id));
     }
   };
 
   return (
-    &lt;div className="space-y-6 animate-fadeIn"&gt;
-      &lt;div className="flex justify-between items-end"&gt;
-        &lt;div&gt;
-          &lt;h2 className="text-2xl font-bold text-slate-900"&gt;用户管理&lt;/h2&gt;
-          &lt;p className="text-slate-500"&gt;维护系统登录用户信息，支持内部员工与外部客户账号管理。&lt;/p&gt;
-        &lt;/div&gt;
-        &lt;div className="flex gap-3"&gt;
-          &lt;div className="relative"&gt;
-            &lt;input 
-              type="text"
-              placeholder="搜索用户名/用户ID..."
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-sm"
-              value={searchTerm}
-              onChange={(e) =&gt; setSearchTerm(e.target.value)}
-            /&gt;
-            &lt;div className="absolute left-3 top-2.5 text-slate-400"&gt;
-               &lt;svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"&gt;&lt;path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/&gt;&lt;/svg&gt;
-            &lt;/div&gt;
-          &lt;/div&gt;
-          &lt;button 
-            onClick={() =&gt; { setEditingUser(null); setSelectedUserType(UserType.INTERNAL); setSelectedRoles([]); setIsModalOpen(true); }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95"
-          &gt;
-            &lt;ICONS.Plus className="w-4 h-4" /&gt;
-            新增用户
-          &lt;/button&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
+    <div className="space-y-6 animate-fadeIn">
+      <div className="flex flex-col md:flex-row gap-3 md:items-end md:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">用户管理</h2>
+          <p className="text-slate-500">创建、启停和删除系统用户</p>
+        </div>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜索用户名/手机号/邮箱"
+          className="w-full md:w-80 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+      </div>
 
-      &lt;div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"&gt;
-        &lt;table className="w-full text-left"&gt;
-          &lt;thead className="bg-slate-50 border-b border-slate-200"&gt;
-            &lt;tr&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;用户ID&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;用户名&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;姓名&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;用户类型&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;手机号&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;邮箱&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;状态&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;创建时间&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider"&gt;上次登录时间&lt;/th&gt;
-              &lt;th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right"&gt;操作&lt;/th&gt;
-            &lt;/tr&gt;
-          &lt;/thead&gt;
-          &lt;tbody className="divide-y divide-slate-100"&gt;
-            {filteredUsers.map(user =&gt; (
-              &lt;tr key={user.id} className="hover:bg-slate-50 transition-colors"&gt;
-                &lt;td className="px-6 py-4 text-sm text-slate-900 font-medium"&gt;{user.id}&lt;/td&gt;
-                &lt;td className="px-6 py-4"&gt;
-                  &lt;div className="flex items-center gap-3"&gt;
-                    &lt;div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-[10px]"&gt;
-                      {(user.username || user.user_name || 'U').slice(0, 1)}
-                    &lt;/div&gt;
-                    &lt;span className="font-bold text-slate-900"&gt;{user.username || user.user_name || '-'}&lt;/span&gt;
-                  &lt;/div&gt;
-                &lt;/td&gt;
-                &lt;td className="px-6 py-4 text-sm text-slate-500"&gt;{user.name || '-'}&lt;/td&gt;
-                &lt;td className="px-6 py-4"&gt;
-                  &lt;span className="text-[10px] text-slate-400 font-bold uppercase"&gt;{user.type === UserType.INTERNAL ? '内部用户' : '外部客户'}&lt;/span&gt;
-                &lt;/td&gt;
-                &lt;td className="px-6 py-4 text-sm text-slate-500"&gt;{user.phone || '-'}&lt;/td&gt;
-                &lt;td className="px-6 py-4 text-sm text-slate-500"&gt;{user.email || '-'}&lt;/td&gt;
-                &lt;td className="px-6 py-4"&gt;
-                  &lt;span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${user.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}&gt;
-                    {user.status}
-                  &lt;/span&gt;
-                &lt;/td&gt;
-                &lt;td className="px-6 py-4 text-sm text-slate-500"&gt;{user.createTime}&lt;/td&gt;
-                &lt;td className="px-6 py-4 text-sm text-slate-500"&gt;{user.last_login_time || '-'}&lt;/td&gt;
-                &lt;td className="px-6 py-4 text-right space-x-3"&gt;
-                  &lt;button 
-                    onClick={() =&gt; {
-                      setEditingUser(user);
-                      setSelectedUserType(user.type);
-                      setSelectedRoles(user.role_ids || []);
-                      setIsModalOpen(true);
-                    }}
-                    className="text-blue-600 font-bold text-sm hover:underline"
-                  &gt;
-                    编辑
-                  &lt;/button&gt;
-                  &lt;button 
-                    onClick={() =&gt; handleToggleStatus(user.id)}
-                    className={`${user.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
-                  &gt;
-                    {user.status === UserStatus.ENABLED ? '禁用' : '启用'}
-                  &lt;/button&gt;
-                  &lt;button 
-                    onClick={() =&gt; handleDelete(user.id)}
-                    className="text-red-600 font-bold text-sm hover:underline"
-                  &gt;
-                    删除
-                  &lt;/button&gt;
-                &lt;/td&gt;
-              &lt;/tr&gt;
-            ))}
-          &lt;/tbody&gt;
-        &lt;/table&gt;
-      &lt;/div&gt;
-
-      {isModalOpen &amp;&amp; (
-        &lt;Portal&gt;
-          &lt;div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"&gt;
-            &lt;div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp"&gt;
-              &lt;div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center"&gt;
-                &lt;h3 className="text-xl font-bold text-slate-900"&gt;{editingUser ? '编辑用户' : '新增用户'}&lt;/h3&gt;
-                &lt;button onClick={() =&gt; setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"&gt;
-                  &lt;svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"&gt;&lt;path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/&gt;&lt;/svg&gt;
-                &lt;/button&gt;
-              &lt;/div&gt;
-              &lt;form className="p-8 space-y-4" onSubmit={async (e) =&gt; {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                
-                const userData = {
-                  username: formData.get('user_name') as string,
-                  password_hash: '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW',
-                  type: formData.get('type') as UserType,
-                  role_id: selectedRoles[0],
-                  status: editingUser?.status || UserStatus.ENABLED
-                };
-                
-                try {
-                  console.log('用户数据:', userData);
-                  console.log('选中的角色:', selectedRoles);
-                  
-                  if (!userData.username || userData.username.trim() === '') {
-                    console.error('用户名不能为空');
-                    alert('请输入用户名');
-                    return;
-                  }
-                  
-                  if (!userData.type) {
-                    console.error('用户类型不能为空');
-                    alert('请选择用户类型');
-                    return;
-                  }
-                  
-                  if (!formData.get('phone') || (formData.get('phone') as string).trim() === '') {
-                    console.error('手机号不能为空');
-                    alert('请输入手机号');
-                    return;
-                  }
-                  
-                  if (!formData.get('email') || (formData.get('email') as string).trim() === '') {
-                    console.error('邮箱不能为空');
-                    alert('请输入邮箱');
-                    return;
-                  }
-                  
-                  if (!Array.isArray(selectedRoles) || selectedRoles.length === 0) {
-                    console.error('至少选择一个角色');
-                    alert('请至少选择一个角色');
-                    return;
-                  }
-                  
-                  if (!userData.role_id) {
-                    console.error('角色ID不能为空');
-                    alert('请选择一个角色');
-                    return;
-                  }
-                  
-                  if (editingUser) {
-                    console.log('更新用户 ID:', editingUser.id);
-                    const updatedUser = await userService.updateUser(editingUser.id, userData);
-                    console.log('更新用户结果:', updatedUser);
-                    if (updatedUser) {
-                      const roleNames = selectedRoles.map(roleId =&gt; roles.find(r =&gt; r.id === roleId)?.name || '未知').join(', ');
-                      setUsers(users.map(u =&gt; {
-                        if (u.id === editingUser.id) {
-                          return {
-                            ...u,
-                            user_name: updatedUser.username,
-                            username: updatedUser.username,
-                            name: updatedUser.username,
-                            type: updatedUser.type,
-                            role_id: selectedRoles[0],
-                            role_ids: selectedRoles,
-                            role: roleNames || '未分配',
-                            status: updatedUser.status
-                          };
-                        }
-                        return u;
-                      }));
-                      setIsModalOpen(false);
-                      setSelectedRoles([]);
-                    } else {
-                      alert('更新用户失败，请检查控制台错误信息');
-                    }
-                  } else {
-                    console.log('创建新用户');
-                    const newUser = await userService.createUser(userData);
-                    console.log('创建用户结果:', newUser);
-                    if (newUser) {
-                      const roleNames = selectedRoles.map(roleId =&gt; roles.find(r =&gt; r.id === roleId)?.name || '未知').join(', ');
-                      setUsers([...users, {
-                        id: newUser.id,
-                        user_name: newUser.username,
-                        username: newUser.username,
-                        name: newUser.username,
-                        type: newUser.type,
-                        role_id: selectedRoles[0],
-                        role_ids: selectedRoles,
-                        role: roleNames || '未分配',
-                        status: newUser.status,
-                        last_login_time: newUser.last_login_time,
-                        createTime: newUser.create_time ? new Date(newUser.create_time).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-                      }]);
-                      setIsModalOpen(false);
-                      setSelectedRoles([]);
-                    } else {
-                      alert('创建用户失败，请检查控制台错误信息');
-                    }
-                  }
-                } catch (error) {
-                  console.error('保存用户失败:', error);
-                  console.error('错误详情:', JSON.stringify(error, null, 2));
-                  alert('保存用户失败，请检查控制台错误信息');
-                }
-              }}&gt;
-                &lt;div className="grid grid-cols-2 gap-4"&gt;
-                  &lt;div className="space-y-1"&gt;
-                    &lt;label className="text-xs font-bold text-slate-500 uppercase"&gt;用户名 &lt;span className="text-rose-600"&gt;*&lt;/span&gt;&lt;/label&gt;
-                    &lt;input name="user_name" required defaultValue={editingUser?.username || editingUser?.user_name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /&gt;
-                  &lt;/div&gt;
-                  &lt;div className="space-y-1"&gt;
-                    &lt;label className="text-xs font-bold text-slate-500 uppercase"&gt;姓名&lt;/label&gt;
-                    &lt;input name="name" defaultValue={editingUser?.name} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入姓名" /&gt;
-                  &lt;/div&gt;
-                &lt;/div&gt;
-                &lt;div className="grid grid-cols-2 gap-4"&gt;
-                  &lt;div className="space-y-1"&gt;
-                    &lt;label className="text-xs font-bold text-slate-500 uppercase"&gt;用户类型 &lt;span className="text-rose-600"&gt;*&lt;/span&gt;&lt;/label&gt;
-                    &lt;select 
-                      name="type" 
-                      required 
-                      defaultValue={editingUser?.type || UserType.INTERNAL} 
-                      onChange={(e) =&gt; {
-                        const newType = e.target.value as UserType;
-                        setSelectedUserType(newType);
-                        setSelectedRoles([]);
-                      }}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    &gt;
-                      &lt;option value={UserType.INTERNAL}&gt;内部用户&lt;/option&gt;
-                      &lt;option value={UserType.EXTERNAL}&gt;外部客户&lt;/option&gt;
-                    &lt;/select&gt;
-                  &lt;/div&gt;
-                  &lt;div className="space-y-1"&gt;
-                    &lt;label className="text-xs font-bold text-slate-500 uppercase"&gt;手机号 &lt;span className="text-rose-600"&gt;*&lt;/span&gt;&lt;/label&gt;
-                    &lt;input name="phone" required defaultValue={editingUser?.phone} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入手机号" /&gt;
-                  &lt;/div&gt;
-                &lt;/div&gt;
-                &lt;div className="grid grid-cols-1 gap-4"&gt;
-                  &lt;div className="space-y-1"&gt;
-                    &lt;label className="text-xs font-bold text-slate-500 uppercase"&gt;邮箱 &lt;span className="text-rose-600"&gt;*&lt;/span&gt;&lt;/label&gt;
-                    &lt;input name="email" required defaultValue={editingUser?.email} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="请输入邮箱" /&gt;
-                  &lt;/div&gt;
-                &lt;/div&gt;
-                &lt;div className="grid grid-cols-1 gap-4"&gt;
-                  &lt;div className="space-y-1"&gt;
-                    &lt;label className="text-xs font-bold text-slate-500 uppercase"&gt;角色 (多选) &lt;span className="text-rose-600"&gt;*&lt;/span&gt;&lt;/label&gt;
-                    &lt;div className="flex flex-wrap gap-2 border border-slate-200 rounded-lg p-2 min-h-[40px]"&gt;
-                      {roles.map(role =&gt; {
-                        const isDisabled = role.type !== selectedUserType;
-                        return (
-                          &lt;div key={role.id} className="flex items-center"&gt;
-                            &lt;input
-                              type="checkbox"
-                              id={`role-${role.id}`}
-                              checked={selectedRoles.includes(role.id)}
-                              onChange={(e) =&gt; {
-                                if (isDisabled) return;
-                                if (e.target.checked) {
-                                  setSelectedRoles([...selectedRoles, role.id]);
-                                } else {
-                                  setSelectedRoles(selectedRoles.filter(id =&gt; id !== role.id));
-                                }
-                              }}
-                              disabled={isDisabled}
-                              className={`mr-1 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            /&gt;
-                            &lt;label 
-                              htmlFor={`role-${role.id}`} 
-                              className={`text-sm ${isDisabled ? 'text-slate-400 cursor-not-allowed' : 'text-slate-600'}`}
-                            &gt;
-                              {role.name}
-                            &lt;/label&gt;
-                          &lt;/div&gt;
-                        );
-                      })}
-                    &lt;/div&gt;
-                  &lt;/div&gt;
-                &lt;/div&gt;
-
-                &lt;div className="pt-4 flex justify-end gap-3"&gt;
-                  &lt;button type="button" onClick={() =&gt; setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100"&gt;取消&lt;/button&gt;
-                  &lt;button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200"&gt;保存&lt;/button&gt;
-                &lt;/div&gt;
-              &lt;/form&gt;
-            &lt;/div&gt;
-          &lt;/div&gt;
-        &lt;/Portal&gt;
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-lg px-4 py-2 text-rose-600 text-sm">
+          {error}
+        </div>
       )}
-    &lt;/div&gt;
+
+      <div className="bg-white border border-slate-200 rounded-xl p-4">
+        <h3 className="font-bold text-slate-800 mb-3">新建用户</h3>
+        <form onSubmit={onCreateUser} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input
+            value={form.username}
+            onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
+            placeholder="用户名"
+            className="px-3 py-2 border border-slate-300 rounded-lg"
+          />
+          <input
+            value={form.password}
+            onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+            placeholder="密码"
+            className="px-3 py-2 border border-slate-300 rounded-lg"
+          />
+          <select
+            value={form.type}
+            onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value as UserType }))}
+            className="px-3 py-2 border border-slate-300 rounded-lg"
+          >
+            <option value={UserType.EXTERNAL}>外部客户</option>
+            <option value={UserType.INTERNAL}>内部用户</option>
+          </select>
+          <select
+            value={form.role_id}
+            onChange={(e) => setForm((prev) => ({ ...prev, role_id: e.target.value }))}
+            className="px-3 py-2 border border-slate-300 rounded-lg"
+          >
+            {filteredRoles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+          <input
+            value={form.phone}
+            onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+            placeholder="手机号"
+            className="px-3 py-2 border border-slate-300 rounded-lg"
+          />
+          <input
+            value={form.email}
+            onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+            placeholder="邮箱"
+            className="px-3 py-2 border border-slate-300 rounded-lg"
+          />
+          <button
+            disabled={submitting}
+            className="md:col-span-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg disabled:opacity-60"
+          >
+            {submitting ? '创建中...' : '创建用户'}
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="text-left px-4 py-3">用户名</th>
+              <th className="text-left px-4 py-3">类型</th>
+              <th className="text-left px-4 py-3">角色</th>
+              <th className="text-left px-4 py-3">手机号</th>
+              <th className="text-left px-4 py-3">邮箱</th>
+              <th className="text-left px-4 py-3">状态</th>
+              <th className="text-right px-4 py-3">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  加载中...
+                </td>
+              </tr>
+            ) : visibleUsers.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  暂无数据
+                </td>
+              </tr>
+            ) : (
+              visibleUsers.map((u) => (
+                <tr key={u.id} className="border-b border-slate-100 last:border-b-0">
+                  <td className="px-4 py-3 font-medium text-slate-800">{u.username}</td>
+                  <td className="px-4 py-3">{u.type === UserType.INTERNAL ? '内部' : '外部'}</td>
+                  <td className="px-4 py-3">{u.role_id ? roleNameMap[u.role_id] || u.role_id : '-'}</td>
+                  <td className="px-4 py-3">{u.phone || '-'}</td>
+                  <td className="px-4 py-3">{u.email || '-'}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={
+                        u.status === UserStatus.ENABLED
+                          ? 'text-emerald-600 font-medium'
+                          : 'text-rose-600 font-medium'
+                      }
+                    >
+                      {u.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right space-x-3">
+                    <button
+                      onClick={() => onToggleStatus(u)}
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      {u.status === UserStatus.ENABLED ? '禁用' : '启用'}
+                    </button>
+                    <button
+                      onClick={() => onDeleteUser(u)}
+                      className="text-rose-600 hover:underline font-medium"
+                    >
+                      删除
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 };
+
