@@ -6,6 +6,44 @@ import {
 import { ICONS } from '../constants';
 import { dictService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
+import { INITIAL_REGIONS } from '../constants/regions';
+
+const REGION_STORAGE_KEY = 'ems_regions';
+
+const buildPresetRegions = (): RegionDict[] => {
+  const source = INITIAL_REGIONS.filter((item) => {
+    if (item.regionLevel === RegionLevel.CITY && (item.regionCode === '810100' || item.regionCode === '820100')) {
+      return false;
+    }
+    return true;
+  });
+
+  const oldIdToCode = new Map<string, string>();
+  source.forEach((item) => {
+    if (!oldIdToCode.has(item.regionId)) {
+      oldIdToCode.set(item.regionId, item.regionCode);
+    }
+  });
+
+  return source.map((item) => {
+    const parentCode = item.parentId ? oldIdToCode.get(item.parentId) : undefined;
+    return {
+      ...item,
+      regionId: item.regionCode,
+      parentId: parentCode || undefined,
+      isSystem: true,
+    };
+  });
+};
+
+const isRegionCacheUsable = (data: unknown): data is RegionDict[] => {
+  if (!Array.isArray(data) || data.length < 300) {
+    return false;
+  }
+  const rows = data as RegionDict[];
+  const codeSet = new Set(rows.map((item) => item.regionCode));
+  return codeSet.has('CN') && codeSet.has('110000') && codeSet.has('810000') && codeSet.has('820000');
+};
 
 export const Dictionaries: React.FC = () => {
   const [selectedType, setSelectedType] = useState<DictType | null>(null);
@@ -72,19 +110,30 @@ export const Dictionaries: React.FC = () => {
     }
   }, [selectedType]);
 
-  // 模拟获取区域数据（暂时使用静态数据，后续可从数据库获取）
+  // Load preset region dictionary (with local cache fallback)
   useEffect(() => {
-    // 这里可以从数据库获取区域数据
-    // 暂时使用模拟数据
-    const mockRegions: RegionDict[] = [
-      { regionId: '1', regionName: '中国', regionCode: 'CN', parentId: '', regionLevel: RegionLevel.COUNTRY, status: DictStatus.ENABLED, isSystem: true, createTime: new Date().toISOString() },
-      { regionId: '2', regionName: '华北', regionCode: 'CN_NORTH', parentId: '1', regionLevel: RegionLevel.REGION, status: DictStatus.ENABLED, isSystem: true, createTime: new Date().toISOString() },
-      { regionId: '3', regionName: '华东', regionCode: 'CN_EAST', parentId: '1', regionLevel: RegionLevel.REGION, status: DictStatus.ENABLED, isSystem: true, createTime: new Date().toISOString() },
-      { regionId: '4', regionName: '北京市', regionCode: 'CN_BJ', parentId: '2', regionLevel: RegionLevel.PROVINCE, status: DictStatus.ENABLED, isSystem: true, createTime: new Date().toISOString() },
-      { regionId: '5', regionName: '上海市', regionCode: 'CN_SH', parentId: '3', regionLevel: RegionLevel.PROVINCE, status: DictStatus.ENABLED, isSystem: true, createTime: new Date().toISOString() },
-    ];
-    setRegions(mockRegions);
+    const cachedRegions = localStorage.getItem(REGION_STORAGE_KEY);
+    if (cachedRegions) {
+      try {
+        const parsed = JSON.parse(cachedRegions);
+        if (isRegionCacheUsable(parsed)) {
+          setRegions(parsed);
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to read cached regions, fallback to presets', error);
+      }
+    }
+
+    const presetRegions = buildPresetRegions();
+    setRegions(presetRegions);
+    localStorage.setItem(REGION_STORAGE_KEY, JSON.stringify(presetRegions));
   }, []);
+
+  useEffect(() => {
+    if (regions.length === 0) return;
+    localStorage.setItem(REGION_STORAGE_KEY, JSON.stringify(regions));
+  }, [regions]);
 
   const filteredItems = useMemo(() => {
     if (!selectedType) return [];

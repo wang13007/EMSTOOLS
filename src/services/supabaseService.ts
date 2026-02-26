@@ -1,4 +1,4 @@
-﻿import supabase from '../config/supabase';
+﻿﻿import supabase from '../config/supabase';
 import { SurveyForm, SurveyTemplate, SystemLog } from '../../types';
 
 const isMissingColumn = (error: any, column: string) => {
