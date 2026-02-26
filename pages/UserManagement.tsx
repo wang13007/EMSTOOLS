@@ -17,7 +17,6 @@ type UserRow = User & {
 type FormState = {
   username: string;
   name: string;
-  password: string;
   phone: string;
   email: string;
   type: UserType;
@@ -27,7 +26,6 @@ type FormState = {
 const DEFAULT_FORM: FormState = {
   username: '',
   name: '',
-  password: '',
   phone: '',
   email: '',
   type: UserType.EXTERNAL,
@@ -138,9 +136,6 @@ export const UserManagement: React.FC = () => {
       if (!form.username.trim()) {
         throw new Error('请输入用户名');
       }
-      if (!form.password.trim()) {
-        throw new Error('请输入密码');
-      }
       if (!form.roleId) {
         throw new Error('请选择角色');
       }
@@ -149,7 +144,7 @@ export const UserManagement: React.FC = () => {
         user_name: form.name.trim() || undefined,
         name: form.name.trim() || undefined,
         username: form.username.trim(),
-        password_hash: form.password,
+        password_hash: '1234',
         type: form.type,
         user_type: form.type,
         role_id: form.roleId,
@@ -305,6 +300,10 @@ export const UserManagement: React.FC = () => {
               </div>
 
               <form className="p-8 space-y-4" onSubmit={handleCreateUser}>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-amber-700 text-sm">
+                  默认密码为 <span className="font-bold">1234</span>，创建后可使用该密码登录。
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">用户名 <span className="text-rose-600">*</span></label>
@@ -322,19 +321,6 @@ export const UserManagement: React.FC = () => {
                       onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                       placeholder="请输入姓名（可选）"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">密码 <span className="text-rose-600">*</span></label>
-                    <input
-                      type="password"
-                      value={form.password}
-                      onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      placeholder="请输入密码"
                     />
                   </div>
                 </div>
