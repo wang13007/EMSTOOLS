@@ -329,6 +329,15 @@ export const surveyService = {
     return data;
   },
 
+  async getSurveyById(id: string) {
+    const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
+    if (error) {
+      console.error('获取表单详情失败:', error);
+      return null;
+    }
+    return data;
+  },
+
   async createSurvey(survey: Omit<SurveyForm, 'id' | 'create_time'>) {
     const { data, error } = await supabase.from('survey_forms').insert(survey).select().single();
     if (error) {
