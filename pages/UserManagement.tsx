@@ -412,32 +412,32 @@ export const UserManagement: React.FC = () => {
                       <option value={UserType.EXTERNAL}>外部客户</option>
                     </select>
                   </div>
-                  <div className="space-y-1" ref={roleDropdownRef}>
+                  <div className="space-y-1 relative" ref={roleDropdownRef}>
                     <label className="text-xs font-bold text-slate-500 uppercase">角色 <span className="text-rose-600">*</span></label>
                     <button
                       type="button"
                       onClick={() => setIsRoleDropdownOpen((prev) => !prev)}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg text-left focus:ring-2 focus:ring-blue-500 outline-none flex items-center justify-between"
+                      className="w-full min-h-[42px] px-4 py-2 border border-slate-200 rounded-lg text-left focus:ring-2 focus:ring-blue-500 outline-none flex items-center justify-between gap-2"
                     >
-                      <span className={form.roleIds.length ? 'text-slate-700' : 'text-slate-400'}>
+                      <span className={`flex-1 min-w-0 truncate ${form.roleIds.length ? 'text-slate-700' : 'text-slate-400'}`}>
                         {selectedRoleNames || '请选择角色（可多选）'}
                       </span>
-                      <svg className={`w-4 h-4 text-slate-400 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className={`w-4 h-4 shrink-0 text-slate-400 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
                     {isRoleDropdownOpen && (
-                      <div className="absolute mt-1 w-full z-10 bg-white border border-slate-200 rounded-lg shadow-xl p-2 max-h-52 overflow-y-auto">
+                      <div className="absolute left-0 top-full mt-1 w-full z-30 bg-white border border-slate-200 rounded-lg shadow-xl p-2 max-h-52 overflow-y-auto">
                         {availableRoles.length === 0 ? (
                           <p className="px-2 py-2 text-sm text-slate-400">当前用户类型暂无可选角色</p>
                         ) : (
                           availableRoles.map((role) => (
-                            <label key={role.id} className="flex items-center gap-2 px-2 py-2 rounded hover:bg-slate-50 cursor-pointer">
+                            <label key={role.id} className="flex items-center gap-2 px-2 py-2 min-h-[36px] rounded hover:bg-slate-50 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={form.roleIds.includes(role.id)}
                                 onChange={() => toggleRoleSelection(role.id)}
-                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                className="w-4 h-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                               />
                               <span className="text-sm text-slate-700">{role.name}</span>
                             </label>
