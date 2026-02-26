@@ -53,6 +53,8 @@ export const UserManagement: React.FC = () => {
   const [roles, setRoles] = useState<RoleLite[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -163,17 +165,49 @@ export const UserManagement: React.FC = () => {
     });
   }, [searchTerm, users]);
 
+  const editingUser = useMemo(() => {
+    if (!editingUserId) return null;
+    return users.find((item) => item.id === editingUserId) || null;
+  }, [editingUserId, users]);
+
   const openCreateModal = () => {
     const defaultType = UserType.EXTERNAL;
     const defaultRoleIds = roles.filter((r) => r.type === defaultType).slice(0, 1).map((r) => r.id);
+    setModalMode('create');
+    setEditingUserId(null);
     setError('');
     setForm({ ...DEFAULT_FORM, type: defaultType, roleIds: defaultRoleIds });
     setIsRoleDropdownOpen(false);
     setIsModalOpen(true);
   };
 
+  const openEditModal = (user: UserRow) => {
+    const type = (user.type || user.user_type || UserType.EXTERNAL) as UserType;
+    const typedRoles = roles.filter((r) => r.type === type);
+    const typedRoleSet = new Set(typedRoles.map((r) => r.id));
+    const currentRoleIds = user.role_ids?.length ? user.role_ids : user.role_id ? [user.role_id] : [];
+    const validRoleIds = currentRoleIds.filter((id) => typedRoleSet.has(id));
+    const roleIds = validRoleIds.length ? validRoleIds : typedRoles[0] ? [typedRoles[0].id] : [];
+
+    setModalMode('edit');
+    setEditingUserId(user.id);
+    setError('');
+    setForm({
+      username: user.username || '',
+      name: user.name || user.user_name || '',
+      phone: user.phone || '',
+      email: user.email || '',
+      type,
+      roleIds,
+    });
+    setIsRoleDropdownOpen(false);
+    setIsModalOpen(true);
+  };
+
   const closeModal = () => {
     if (submitting) return;
+    setModalMode('create');
+    setEditingUserId(null);
     setIsRoleDropdownOpen(false);
     setIsModalOpen(false);
   };
@@ -188,7 +222,7 @@ export const UserManagement: React.FC = () => {
     });
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
+  const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
@@ -210,32 +244,49 @@ export const UserManagement: React.FC = () => {
         throw new Error('请至少选择一个角色');
       }
 
-      const payload = {
-        user_id: generateUserId(),
+      const basePayload = {
         user_name: form.name.trim() || undefined,
         name: form.name.trim() || undefined,
         username,
-        password_hash: '1234',
         type: form.type,
         user_type: form.type,
         role_id: form.roleIds[0],
         role_ids: form.roleIds,
         phone,
         email,
-        status: UserStatus.ENABLED,
       };
 
-      const created = await userService.createUser(payload);
-      if (!created) {
-        throw new Error('用户创建失败');
+      if (modalMode === 'create') {
+        const created = await userService.createUser({
+          ...basePayload,
+          user_id: generateUserId(),
+          password_hash: '1234',
+          status: UserStatus.ENABLED,
+        });
+        if (!created) {
+          throw new Error('用户创建失败');
+        }
+      } else {
+        if (!editingUserId) {
+          throw new Error('编辑用户ID不存在');
+        }
+        const updated = await userService.updateUser(editingUserId, {
+          ...basePayload,
+          status: editingUser?.status || UserStatus.ENABLED,
+        });
+        if (!updated) {
+          throw new Error('用户更新失败');
+        }
       }
 
-      setIsModalOpen(false);
+      setModalMode('create');
+      setEditingUserId(null);
       setIsRoleDropdownOpen(false);
+      setIsModalOpen(false);
       setForm(DEFAULT_FORM);
       await loadData();
     } catch (err) {
-      const message = err instanceof Error ? err.message : '用户创建失败';
+      const message = err instanceof Error ? err.message : modalMode === 'create' ? '用户创建失败' : '用户更新失败';
       setError(message);
     } finally {
       setSubmitting(false);
@@ -257,6 +308,9 @@ export const UserManagement: React.FC = () => {
       setUsers((prev) => prev.filter((item) => item.id !== u.id));
     }
   };
+
+  const modalTitle = modalMode === 'create' ? '新建用户' : '编辑用户';
+  const submitLabel = submitting ? (modalMode === 'create' ? '创建中...' : '保存中...') : modalMode === 'create' ? '创建' : '保存';
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -339,6 +393,9 @@ export const UserManagement: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">{u.createTime || '-'}</td>
                     <td className="px-6 py-4 text-right space-x-3">
+                      <button onClick={() => openEditModal(u)} className="text-blue-600 font-bold text-sm hover:underline">
+                        编辑
+                      </button>
                       <button
                         onClick={() => handleToggleStatus(u)}
                         className={`${u.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
@@ -362,7 +419,7 @@ export const UserManagement: React.FC = () => {
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
               <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
-                <h3 className="text-xl font-bold text-slate-900">新建用户</h3>
+                <h3 className="text-xl font-bold text-slate-900">{modalTitle}</h3>
                 <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -370,10 +427,16 @@ export const UserManagement: React.FC = () => {
                 </button>
               </div>
 
-              <form className="p-8 space-y-4" onSubmit={handleCreateUser}>
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-amber-700 text-sm">
-                  默认密码为 <span className="font-bold">1234</span>，系统将自动生成用户ID。
-                </div>
+              <form className="p-8 space-y-4" onSubmit={handleSubmitUser}>
+                {modalMode === 'create' ? (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-amber-700 text-sm">
+                    默认密码为 <span className="font-bold">1234</span>，系统将自动生成用户ID。
+                  </div>
+                ) : (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-blue-700 text-sm">
+                    编辑用户仅修改基础信息，密码保持不变。
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -482,7 +545,7 @@ export const UserManagement: React.FC = () => {
                     disabled={submitting}
                     className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 disabled:opacity-60"
                   >
-                    {submitting ? '创建中...' : '创建'}
+                    {submitLabel}
                   </button>
                 </div>
               </form>
