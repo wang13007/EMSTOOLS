@@ -100,7 +100,7 @@ export const authService = {
       console.log('注册请求:', data);
       
       // 调用 supabaseService 进行真实注册
-      const { userService } = await import('../services/supabaseService');
+      const { userService, roleService } = await import('../services/supabaseService');
       
       // 检查用户是否已存在
       const users = await userService.getUsers();
@@ -110,12 +110,24 @@ export const authService = {
         throw new Error('用户名已存在');
       }
       
+      // 获取角色列表，找到客户用户角色
+      const roles = await roleService.getRoles();
+      console.log('角色列表:', roles);
+      
+      // 查找客户用户角色
+      const customerRole = roles.find(r => r.name === '客户用户' || r.name === '外部客户');
+      if (!customerRole) {
+        console.error('未找到客户用户角色');
+        throw new Error('系统配置错误，未找到客户角色');
+      }
+      
       // 创建用户数据
       const userData = {
         user_name: data.user_name,
         username: data.username,
         password_hash: data.password, // 注意：实际生产环境中应该使用 bcrypt 等库对密码进行哈希处理
         type: 'external', // 外部客户
+        role_id: customerRole.id, // 设置客户用户角色
         status: 'enabled', // 启用状态
         email: data.email,
         phone: data.phone
@@ -134,7 +146,7 @@ export const authService = {
         username: createdUser.username,
         name: data.user_name,
         type: 'external',
-        role: '外部客户',
+        role: customerRole.name || '外部客户',
         email: data.email,
         phone: data.phone
       };
