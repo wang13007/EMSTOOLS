@@ -112,8 +112,7 @@ export const userService = {
       
       // 构建数据库用户对象，确保与数据表结构一致
       const dbUser = {
-        // 基本字段
-        user_id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // 生成唯一用户ID
+        // 基本字段 - 不手动生成user_id，让数据库自动生成UUID
         username: user.username || user.user_name, // 用户名
         password_hash: user.password_hash || user.password, // 密码哈希字段，确保非空
         user_type: user.user_type || user.type || 'external', // 用户类型

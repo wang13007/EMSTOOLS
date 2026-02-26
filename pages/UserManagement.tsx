@@ -46,7 +46,8 @@ export const UserManagement: React.FC = () => {
             }
             
             return {
-              id: user.id,
+              id: user.user_id || user.id, // 优先使用user_id
+              user_id: user.user_id,
               user_name: user.user_name,
               username: user.username,
               name: user.name || user.user_name || user.username,
