@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { SurveyTemplate } from './types';
 
 export const ICONS = {
   Dashboard: (props: any) => (
@@ -68,58 +67,4 @@ export const REGIONS = [
   '东北地区'
 ];
 
-export const SURVEY_TEMPLATES: SurveyTemplate[] = [
-  {
-    id: 'tpl-comm-1',
-    name: '商业综合体调研模板',
-    industry: '商业综合体',
-    createTime: '2024-01-01',
-    sections: [
-      {
-        id: 'sec-biz',
-        title: '商务售前类',
-        fields: [
-          { id: 'biz-scale', label: '项目规模', type: 'text', required: true },
-          { id: 'biz-area', label: '建筑面积 (㎡)', type: 'number', required: true },
-          { id: 'biz-goal', label: '主要建设目标', type: 'multiselect', options: ['示范项目', '数字化升级', '集团监管', '管理提升', '合规监管'] },
-          { id: 'biz-budget', label: '预算范围', type: 'text' }
-        ]
-      },
-      {
-        id: 'sec-design',
-        title: '方案设计类',
-        fields: [
-          { id: 'des-energy', label: '能源类型', type: 'multiselect', options: ['电', '水', '气', '蒸汽', '冷热量'] },
-          { id: 'des-systems', label: '用能系统', type: 'multiselect', options: ['暖通系统', '照明系统', '空压系统', '给排水系统', '生产设备系统'] },
-          { id: 'des-it', label: '现有IT系统', type: 'multiselect', options: ['BMS', 'SCADA', 'MES', 'ERP'] }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'tpl-mfg-1',
-    name: '制造业调研模板',
-    industry: '制造业',
-    createTime: '2024-01-01',
-    sections: [
-      {
-        id: 'sec-biz',
-        title: '商务售前类',
-        fields: [
-          { id: 'biz-scale', label: '产值规模', type: 'text', required: true },
-          { id: 'biz-area', label: '厂区面积 (㎡)', type: 'number', required: true },
-          { id: 'biz-goal', label: '主要建设目标', type: 'multiselect', options: ['节能降耗', '碳中和', '数字化工厂', '合规监管'] }
-        ]
-      },
-      {
-        id: 'sec-design',
-        title: '方案设计类',
-        fields: [
-          { id: 'des-energy', label: '能源类型', type: 'multiselect', options: ['电', '水', '气', '蒸汽', '压缩空气'] },
-          { id: 'des-equip', label: '重点用能设备', type: 'textarea' },
-          { id: 'des-it', label: '现有IT系统', type: 'multiselect', options: ['MES', 'ERP', 'DCS', 'SCADA'] }
-        ]
-      }
-    ]
-  }
-];
+export { SURVEY_TEMPLATES } from './constants/surveyTemplatePreset';

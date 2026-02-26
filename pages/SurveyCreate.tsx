@@ -1,18 +1,19 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SurveyForm, SurveyStatus, ReportStatus } from '../types';
-import { INDUSTRIES, REGIONS, SURVEY_TEMPLATES } from '../constants';
+import { SurveyStatus, ReportStatus } from '../types';
+import { INDUSTRIES, REGIONS } from '../constants';
+import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { surveyService } from '../src/services/supabaseService';
 
 export const SurveyCreate: React.FC = () => {
+  const presetTemplate = SURVEY_TEMPLATES[0];
   const [formData, setFormData] = useState({
     name: '',
     customerName: '',
     projectName: '',
     industry: INDUSTRIES[0],
     region: REGIONS[0],
-    templateId: SURVEY_TEMPLATES[0].id,
     preSalesResponsible: '',
     submitter: ''
   });
@@ -30,7 +31,7 @@ export const SurveyCreate: React.FC = () => {
         project_name: formData.projectName,
         industry: formData.industry,
         region: formData.region,
-        template_id: formData.templateId,
+        template_id: presetTemplate.id,
         status: SurveyStatus.DRAFT,
         report_status: ReportStatus.NOT_GENERATED,
         creator_id: 'user-1', // 需要根据实际登录用户获取
@@ -142,12 +143,13 @@ export const SurveyCreate: React.FC = () => {
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-700">调研模板</label>
           <select 
-            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            value={formData.templateId}
-            onChange={e => setFormData({...formData, templateId: e.target.value})}
+            disabled
+            className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
+            value={presetTemplate.id}
           >
-            {SURVEY_TEMPLATES.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
+            <option value={presetTemplate.id}>{presetTemplate.name}</option>
           </select>
+          <p className="text-xs text-slate-500">系统使用预置模板发起调研，不支持手动更改。</p>
         </div>
 
         <div className="pt-4 flex justify-end gap-4">

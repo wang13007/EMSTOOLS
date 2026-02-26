@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SurveyForm, SurveyStatus, ReportStatus, SurveyTemplate } from '../types';
-import { SURVEY_TEMPLATES } from '../constants';
+import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { generateEnergyReport } from '../services/geminiService';
 
 export const SurveyFill: React.FC = () => {
