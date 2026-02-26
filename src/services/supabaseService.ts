@@ -5,18 +5,96 @@ const isMissingColumn = (error: any, column: string) => {
   return error?.code === 'PGRST204' && String(error?.message || '').includes(`'${column}'`);
 };
 
+const MULTI_ROLE_CACHE_KEY = 'ems_user_role_ids_map';
+
+const dedupeStringArray = (values: Array<string | undefined | null>) => {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+};
+
+const normalizeUserType = (value: any): 'internal' | 'external' => {
+  return value === 'internal' ? 'internal' : 'external';
+};
+
+const inferRoleType = (role: any): 'internal' | 'external' => {
+  const directType = role?.type || role?.user_type;
+  if (directType === 'internal' || directType === 'external') {
+    return directType;
+  }
+
+  const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
+  const externalKeywords = ['外部', '客户', 'customer', 'client', 'external'];
+  return externalKeywords.some((keyword) => source.includes(keyword)) ? 'external' : 'internal';
+};
+
+const canUseLocalStorage = () => {
+  return typeof window !== 'undefined' && !!window.localStorage;
+};
+
+const readRoleCache = (): Record<string, string[]> => {
+  if (!canUseLocalStorage()) return {};
+  try {
+    const raw = window.localStorage.getItem(MULTI_ROLE_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeRoleCache = (cache: Record<string, string[]>) => {
+  if (!canUseLocalStorage()) return;
+  try {
+    window.localStorage.setItem(MULTI_ROLE_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // ignore localStorage write failures
+  }
+};
+
+const cacheRoleIdsForUser = (userId: string | undefined, roleIds: string[]) => {
+  if (!userId || !roleIds.length) return;
+  const cache = readRoleCache();
+  cache[userId] = dedupeStringArray(roleIds);
+  writeRoleCache(cache);
+};
+
+const removeCachedRoleIdsForUser = (userId: string | undefined) => {
+  if (!userId) return;
+  const cache = readRoleCache();
+  if (!(userId in cache)) return;
+  delete cache[userId];
+  writeRoleCache(cache);
+};
+
+const resolveRoleIds = (user: any) => {
+  const userId = user.user_id || user.id;
+  const roleIdsFromRow = Array.isArray(user.role_ids)
+    ? dedupeStringArray(user.role_ids)
+    : dedupeStringArray([user.role_id]);
+  const cached = userId ? dedupeStringArray(readRoleCache()[userId] || []) : [];
+  return cached.length ? cached : roleIdsFromRow;
+};
+
+const normalizeRole = (role: any) => ({
+  ...role,
+  type: inferRoleType(role),
+});
+
 const normalizeUser = (user: any) => {
-  const userType = user.user_type || user.type || 'external';
+  const userType = normalizeUserType(user.user_type || user.type);
+  const roleIds = resolveRoleIds(user);
   return {
     id: user.user_id || user.id,
     user_id: user.user_id,
     user_name: user.user_realname || user.user_name || user.username,
+    name: user.user_realname || user.user_name || user.username,
     username: user.username,
     phone: user.phone,
     email: user.email,
     type: userType,
     user_type: userType,
     role_id: user.role_id,
+    role_ids: roleIds,
     status: user.status,
     last_login_time: user.last_login_time,
     create_time: user.create_time,
@@ -45,8 +123,22 @@ export const userService = {
     return roleService.getRoles();
   },
 
-  async validateUserRoles(_userId: string | null, _userType: string, _roleIds: string[]) {
-    return true;
+  async validateUserRoles(_userId: string | null, userType: string, roleIds: string[]) {
+    const selectedRoleIds = dedupeStringArray(roleIds);
+    if (!selectedRoleIds.length) return false;
+
+    const { data, error } = await supabase.from('roles').select('*').in('id', selectedRoleIds);
+    if (error || !data) {
+      console.error('校验用户角色失败:', error);
+      return false;
+    }
+
+    if (data.length !== selectedRoleIds.length) {
+      return false;
+    }
+
+    const expectedType = normalizeUserType(userType);
+    return data.every((role: any) => inferRoleType(role) === expectedType);
   },
 
   async createUser(user: any) {
@@ -58,25 +150,28 @@ export const userService = {
         console.error('获取角色列表失败:', rolesError);
       }
 
-      let roleId = user.role_id;
-      const userType = user.user_type || user.type || 'external';
+      const userType = normalizeUserType(user.user_type || user.type);
+      let roleIds = dedupeStringArray([...(user.role_ids || []), user.role_id]);
+      let roleId = roleIds[0];
 
       if (!roleId && roles && roles.length > 0) {
-        if (userType === 'external') {
-          const customerRole = roles.find((r: any) => r.name === '客户用户' || r.name === '外部客户');
-          if (customerRole) roleId = customerRole.id;
-        } else {
-          const engineerRole = roles.find((r: any) => r.name === '售前工程师' || r.name === '超级管理员');
-          if (engineerRole) roleId = engineerRole.id;
-        }
-        if (!roleId) roleId = roles[0].id;
+        const typedRoles = roles.filter((r: any) => inferRoleType(r) === userType);
+        const fallbackRoles = typedRoles.length > 0 ? typedRoles : roles;
+        roleId = fallbackRoles[0]?.id;
+        roleIds = roleId ? [roleId] : [];
       }
 
       if (!roleId) {
         throw new Error('无法确定用户角色，请先创建角色');
       }
 
+      const roleValidationPassed = await userService.validateUserRoles(null, userType, roleIds);
+      if (!roleValidationPassed) {
+        throw new Error(userType === 'internal' ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色');
+      }
+
       const baseUser: any = {
+        user_id: user.user_id,
         username: user.username || user.user_name,
         user_realname: user.user_name || user.name || user.username,
         password_hash: user.password_hash || user.password,
@@ -103,8 +198,10 @@ export const userService = {
         const { data, error } = await supabase.from('users').insert(dbUser).select().single();
 
         if (!error) {
+          const createdUserId = data.user_id || data.id;
+          cacheRoleIdsForUser(createdUserId, roleIds);
           console.log('创建用户成功:', data);
-          return normalizeUser(data);
+          return normalizeUser({ ...data, role_ids: roleIds });
         }
 
         lastError = error;
@@ -129,6 +226,7 @@ export const userService = {
   async updateUser(id: string, user: any) {
     try {
       const baseUser: any = { status: user.status || 'enabled' };
+      const roleIds = dedupeStringArray([...(user.role_ids || []), user.role_id]);
 
       if (user.username || user.user_name) {
         baseUser.username = user.username || user.user_name;
@@ -145,14 +243,20 @@ export const userService = {
       if (user.email) {
         baseUser.email = user.email;
       }
-      if (user.role_id) {
-        baseUser.role_id = user.role_id;
+      if (roleIds.length) {
+        baseUser.role_id = roleIds[0];
       }
       if (user.last_login_time) {
         baseUser.last_login_time = user.last_login_time;
       }
 
       const userType = user.user_type || user.type;
+      if (userType && roleIds.length) {
+        const roleValidationPassed = await userService.validateUserRoles(id, userType, roleIds);
+        if (!roleValidationPassed) {
+          throw new Error(userType === 'internal' ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色');
+        }
+      }
       const payloads: any[] = userType
         ? [{ ...baseUser, user_type: userType }, { ...baseUser, type: userType }]
         : [{ ...baseUser }];
@@ -161,10 +265,18 @@ export const userService = {
         console.log('处理后的数据库用户数据:', dbUser);
 
         const primary = await supabase.from('users').update(dbUser).eq('user_id', id).select().single();
-        if (!primary.error) return normalizeUser(primary.data);
+        if (!primary.error) {
+          const updatedUserId = primary.data?.user_id || primary.data?.id;
+          if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
+          return normalizeUser({ ...primary.data, role_ids: roleIds.length ? roleIds : undefined });
+        }
 
         const fallback = await supabase.from('users').update(dbUser).eq('id', id).select().single();
-        if (!fallback.error) return normalizeUser(fallback.data);
+        if (!fallback.error) {
+          const updatedUserId = fallback.data?.user_id || fallback.data?.id;
+          if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
+          return normalizeUser({ ...fallback.data, role_ids: roleIds.length ? roleIds : undefined });
+        }
 
         if (
           isMissingColumn(primary.error, 'type') ||
@@ -198,6 +310,7 @@ export const userService = {
           return false;
         }
       }
+      removeCachedRoleIdsForUser(id);
       return true;
     } catch (error) {
       console.error('删除用户过程中发生异常:', error);
@@ -349,7 +462,7 @@ export const roleService = {
       console.error('获取角色列表失败:', error);
       return [];
     }
-    return data;
+    return (data || []).map(normalizeRole);
   },
 
   async createRole(role: any) {

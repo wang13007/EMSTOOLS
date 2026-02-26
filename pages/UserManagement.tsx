@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ICONS } from '../constants';
 import { User, UserStatus, UserType } from '../types';
 import { roleService, userService } from '../src/services/supabaseService';
@@ -7,7 +7,7 @@ import Portal from '../src/components/Portal';
 type RoleLite = {
   id: string;
   name: string;
-  type?: UserType;
+  type: UserType;
 };
 
 type UserRow = User & {
@@ -20,7 +20,7 @@ type FormState = {
   phone: string;
   email: string;
   type: UserType;
-  roleId: string;
+  roleIds: string[];
 };
 
 const DEFAULT_FORM: FormState = {
@@ -29,7 +29,23 @@ const DEFAULT_FORM: FormState = {
   phone: '',
   email: '',
   type: UserType.EXTERNAL,
-  roleId: '',
+  roleIds: [],
+};
+
+const inferRoleType = (role: any): UserType => {
+  const directType = role?.type || role?.user_type;
+  if (directType === UserType.INTERNAL || directType === UserType.EXTERNAL) {
+    return directType;
+  }
+  const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
+  return source.includes('外部') || source.includes('客户') ? UserType.EXTERNAL : UserType.INTERNAL;
+};
+
+const generateUserId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 };
 
 export const UserManagement: React.FC = () => {
@@ -37,18 +53,21 @@ export const UserManagement: React.FC = () => {
   const [roles, setRoles] = useState<RoleLite[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const roleDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const normalizeUsers = (list: any[]): UserRow[] => {
     return (list || []).map((u: any) => {
       const type = (u.user_type || u.type || UserType.EXTERNAL) as UserType;
+      const roleIds = Array.isArray(u.role_ids) ? u.role_ids : u.role_id ? [u.role_id] : [];
       return {
         id: u.user_id || u.id,
         user_id: u.user_id,
-        user_name: u.user_name || u.username,
+        user_name: u.user_name || u.user_realname || u.username,
         username: u.username,
         name: u.user_name || u.user_realname || u.name || u.username,
         phone: u.phone || '',
@@ -56,8 +75,8 @@ export const UserManagement: React.FC = () => {
         type,
         user_type: type,
         role: '',
-        role_id: u.role_id,
-        role_ids: u.role_id ? [u.role_id] : [],
+        role_id: u.role_id || roleIds[0],
+        role_ids: roleIds,
         status: (u.status || UserStatus.ENABLED) as UserStatus,
         last_login_time: u.last_login_time || '',
         create_time: u.create_time || '',
@@ -71,7 +90,11 @@ export const UserManagement: React.FC = () => {
     setError('');
     try {
       const [roleList, userList] = await Promise.all([roleService.getRoles(), userService.getUsers()]);
-      const formattedRoles = (roleList || []).map((r: any) => ({ id: r.id, name: r.name, type: r.type }));
+      const formattedRoles = (roleList || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        type: inferRoleType(r),
+      }));
       setRoles(formattedRoles);
       setUsers(normalizeUsers(userList || []));
     } catch (e) {
@@ -86,6 +109,19 @@ export const UserManagement: React.FC = () => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!isRoleDropdownOpen) return;
+    const onClickOutside = (event: MouseEvent) => {
+      if (!roleDropdownRef.current?.contains(event.target as Node)) {
+        setIsRoleDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+    };
+  }, [isRoleDropdownOpen]);
+
   const roleNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     roles.forEach((r) => {
@@ -95,14 +131,24 @@ export const UserManagement: React.FC = () => {
   }, [roles]);
 
   const availableRoles = useMemo(() => {
-    return roles.filter((r) => !r.type || r.type === form.type);
+    return roles.filter((r) => r.type === form.type);
   }, [roles, form.type]);
 
   useEffect(() => {
-    if (!availableRoles.find((r) => r.id === form.roleId)) {
-      setForm((prev) => ({ ...prev, roleId: availableRoles[0]?.id || '' }));
-    }
-  }, [availableRoles, form.roleId]);
+    setForm((prev) => {
+      const availableRoleIdSet = new Set(availableRoles.map((r) => r.id));
+      const filteredRoleIds = prev.roleIds.filter((id) => availableRoleIdSet.has(id));
+      const nextRoleIds = filteredRoleIds.length ? filteredRoleIds : availableRoles[0] ? [availableRoles[0].id] : [];
+      const changed =
+        nextRoleIds.length !== prev.roleIds.length || nextRoleIds.some((id, idx) => id !== prev.roleIds[idx]);
+      return changed ? { ...prev, roleIds: nextRoleIds } : prev;
+    });
+  }, [availableRoles]);
+
+  const selectedRoleNames = useMemo(() => {
+    if (!form.roleIds.length) return '';
+    return form.roleIds.map((id) => roleNameMap[id] || id).join('、');
+  }, [form.roleIds, roleNameMap]);
 
   const filteredUsers = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
@@ -118,14 +164,28 @@ export const UserManagement: React.FC = () => {
   }, [searchTerm, users]);
 
   const openCreateModal = () => {
+    const defaultType = UserType.EXTERNAL;
+    const defaultRoleIds = roles.filter((r) => r.type === defaultType).slice(0, 1).map((r) => r.id);
     setError('');
-    setForm((prev) => ({ ...DEFAULT_FORM, roleId: availableRoles[0]?.id || prev.roleId || '' }));
+    setForm({ ...DEFAULT_FORM, type: defaultType, roleIds: defaultRoleIds });
+    setIsRoleDropdownOpen(false);
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     if (submitting) return;
+    setIsRoleDropdownOpen(false);
     setIsModalOpen(false);
+  };
+
+  const toggleRoleSelection = (roleId: string) => {
+    setForm((prev) => {
+      const exists = prev.roleIds.includes(roleId);
+      return {
+        ...prev,
+        roleIds: exists ? prev.roleIds.filter((id) => id !== roleId) : [...prev.roleIds, roleId],
+      };
+    });
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -133,23 +193,35 @@ export const UserManagement: React.FC = () => {
     setSubmitting(true);
     setError('');
     try {
-      if (!form.username.trim()) {
+      const username = form.username.trim();
+      const phone = form.phone.trim();
+      const email = form.email.trim();
+
+      if (!username) {
         throw new Error('请输入用户名');
       }
-      if (!form.roleId) {
-        throw new Error('请选择角色');
+      if (!phone) {
+        throw new Error('请输入手机号');
+      }
+      if (!email) {
+        throw new Error('请输入邮箱');
+      }
+      if (!form.roleIds.length) {
+        throw new Error('请至少选择一个角色');
       }
 
       const payload = {
+        user_id: generateUserId(),
         user_name: form.name.trim() || undefined,
         name: form.name.trim() || undefined,
-        username: form.username.trim(),
+        username,
         password_hash: '1234',
         type: form.type,
         user_type: form.type,
-        role_id: form.roleId,
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
+        role_id: form.roleIds[0],
+        role_ids: form.roleIds,
+        phone,
+        email,
         status: UserStatus.ENABLED,
       };
 
@@ -159,6 +231,7 @@ export const UserManagement: React.FC = () => {
       }
 
       setIsModalOpen(false);
+      setIsRoleDropdownOpen(false);
       setForm(DEFAULT_FORM);
       await loadData();
     } catch (err) {
@@ -217,11 +290,7 @@ export const UserManagement: React.FC = () => {
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-600 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-600 text-sm">{error}</div>}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-left">
@@ -248,39 +317,41 @@ export const UserManagement: React.FC = () => {
                 <td colSpan={9} className="px-6 py-20 text-center text-slate-400">暂无用户数据</td>
               </tr>
             ) : (
-              filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-slate-900">{u.username}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{u.name || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {u.type === UserType.INTERNAL ? '内部用户' : '外部客户'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">{u.role_id ? roleNameMap[u.role_id] || u.role_id : '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{u.phone || '-'}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{u.email || '-'}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
-                        u.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
-                      }`}
-                    >
-                      {u.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{u.createTime || '-'}</td>
-                  <td className="px-6 py-4 text-right space-x-3">
-                    <button
-                      onClick={() => handleToggleStatus(u)}
-                      className={`${u.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
-                    >
-                      {u.status === UserStatus.ENABLED ? '禁用' : '启用'}
-                    </button>
-                    <button onClick={() => handleDelete(u)} className="text-red-600 font-bold text-sm hover:underline">
-                      删除
-                    </button>
-                  </td>
-                </tr>
-              ))
+              filteredUsers.map((u) => {
+                const roleIds = u.role_ids?.length ? u.role_ids : u.role_id ? [u.role_id] : [];
+                const roleText = roleIds.length ? roleIds.map((id) => roleNameMap[id] || id).join('、') : '-';
+                return (
+                  <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-slate-900">{u.username}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{u.name || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{u.type === UserType.INTERNAL ? '内部用户' : '外部客户'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">{roleText}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{u.phone || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{u.email || '-'}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
+                          u.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                        }`}
+                      >
+                        {u.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{u.createTime || '-'}</td>
+                    <td className="px-6 py-4 text-right space-x-3">
+                      <button
+                        onClick={() => handleToggleStatus(u)}
+                        className={`${u.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
+                      >
+                        {u.status === UserStatus.ENABLED ? '禁用' : '启用'}
+                      </button>
+                      <button onClick={() => handleDelete(u)} className="text-red-600 font-bold text-sm hover:underline">
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -301,13 +372,14 @@ export const UserManagement: React.FC = () => {
 
               <form className="p-8 space-y-4" onSubmit={handleCreateUser}>
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-amber-700 text-sm">
-                  默认密码为 <span className="font-bold">1234</span>，创建后可使用该密码登录。
+                  默认密码为 <span className="font-bold">1234</span>，系统将自动生成用户ID。
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-slate-500 uppercase">用户名 <span className="text-rose-600">*</span></label>
                     <input
+                      required
                       value={form.username}
                       onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -330,31 +402,58 @@ export const UserManagement: React.FC = () => {
                     <label className="text-xs font-bold text-slate-500 uppercase">用户类型 <span className="text-rose-600">*</span></label>
                     <select
                       value={form.type}
-                      onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value as UserType }))}
+                      onChange={(e) => {
+                        setForm((prev) => ({ ...prev, type: e.target.value as UserType }));
+                        setIsRoleDropdownOpen(false);
+                      }}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value={UserType.INTERNAL}>内部用户</option>
                       <option value={UserType.EXTERNAL}>外部客户</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1" ref={roleDropdownRef}>
                     <label className="text-xs font-bold text-slate-500 uppercase">角色 <span className="text-rose-600">*</span></label>
-                    <select
-                      value={form.roleId}
-                      onChange={(e) => setForm((prev) => ({ ...prev, roleId: e.target.value }))}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    <button
+                      type="button"
+                      onClick={() => setIsRoleDropdownOpen((prev) => !prev)}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg text-left focus:ring-2 focus:ring-blue-500 outline-none flex items-center justify-between"
                     >
-                      {availableRoles.map((r) => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
-                      ))}
-                    </select>
+                      <span className={form.roleIds.length ? 'text-slate-700' : 'text-slate-400'}>
+                        {selectedRoleNames || '请选择角色（可多选）'}
+                      </span>
+                      <svg className={`w-4 h-4 text-slate-400 transition-transform ${isRoleDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {isRoleDropdownOpen && (
+                      <div className="absolute mt-1 w-full z-10 bg-white border border-slate-200 rounded-lg shadow-xl p-2 max-h-52 overflow-y-auto">
+                        {availableRoles.length === 0 ? (
+                          <p className="px-2 py-2 text-sm text-slate-400">当前用户类型暂无可选角色</p>
+                        ) : (
+                          availableRoles.map((role) => (
+                            <label key={role.id} className="flex items-center gap-2 px-2 py-2 rounded hover:bg-slate-50 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={form.roleIds.includes(role.id)}
+                                onChange={() => toggleRoleSelection(role.id)}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-slate-700">{role.name}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-slate-400">仅显示与当前用户类型匹配的角色，支持多选。</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">手机号</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">手机号 <span className="text-rose-600">*</span></label>
                     <input
+                      required
                       value={form.phone}
                       onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -362,8 +461,10 @@ export const UserManagement: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱 <span className="text-rose-600">*</span></label>
                     <input
+                      required
+                      type="email"
                       value={form.email}
                       onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
