@@ -1,11 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { ICONS } from '../constants';
 import { User, UserStatus, UserType } from '../types';
 import { roleService, userService } from '../src/services/supabaseService';
+import Portal from '../src/components/Portal';
 
 type RoleLite = {
   id: string;
   name: string;
   type?: UserType;
+};
+
+type UserRow = User & {
+  name?: string;
 };
 
 type FormState = {
@@ -14,47 +20,41 @@ type FormState = {
   phone: string;
   email: string;
   type: UserType;
-  role_id: string;
+  roleId: string;
 };
 
-const defaultForm: FormState = {
+const DEFAULT_FORM: FormState = {
   username: '',
   password: '',
   phone: '',
   email: '',
   type: UserType.EXTERNAL,
-  role_id: '',
+  roleId: '',
 };
 
 export const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [roles, setRoles] = useState<RoleLite[]>([]);
-  const [search, setSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState<FormState>(defaultForm);
   const [error, setError] = useState('');
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [roleList, userList] = await Promise.all([
-        roleService.getRoles(),
-        userService.getUsers(),
-      ]);
-
-      setRoles((roleList || []).map((r: any) => ({ id: r.id, name: r.name, type: r.type })));
-
-      const normalizedUsers: User[] = (userList || []).map((u: any) => ({
+  const normalizeUsers = (list: any[]): UserRow[] => {
+    return (list || []).map((u: any) => {
+      const type = (u.user_type || u.type || UserType.EXTERNAL) as UserType;
+      return {
         id: u.user_id || u.id,
         user_id: u.user_id,
         user_name: u.user_name || u.username,
         username: u.username,
+        name: u.user_name || u.user_realname || u.name || u.username,
         phone: u.phone || '',
         email: u.email || '',
-        type: (u.type || u.user_type || UserType.EXTERNAL) as UserType,
-        user_type: (u.type || u.user_type || UserType.EXTERNAL) as UserType,
+        type,
+        user_type: type,
         role: '',
         role_id: u.role_id,
         role_ids: u.role_id ? [u.role_id] : [],
@@ -62,12 +62,21 @@ export const UserManagement: React.FC = () => {
         last_login_time: u.last_login_time || '',
         create_time: u.create_time || '',
         createTime: u.create_time ? new Date(u.create_time).toISOString().split('T')[0] : '',
-      }));
+      };
+    });
+  };
 
-      setUsers(normalizedUsers);
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [roleList, userList] = await Promise.all([roleService.getRoles(), userService.getUsers()]);
+      const formattedRoles = (roleList || []).map((r: any) => ({ id: r.id, name: r.name, type: r.type }));
+      setRoles(formattedRoles);
+      setUsers(normalizeUsers(userList || []));
     } catch (e) {
       console.error('加载用户数据失败:', e);
-      setError('加载用户数据失败');
+      setError('加载用户数据失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -79,46 +88,59 @@ export const UserManagement: React.FC = () => {
 
   const roleNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const r of roles) map[r.id] = r.name;
+    roles.forEach((r) => {
+      map[r.id] = r.name;
+    });
     return map;
   }, [roles]);
 
-  const visibleUsers = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+  const availableRoles = useMemo(() => {
+    return roles.filter((r) => !r.type || r.type === form.type);
+  }, [roles, form.type]);
+
+  useEffect(() => {
+    if (!availableRoles.find((r) => r.id === form.roleId)) {
+      setForm((prev) => ({ ...prev, roleId: availableRoles[0]?.id || '' }));
+    }
+  }, [availableRoles, form.roleId]);
+
+  const filteredUsers = useMemo(() => {
+    const keyword = searchTerm.trim().toLowerCase();
     if (!keyword) return users;
     return users.filter((u) => {
       return (
         (u.username || '').toLowerCase().includes(keyword) ||
         (u.user_name || '').toLowerCase().includes(keyword) ||
-        (u.email || '').toLowerCase().includes(keyword) ||
-        (u.phone || '').toLowerCase().includes(keyword)
+        (u.phone || '').toLowerCase().includes(keyword) ||
+        (u.email || '').toLowerCase().includes(keyword)
       );
     });
-  }, [users, search]);
+  }, [searchTerm, users]);
 
-  const filteredRoles = useMemo(() => {
-    return roles.filter((r) => !r.type || r.type === form.type);
-  }, [roles, form.type]);
+  const openCreateModal = () => {
+    setError('');
+    setForm((prev) => ({ ...DEFAULT_FORM, roleId: availableRoles[0]?.id || prev.roleId || '' }));
+    setIsModalOpen(true);
+  };
 
-  useEffect(() => {
-    if (!filteredRoles.find((r) => r.id === form.role_id)) {
-      setForm((prev) => ({ ...prev, role_id: filteredRoles[0]?.id || '' }));
-    }
-  }, [filteredRoles, form.role_id]);
+  const closeModal = () => {
+    if (submitting) return;
+    setIsModalOpen(false);
+  };
 
-  const onCreateUser = async (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
     try {
       if (!form.username.trim()) {
-        throw new Error('用户名不能为空');
+        throw new Error('请输入用户名');
       }
       if (!form.password.trim()) {
-        throw new Error('密码不能为空');
+        throw new Error('请输入密码');
       }
-      if (!form.role_id) {
-        throw new Error('请先选择角色');
+      if (!form.roleId) {
+        throw new Error('请选择角色');
       }
 
       const payload = {
@@ -127,35 +149,38 @@ export const UserManagement: React.FC = () => {
         password_hash: form.password,
         type: form.type,
         user_type: form.type,
-        role_id: form.role_id,
+        role_id: form.roleId,
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
         status: UserStatus.ENABLED,
       };
 
       const created = await userService.createUser(payload);
-      if (!created) throw new Error('创建用户失败');
+      if (!created) {
+        throw new Error('用户创建失败');
+      }
 
-      setForm(defaultForm);
+      setIsModalOpen(false);
+      setForm(DEFAULT_FORM);
       await loadData();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '创建用户失败';
-      setError(msg);
+      const message = err instanceof Error ? err.message : '用户创建失败';
+      setError(message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const onToggleStatus = async (u: User) => {
+  const handleToggleStatus = async (u: UserRow) => {
     const nextStatus = u.status === UserStatus.ENABLED ? UserStatus.DISABLED : UserStatus.ENABLED;
-    const ok = await userService.updateUser(u.id, { status: nextStatus });
-    if (ok) {
+    const updated = await userService.updateUser(u.id, { status: nextStatus });
+    if (updated) {
       setUsers((prev) => prev.map((item) => (item.id === u.id ? { ...item, status: nextStatus } : item)));
     }
   };
 
-  const onDeleteUser = async (u: User) => {
-    if (!window.confirm(`确认删除用户 ${u.username} 吗？`)) return;
+  const handleDelete = async (u: UserRow) => {
+    if (!window.confirm(`确定删除用户 ${u.username} 吗？`)) return;
     const ok = await userService.deleteUser(u.id);
     if (ok) {
       setUsers((prev) => prev.filter((item) => item.id !== u.id));
@@ -164,136 +189,95 @@ export const UserManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="flex flex-col md:flex-row gap-3 md:items-end md:justify-between">
+      <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">用户管理</h2>
-          <p className="text-slate-500">创建、启停和删除系统用户</p>
+          <p className="text-slate-500">维护系统登录用户信息，支持内部员工与外部客户账号管理。</p>
         </div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="搜索用户名/手机号/邮箱"
-          className="w-full md:w-80 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
+        <div className="flex gap-3">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="搜索用户名/手机号/邮箱..."
+              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="absolute left-3 top-2.5 text-slate-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+          <button
+            onClick={openCreateModal}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95"
+          >
+            <ICONS.Plus className="w-4 h-4" />
+            新建用户
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-rose-50 border border-rose-200 rounded-lg px-4 py-2 text-rose-600 text-sm">
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-red-600 text-sm">
           {error}
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <h3 className="font-bold text-slate-800 mb-3">新建用户</h3>
-        <form onSubmit={onCreateUser} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
-            value={form.username}
-            onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
-            placeholder="用户名"
-            className="px-3 py-2 border border-slate-300 rounded-lg"
-          />
-          <input
-            value={form.password}
-            onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
-            placeholder="密码"
-            className="px-3 py-2 border border-slate-300 rounded-lg"
-          />
-          <select
-            value={form.type}
-            onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value as UserType }))}
-            className="px-3 py-2 border border-slate-300 rounded-lg"
-          >
-            <option value={UserType.EXTERNAL}>外部客户</option>
-            <option value={UserType.INTERNAL}>内部用户</option>
-          </select>
-          <select
-            value={form.role_id}
-            onChange={(e) => setForm((prev) => ({ ...prev, role_id: e.target.value }))}
-            className="px-3 py-2 border border-slate-300 rounded-lg"
-          >
-            {filteredRoles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-          <input
-            value={form.phone}
-            onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
-            placeholder="手机号"
-            className="px-3 py-2 border border-slate-300 rounded-lg"
-          />
-          <input
-            value={form.email}
-            onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-            placeholder="邮箱"
-            className="px-3 py-2 border border-slate-300 rounded-lg"
-          />
-          <button
-            disabled={submitting}
-            className="md:col-span-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg disabled:opacity-60"
-          >
-            {submitting ? '创建中...' : '创建用户'}
-          </button>
-        </form>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <table className="w-full text-left">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="text-left px-4 py-3">用户名</th>
-              <th className="text-left px-4 py-3">类型</th>
-              <th className="text-left px-4 py-3">角色</th>
-              <th className="text-left px-4 py-3">手机号</th>
-              <th className="text-left px-4 py-3">邮箱</th>
-              <th className="text-left px-4 py-3">状态</th>
-              <th className="text-right px-4 py-3">操作</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户名</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">姓名</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">用户类型</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">角色</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">手机号</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">邮箱</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">状态</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">创建时间</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">操作</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                  加载中...
-                </td>
+                <td colSpan={9} className="px-6 py-20 text-center text-slate-400">加载中...</td>
               </tr>
-            ) : visibleUsers.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
-                  暂无数据
-                </td>
+                <td colSpan={9} className="px-6 py-20 text-center text-slate-400">暂无用户数据</td>
               </tr>
             ) : (
-              visibleUsers.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100 last:border-b-0">
-                  <td className="px-4 py-3 font-medium text-slate-800">{u.username}</td>
-                  <td className="px-4 py-3">{u.type === UserType.INTERNAL ? '内部' : '外部'}</td>
-                  <td className="px-4 py-3">{u.role_id ? roleNameMap[u.role_id] || u.role_id : '-'}</td>
-                  <td className="px-4 py-3">{u.phone || '-'}</td>
-                  <td className="px-4 py-3">{u.email || '-'}</td>
-                  <td className="px-4 py-3">
+              filteredUsers.map((u) => (
+                <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-bold text-slate-900">{u.username}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{u.name || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">
+                    {u.type === UserType.INTERNAL ? '内部用户' : '外部客户'}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{u.role_id ? roleNameMap[u.role_id] || u.role_id : '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{u.phone || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{u.email || '-'}</td>
+                  <td className="px-6 py-4">
                     <span
-                      className={
-                        u.status === UserStatus.ENABLED
-                          ? 'text-emerald-600 font-medium'
-                          : 'text-rose-600 font-medium'
-                      }
+                      className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
+                        u.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                      }`}
                     >
                       {u.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right space-x-3">
+                  <td className="px-6 py-4 text-sm text-slate-500">{u.createTime || '-'}</td>
+                  <td className="px-6 py-4 text-right space-x-3">
                     <button
-                      onClick={() => onToggleStatus(u)}
-                      className="text-blue-600 hover:underline font-medium"
+                      onClick={() => handleToggleStatus(u)}
+                      className={`${u.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
                     >
                       {u.status === UserStatus.ENABLED ? '禁用' : '启用'}
                     </button>
-                    <button
-                      onClick={() => onDeleteUser(u)}
-                      className="text-rose-600 hover:underline font-medium"
-                    >
+                    <button onClick={() => handleDelete(u)} className="text-red-600 font-bold text-sm hover:underline">
                       删除
                     </button>
                   </td>
@@ -303,7 +287,107 @@ export const UserManagement: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {isModalOpen && (
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-slideUp">
+              <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
+                <h3 className="text-xl font-bold text-slate-900">新建用户</h3>
+                <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form className="p-8 space-y-4" onSubmit={handleCreateUser}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">用户名 <span className="text-rose-600">*</span></label>
+                    <input
+                      value={form.username}
+                      onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="请输入用户名"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">密码 <span className="text-rose-600">*</span></label>
+                    <input
+                      type="password"
+                      value={form.password}
+                      onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="请输入密码"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">用户类型 <span className="text-rose-600">*</span></label>
+                    <select
+                      value={form.type}
+                      onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value as UserType }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value={UserType.INTERNAL}>内部用户</option>
+                      <option value={UserType.EXTERNAL}>外部客户</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">角色 <span className="text-rose-600">*</span></label>
+                    <select
+                      value={form.roleId}
+                      onChange={(e) => setForm((prev) => ({ ...prev, roleId: e.target.value }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      {availableRoles.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">手机号</label>
+                    <input
+                      value={form.phone}
+                      onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="请输入手机号"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">邮箱</label>
+                    <input
+                      value={form.email}
+                      onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      placeholder="请输入邮箱"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3">
+                  <button type="button" onClick={closeModal} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">
+                    取消
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 disabled:opacity-60"
+                  >
+                    {submitting ? '创建中...' : '创建'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   );
 };
-
