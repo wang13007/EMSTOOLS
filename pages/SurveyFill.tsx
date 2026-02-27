@@ -58,15 +58,30 @@ export const SurveyFill: React.FC = () => {
 
   useEffect(() => {
     const loadSurvey = async () => {
-      if (!id) {
+      const routeId = id && id !== 'undefined' && id !== 'null' ? id : '';
+      const fallbackId = localStorage.getItem('ems_last_created_survey_id') || '';
+      const resolvedId = routeId || fallbackId;
+
+      if (!resolvedId) {
+        setInitializing(false);
         alert('未找到该表单');
         navigate('/customer-survey/list');
         return;
       }
 
       setInitializing(true);
-      const survey = await surveyService.getSurveyById(id);
+      let survey = await surveyService.getSurveyById(resolvedId);
       if (!survey) {
+        // Retry for eventual consistency right after create.
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        survey = await surveyService.getSurveyById(resolvedId);
+      }
+      if (!survey) {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        survey = await surveyService.getSurveyById(resolvedId);
+      }
+      if (!survey) {
+        setInitializing(false);
         alert('未找到该表单');
         navigate('/customer-survey/list');
         return;

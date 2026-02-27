@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SurveyStatus, ReportStatus } from '../types';
 import { INDUSTRIES, REGIONS } from '../constants';
@@ -38,6 +38,7 @@ const getCurrentUserId = () => {
 
 export const SurveyCreate: React.FC = () => {
   const presetTemplate = SURVEY_TEMPLATES[0];
+  const hasLoadedUsersRef = useRef(false);
   const [formData, setFormData] = useState({
     name: '',
     customerName: '',
@@ -52,6 +53,9 @@ export const SurveyCreate: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (hasLoadedUsersRef.current) return;
+    hasLoadedUsersRef.current = true;
+
     const loadPreSalesUsers = async () => {
       setLoadingUsers(true);
       try {
@@ -133,7 +137,21 @@ export const SurveyCreate: React.FC = () => {
         throw new Error('创建调研表单失败，请重试');
       }
 
-      navigate(`/surveys/fill/${newSurvey.id}`);
+      let surveyId = newSurvey?.id;
+      if (!surveyId) {
+        const list = await surveyService.getSurveys();
+        const latest = (list || [])
+          .filter((item: any) => item.creator_id === currentUserId)
+          .sort((a: any, b: any) => new Date(b.create_time).getTime() - new Date(a.create_time).getTime())[0];
+        surveyId = latest?.id;
+      }
+
+      if (!surveyId) {
+        throw new Error('Created form but could not get form ID');
+      }
+
+      localStorage.setItem('ems_last_created_survey_id', surveyId);
+      navigate(`/surveys/fill/${surveyId}`);
     } catch (error) {
       console.error('创建调研表单失败:', error);
       alert(error instanceof Error ? error.message : '创建调研表单失败，请重试');
