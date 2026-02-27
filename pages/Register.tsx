@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+﻿import React, { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { authService } from '../src/services/authService';
 
@@ -10,46 +10,49 @@ export const Register: React.FC = () => {
     phone: '',
     email: '',
     password: '',
-    confirm_password: ''
+    confirm_password: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const redirectTo = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('redirect') || '/';
+  }, [location.search]);
+
+  const loginPath = useMemo(() => `/login?redirect=${encodeURIComponent(redirectTo)}`, [redirectTo]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
     setSuccess('');
   };
 
   const validateForm = (): boolean => {
-    // 用户名长度校验
     if (formData.username.length < 4 || formData.username.length > 50) {
       setError('用户名长度必须在4-50字符之间');
       return false;
     }
 
-    // 密码长度校验
     if (formData.password.length < 4 || formData.password.length > 32) {
       setError('密码长度必须在4-32字符之间');
       return false;
     }
 
-    // 密码一致性校验
     if (formData.password !== formData.confirm_password) {
       setError('两次输入的密码不一致');
       return false;
     }
 
-    // 手机号格式校验（如果填写）
     if (formData.phone && !/^\d+$/.test(formData.phone)) {
       setError('手机号必须为数字格式');
       return false;
     }
 
-    // 邮箱格式校验（如果填写）
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setError('邮箱格式不正确');
       return false;
@@ -60,7 +63,7 @@ export const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -70,22 +73,14 @@ export const Register: React.FC = () => {
     setSuccess('');
 
     try {
-      console.log('注册请求:', formData);
-      
-      // 调用认证服务进行注册
       const registerResult = await authService.register(formData);
       console.log('注册成功:', registerResult);
-      
-      // 注册成功
-      setLoading(false);
-      setSuccess('注册成功！正在跳转到登录页面...');
-      
-      // 3秒后跳转到登录页面
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
+
+      setSuccess('注册成功，正在进入填写页面...');
+      window.setTimeout(() => {
+        navigate(redirectTo);
+      }, 600);
     } catch (err) {
-      setLoading(false);
       const errorMessage = err instanceof Error ? err.message : '注册失败，请稍后重试';
       setError(errorMessage);
       console.error('注册失败:', err);
@@ -151,7 +146,7 @@ export const Register: React.FC = () => {
                 minLength={4}
                 maxLength={50}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="请输入登录账号（4-50字符）"
+                placeholder="请输入登录账号(4-50字符)"
               />
             </div>
 
@@ -199,7 +194,7 @@ export const Register: React.FC = () => {
                 minLength={4}
                 maxLength={32}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="请输入密码（最少4位）"
+                placeholder="请输入密码"
               />
             </div>
 
@@ -224,25 +219,15 @@ export const Register: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {loading && (
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
               {loading ? '注册中...' : '注册'}
             </button>
-
-            <div className="text-sm text-slate-500">
-              <p>注册即表示您同意我们的<a href="#" className="text-blue-600 hover:text-blue-800 font-medium">服务条款</a>和<a href="#" className="text-blue-600 hover:text-blue-800 font-medium">隐私政策</a></p>
-            </div>
           </form>
 
           <div className="mt-8 text-center">
             <p className="text-slate-600 text-sm">
-              已有账号? <Link to="/login" className="text-blue-600 hover:text-blue-800 font-bold">立即登录</Link>
+              已有账号? <Link to={loginPath} className="text-blue-600 hover:text-blue-800 font-bold">立即登录</Link>
             </p>
           </div>
         </div>

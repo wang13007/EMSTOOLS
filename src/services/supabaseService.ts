@@ -60,6 +60,11 @@ const canExternalAccessSurvey = (survey: any, userId: string) => {
   return sharedIds.includes(userId);
 };
 
+const isExternalLinkEnabled = (survey: any) => {
+  const data = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  return Boolean(data.external_link_enabled);
+};
+
 const readRoleCache = (): Record<string, string[]> => {
   if (!canUseLocalStorage()) return {};
   try {
@@ -397,6 +402,52 @@ export const surveyService = {
       return null;
     }
     return data;
+  },
+
+  async grantExternalAccessByAuthorizedLink(id: string) {
+    const externalUser = isExternalLocalUser();
+    if (!externalUser?.id) {
+      return surveyService.getSurveyById(id);
+    }
+
+    const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
+    if (error || !data) {
+      console.error('授权链接获取表单失败:', error);
+      return null;
+    }
+
+    if (canExternalAccessSurvey(data, externalUser.id)) {
+      return data;
+    }
+
+    if (!isExternalLinkEnabled(data)) {
+      console.warn('表单未开启外部授权链接访问:', { surveyId: id, userId: externalUser.id });
+      return null;
+    }
+
+    const rawData = data.data && typeof data.data === 'object' ? data.data : {};
+    const sharedIds = Array.isArray(rawData.external_access_user_ids) ? rawData.external_access_user_ids : [];
+    const nextSharedIds = dedupeStringArray([...sharedIds, externalUser.id]);
+
+    const { data: updated, error: updateError } = await supabase
+      .from('survey_forms')
+      .update({
+        data: {
+          ...rawData,
+          external_link_enabled: true,
+          external_access_user_ids: nextSharedIds,
+        },
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      console.error('授权链接绑定外部用户失败:', updateError);
+      return null;
+    }
+
+    return updated;
   },
 
   async createSurvey(survey: Omit<SurveyForm, 'id' | 'create_time'>) {

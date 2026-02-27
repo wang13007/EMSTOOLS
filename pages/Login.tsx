@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { authService } from '../src/services/authService';
@@ -6,20 +6,28 @@ import { authService } from '../src/services/authService';
 export const Login: React.FC = () => {
   const [formData, setFormData] = useState({
     username: '',
-    password: ''
+    password: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
+
   const redirectTo = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get('redirect') || '/';
   }, [location.search]);
 
+  const isAuthorizedRedirect = useMemo(() => redirectTo.includes('/authorized/surveys/fill/'), [redirectTo]);
+
+  const registerPath = useMemo(() => {
+    const encoded = encodeURIComponent(redirectTo);
+    return `/register?redirect=${encoded}`;
+  }, [redirectTo]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
   };
 
@@ -29,20 +37,14 @@ export const Login: React.FC = () => {
     setError('');
 
     try {
-      console.log('登录请求:', formData);
-      
-      // 调用认证服务进行登录
-      const loginResult = await authService.login(formData);
-      console.log('登录成功:', loginResult);
-      
-      // 保存登录状态到localStorage
+      const loginResult = await authService.login(formData, {
+        autoCreateExternalIfNotExists: isAuthorizedRedirect,
+      });
+
       localStorage.setItem('ems_user', JSON.stringify(loginResult.user));
       localStorage.setItem('ems_token', loginResult.token);
-      
-      // 跳转到首页
       navigate(redirectTo);
     } catch (err) {
-      setLoading(false);
       const errorMessage = err instanceof Error ? err.message : '登录失败，请检查账号和密码';
       setError(errorMessage);
       console.error('登录失败:', err);
@@ -50,8 +52,6 @@ export const Login: React.FC = () => {
       setLoading(false);
     }
   };
-
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
@@ -65,6 +65,9 @@ export const Login: React.FC = () => {
               <span>EMS 售前助手</span>
             </div>
             <p className="text-slate-500 text-sm">登录系统以继续</p>
+            {isAuthorizedRedirect && (
+              <p className="text-xs text-blue-600 mt-2">外部填写入口：首次登录账号不存在将自动创建外部用户</p>
+            )}
           </div>
 
           {error && (
@@ -144,7 +147,7 @@ export const Login: React.FC = () => {
 
           <div className="mt-8 text-center">
             <p className="text-slate-600 text-sm">
-              还没有账号? <Link to="/register" className="text-blue-600 hover:text-blue-800 font-bold">立即注册</Link>
+              还没有账号? <Link to={registerPath} className="text-blue-600 hover:text-blue-800 font-bold">立即注册</Link>
             </p>
           </div>
         </div>

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ReportStatus, SurveyStatus, UserType } from '../types';
+import { ReportStatus, SurveyStatus } from '../types';
 import { INDUSTRIES, REGIONS } from '../constants';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { roleService, surveyService, userService } from '../src/services/supabaseService';
@@ -8,7 +8,6 @@ import { roleService, surveyService, userService } from '../src/services/supabas
 type UserOption = {
   id: string;
   label: string;
-  type: UserType;
 };
 
 type CreateMode = 'direct' | 'link';
@@ -18,7 +17,7 @@ const isUuid = (value: string | undefined | null) => Boolean(value && UUID_REGEX
 
 const isPreSalesRole = (role: any) => {
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
-  const keywords = ['\u552e\u524d', 'presales', 'pre-sales', 'pre sales'];
+  const keywords = ['售前', 'presales', 'pre-sales', 'pre sales'];
   return keywords.some((keyword) => source.includes(keyword));
 };
 
@@ -48,12 +47,10 @@ export const SurveyCreate: React.FC = () => {
     industry: INDUSTRIES[0],
     region: REGIONS[0],
     preSalesResponsibleId: '',
-    externalAccessUserId: '',
   });
 
   const [createMode, setCreateMode] = useState<CreateMode>('direct');
   const [preSalesUsers, setPreSalesUsers] = useState<UserOption[]>([]);
-  const [externalUsers, setExternalUsers] = useState<UserOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
@@ -61,9 +58,8 @@ export const SurveyCreate: React.FC = () => {
 
   const canSubmit = useMemo(() => {
     if (loading || loadingUsers || !isUuid(formData.preSalesResponsibleId)) return false;
-    if (createMode === 'link' && !isUuid(formData.externalAccessUserId)) return false;
     return true;
-  }, [createMode, formData.externalAccessUserId, formData.preSalesResponsibleId, loading, loadingUsers]);
+  }, [formData.preSalesResponsibleId, loading, loadingUsers]);
 
   useEffect(() => {
     if (hasLoadedUsersRef.current) return;
@@ -75,20 +71,6 @@ export const SurveyCreate: React.FC = () => {
         const [roles, users] = await Promise.all([roleService.getRoles(), userService.getUsers()]);
         const preSalesRoleIds = new Set((roles || []).filter(isPreSalesRole).map((role: any) => role.id));
 
-        const normalizedUsers: UserOption[] = (users || [])
-          .filter((user: any) => (user.status || 'enabled') === 'enabled')
-          .map((user: any) => {
-            const id = user.id || user.user_id;
-            const userType = (user.type || user.user_type || UserType.EXTERNAL) as UserType;
-            const name = user.user_name || user.name || user.username;
-            return {
-              id,
-              label: `${name} (${user.username})`,
-              type: userType,
-            };
-          })
-          .filter((user) => isUuid(user.id));
-
         const preSales = (users || [])
           .filter((user: any) => (user.status || 'enabled') === 'enabled')
           .filter((user: any) => {
@@ -98,18 +80,13 @@ export const SurveyCreate: React.FC = () => {
           .map((user: any) => ({
             id: user.id || user.user_id,
             label: `${user.user_name || user.name || user.username} (${user.username})`,
-            type: (user.type || user.user_type || UserType.EXTERNAL) as UserType,
           }))
           .filter((user: UserOption) => isUuid(user.id));
 
-        const externals = normalizedUsers.filter((user) => user.type === UserType.EXTERNAL);
-
         setPreSalesUsers(preSales);
-        setExternalUsers(externals);
         setFormData((prev) => ({
           ...prev,
           preSalesResponsibleId: prev.preSalesResponsibleId || preSales[0]?.id || '',
-          externalAccessUserId: prev.externalAccessUserId || externals[0]?.id || '',
         }));
       } catch (error) {
         console.error('加载用户列表失败:', error);
@@ -145,15 +122,11 @@ export const SurveyCreate: React.FC = () => {
       if (!isUuid(formData.preSalesResponsibleId)) {
         throw new Error('请选择有效的售前负责人');
       }
-      if (createMode === 'link' && !isUuid(formData.externalAccessUserId)) {
-        throw new Error('请选择外部填写用户');
-      }
 
       const dataPayload: Record<string, any> = {
         template_key: presetTemplate.id,
       };
       if (createMode === 'link') {
-        dataPayload.external_access_user_ids = [formData.externalAccessUserId];
         dataPayload.external_link_enabled = true;
       }
 
@@ -329,29 +302,8 @@ export const SurveyCreate: React.FC = () => {
         </div>
 
         {createMode === 'link' && (
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-700">外部填写用户</label>
-            <select
-              required
-              disabled={loadingUsers || externalUsers.length === 0}
-              className={`w-full px-4 py-2 border border-slate-200 rounded-lg outline-none ${
-                loadingUsers || externalUsers.length === 0
-                  ? 'bg-slate-50 text-slate-400 cursor-not-allowed'
-                  : 'focus:ring-2 focus:ring-blue-500'
-              }`}
-              value={formData.externalAccessUserId}
-              onChange={(e) => setFormData({ ...formData, externalAccessUserId: e.target.value })}
-            >
-              {loadingUsers && <option value="">加载中...</option>}
-              {!loadingUsers && externalUsers.length === 0 && <option value="">未找到外部用户</option>}
-              {!loadingUsers &&
-                externalUsers.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.label}
-                  </option>
-                ))}
-            </select>
-            <p className="text-xs text-slate-500">仅该外部用户可通过授权页面访问该表单。</p>
+          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            该链接用于外部用户填写，访问后可自行注册/登录，系统会自动关联授权。
           </div>
         )}
 
@@ -414,4 +366,3 @@ export const SurveyCreate: React.FC = () => {
     </div>
   );
 };
-

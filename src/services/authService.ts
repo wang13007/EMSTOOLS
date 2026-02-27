@@ -3,6 +3,10 @@
   password: string;
 }
 
+export interface LoginOptions {
+  autoCreateExternalIfNotExists?: boolean;
+}
+
 export interface RegisterRequest {
   user_name: string;
   username: string;
@@ -35,7 +39,7 @@ export interface UserInfo {
 const LEGACY_DEFAULT_HASH_PREFIX = '$2';
 
 export const authService = {
-  async login(data: LoginRequest): Promise<{ user: UserInfo; token: string }> {
+  async login(data: LoginRequest, options?: LoginOptions): Promise<{ user: UserInfo; token: string }> {
     try {
       console.log('登录请求:', data);
 
@@ -44,9 +48,33 @@ export const authService = {
       const users = await userService.getUsers();
       console.log('数据库用户列表:', users);
 
-      const currentUser = users.find((u: any) => u.username === data.username);
+      let currentUser = users.find((u: any) => u.username === data.username);
       if (!currentUser) {
-        throw new Error('用户不存在');
+        if (!options?.autoCreateExternalIfNotExists) {
+          throw new Error('用户不存在');
+        }
+
+        const roles = await roleService.getRoles();
+        const customerRole = roles.find(
+          (r: any) => r.name === '客户用户' || r.name === '外部客户' || r.type === 'external'
+        );
+        if (!customerRole) {
+          throw new Error('系统配置错误，未找到外部角色');
+        }
+
+        const createdUser = await userService.createUser({
+          user_name: data.username,
+          username: data.username,
+          password_hash: data.password,
+          type: 'external',
+          user_type: 'external',
+          role_id: customerRole.id,
+          status: 'enabled',
+        });
+        if (!createdUser) {
+          throw new Error('自动创建外部用户失败');
+        }
+        currentUser = createdUser;
       }
 
       const stored = String(currentUser.password_hash || '');

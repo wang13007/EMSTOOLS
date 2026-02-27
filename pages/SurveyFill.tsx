@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { generateEnergyReport } from '../services/geminiService';
@@ -62,6 +62,7 @@ const formatTime = (iso?: string) => {
 export const SurveyFill: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState<SurveyForm | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,6 +80,7 @@ export const SurveyFill: React.FC = () => {
       const routeId = id && id !== 'undefined' && id !== 'null' ? id : '';
       const fallbackId = localStorage.getItem('ems_last_created_survey_id') || '';
       const resolvedId = routeId || fallbackId;
+      const fromAuthorizedLink = location.pathname.includes('/authorized/surveys/fill/');
 
       if (!resolvedId) {
         setInitializing(false);
@@ -89,13 +91,22 @@ export const SurveyFill: React.FC = () => {
 
       setInitializing(true);
       let survey = await surveyService.getSurveyById(resolvedId);
+      if (!survey && fromAuthorizedLink) {
+        survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId);
+      }
       if (!survey) {
         await new Promise((resolve) => setTimeout(resolve, 250));
         survey = await surveyService.getSurveyById(resolvedId);
+        if (!survey && fromAuthorizedLink) {
+          survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId);
+        }
       }
       if (!survey) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         survey = await surveyService.getSurveyById(resolvedId);
+        if (!survey && fromAuthorizedLink) {
+          survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId);
+        }
       }
       if (!survey) {
         setInitializing(false);
@@ -114,7 +125,7 @@ export const SurveyFill: React.FC = () => {
     };
 
     loadSurvey();
-  }, [id, navigate]);
+  }, [id, location.pathname, navigate]);
 
   useEffect(() => {
     return () => {
