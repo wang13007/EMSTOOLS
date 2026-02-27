@@ -296,9 +296,9 @@ export const SurveyFill: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto animate-fadeIn">
-      <div className="sticky top-0 z-30 pb-4 bg-slate-50/95 backdrop-blur supports-[backdrop-filter]:bg-slate-50/85 border-b border-slate-200 mb-8">
-        <div className="pt-3">
+    <div className="animate-fadeIn">
+      <div className="sticky top-0 z-30 bg-slate-50 border-b border-slate-200 shadow-sm">
+        <div className="max-w-4xl mx-auto py-3">
           <div className="flex justify-between items-center gap-4">
             <div>
               <h2 className="text-2xl font-bold text-slate-900">{form.name}</h2>
@@ -352,7 +352,7 @@ export const SurveyFill: React.FC = () => {
         </div>
       </div>
 
-      <div className="space-y-8">
+      <div className="max-w-4xl mx-auto pt-6 space-y-8">
         {template.sections.map((section) => (
           <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
