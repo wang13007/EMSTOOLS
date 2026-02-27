@@ -30,6 +30,36 @@ const canUseLocalStorage = () => {
   return typeof window !== 'undefined' && !!window.localStorage;
 };
 
+const getLocalUserContext = () => {
+  if (!canUseLocalStorage()) return null;
+  try {
+    const raw = window.localStorage.getItem('ems_user');
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    return {
+      id: user?.id || user?.user_id || '',
+      type: user?.type || user?.user_type || '',
+    };
+  } catch {
+    return null;
+  }
+};
+
+const isExternalLocalUser = () => {
+  const user = getLocalUserContext();
+  return user?.type === 'external' ? user : null;
+};
+
+const canExternalAccessSurvey = (survey: any, userId: string) => {
+  if (!survey || !userId) return false;
+  if (survey.creator_id === userId || survey.submitter_id === userId || survey.pre_sales_responsible_id === userId) {
+    return true;
+  }
+  const data = survey.data && typeof survey.data === 'object' ? survey.data : {};
+  const sharedIds = Array.isArray(data.external_access_user_ids) ? data.external_access_user_ids : [];
+  return sharedIds.includes(userId);
+};
+
 const readRoleCache = (): Record<string, string[]> => {
   if (!canUseLocalStorage()) return {};
   try {
@@ -321,6 +351,32 @@ export const userService = {
 
 export const surveyService = {
   async getSurveys() {
+    const externalUser = isExternalLocalUser();
+    if (externalUser?.id) {
+      const [directResult, sharedResult] = await Promise.all([
+        supabase
+          .from('survey_forms')
+          .select('*')
+          .or(
+            `creator_id.eq.${externalUser.id},submitter_id.eq.${externalUser.id},pre_sales_responsible_id.eq.${externalUser.id}`
+          ),
+        supabase.from('survey_forms').select('*').contains('data', { external_access_user_ids: [externalUser.id] }),
+      ]);
+
+      if (directResult.error && sharedResult.error) {
+        console.error('获取外部用户表单列表失败:', directResult.error, sharedResult.error);
+        return [];
+      }
+
+      const merged = new Map<string, any>();
+      [...(directResult.data || []), ...(sharedResult.data || [])].forEach((survey: any) => {
+        if (!survey?.id) return;
+        if (!canExternalAccessSurvey(survey, externalUser.id)) return;
+        merged.set(survey.id, survey);
+      });
+      return Array.from(merged.values());
+    }
+
     const { data, error } = await supabase.from('survey_forms').select('*');
     if (error) {
       console.error('获取表单列表失败:', error);
@@ -333,6 +389,11 @@ export const surveyService = {
     const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
     if (error) {
       console.error('获取表单详情失败:', error);
+      return null;
+    }
+    const externalUser = isExternalLocalUser();
+    if (externalUser?.id && !canExternalAccessSurvey(data, externalUser.id)) {
+      console.warn('外部用户无权限访问该表单:', { surveyId: id, userId: externalUser.id });
       return null;
     }
     return data;
@@ -348,6 +409,15 @@ export const surveyService = {
   },
 
   async updateSurvey(id: string, survey: any) {
+    const externalUser = isExternalLocalUser();
+    if (externalUser?.id) {
+      const target = await surveyService.getSurveyById(id);
+      if (!target) {
+        console.warn('外部用户更新表单被拦截:', { surveyId: id, userId: externalUser.id });
+        return null;
+      }
+    }
+
     const dbSurvey = {
       ...survey,
       report_status: survey.reportStatus || survey.report_status,
@@ -370,6 +440,15 @@ export const surveyService = {
   },
 
   async deleteSurvey(id: string) {
+    const externalUser = isExternalLocalUser();
+    if (externalUser?.id) {
+      const target = await surveyService.getSurveyById(id);
+      if (!target) {
+        console.warn('外部用户删除表单被拦截:', { surveyId: id, userId: externalUser.id });
+        return false;
+      }
+    }
+
     const { error } = await supabase.from('survey_forms').delete().eq('id', id);
     if (error) {
       console.error('删除表单失败:', error);

@@ -91,6 +91,7 @@ export const RoleManagement: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Partial<Role> | null>(null);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState('');
 
   useEffect(() => {
     // 直接使用默认角色数据，避免从数据库获取角色导致的无限递归问题
@@ -115,6 +116,7 @@ export const RoleManagement: React.FC = () => {
         } as Role;
         
         saveRoles(roles.map(r => r.id === editingRole.id ? updatedRole : r));
+        setSaveSuccessMessage('角色权限更新成功');
       } else {
         // 创建新角色（只更新本地状态）
         const newRole: Role = {
@@ -128,9 +130,11 @@ export const RoleManagement: React.FC = () => {
         };
         
         saveRoles([...roles, newRole]);
+        setSaveSuccessMessage('角色创建成功');
       }
       setIsModalOpen(false);
       setEditingRole(null);
+      window.setTimeout(() => setSaveSuccessMessage(''), 3000);
     } catch (error) {
       console.error('保存角色失败:', error);
       alert('保存角色失败，请重试');
@@ -146,6 +150,12 @@ export const RoleManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {saveSuccessMessage && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+          {saveSuccessMessage}
+        </div>
+      )}
+
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">角色管理</h2>

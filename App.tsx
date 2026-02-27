@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { SurveyCreate } from './pages/SurveyCreate';
@@ -32,14 +32,19 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 
 // 路由保护组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
   const isLoggedIn = !!localStorage.getItem('ems_token');
-  return isLoggedIn ? <>{children}</> : <Navigate to="/login" replace />;
+  const redirect = encodeURIComponent(`${location.pathname}${location.search}`);
+  return isLoggedIn ? <>{children}</> : <Navigate to={`/login?redirect=${redirect}`} replace />;
 };
 
 // 公共路由组件（不需要登录）
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
   const isLoggedIn = !!localStorage.getItem('ems_token');
-  return isLoggedIn ? <Navigate to="/" replace /> : <>{children}</>;
+  const params = new URLSearchParams(location.search);
+  const redirect = params.get('redirect');
+  return isLoggedIn ? <Navigate to={redirect || '/'} replace /> : <>{children}</>;
 };
 
 const App: React.FC = () => {
@@ -87,6 +92,13 @@ const App: React.FC = () => {
           </ProtectedRoute>
         } />
         <Route path="/surveys/fill/:id" element={
+          <ProtectedRoute>
+            <Layout>
+              <SurveyFill />
+            </Layout>
+          </ProtectedRoute>
+        } />
+        <Route path="/authorized/surveys/fill/:id" element={
           <ProtectedRoute>
             <Layout>
               <SurveyFill />

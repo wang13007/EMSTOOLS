@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { authService } from '../src/services/authService';
-import { userService } from '../src/services/supabaseService';
 
 export const Login: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +11,11 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('redirect') || '/';
+  }, [location.search]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -36,7 +40,7 @@ export const Login: React.FC = () => {
       localStorage.setItem('ems_token', loginResult.token);
       
       // 跳转到首页
-      navigate('/');
+      navigate(redirectTo);
     } catch (err) {
       setLoading(false);
       const errorMessage = err instanceof Error ? err.message : '登录失败，请检查账号和密码';
