@@ -297,7 +297,7 @@ export const SurveyFill: React.FC = () => {
 
   return (
     <div className="animate-fadeIn">
-      <div className="sticky top-0 z-30 bg-slate-50 border-b border-slate-200 shadow-sm">
+      <div className="sticky -top-8 z-30 -mx-8 px-8 bg-slate-50 border-b border-slate-200 shadow-sm">
         <div className="max-w-4xl mx-auto py-3">
           <div className="flex justify-between items-center gap-4">
             <div>
