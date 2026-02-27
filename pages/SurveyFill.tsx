@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { generateEnergyReport } from '../services/geminiService';
 import { surveyService } from '../src/services/supabaseService';
+
+const AUTO_SAVE_DELAY_MS = 1200;
 
 const getCurrentUserId = () => {
   try {
@@ -48,6 +50,15 @@ const syncLocalSurvey = (form: SurveyForm) => {
   }
 };
 
+const formatTime = (iso?: string) => {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('zh-CN', { hour12: false });
+  } catch {
+    return '';
+  }
+};
+
 export const SurveyFill: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -55,6 +66,13 @@ export const SurveyFill: React.FC = () => {
   const [initializing, setInitializing] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState('');
+
+  const persistLockRef = useRef(false);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const autoSaveStateResetTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const loadSurvey = async () => {
@@ -72,7 +90,6 @@ export const SurveyFill: React.FC = () => {
       setInitializing(true);
       let survey = await surveyService.getSurveyById(resolvedId);
       if (!survey) {
-        // Retry for eventual consistency right after create.
         await new Promise((resolve) => setTimeout(resolve, 250));
         survey = await surveyService.getSurveyById(resolvedId);
       }
@@ -90,11 +107,113 @@ export const SurveyFill: React.FC = () => {
       const mapped = toSurveyForm(survey);
       setForm(mapped);
       syncLocalSurvey(mapped);
+      setDirty(false);
+      setAutoSaveState('idle');
+      setLastSavedAt(survey.update_time || survey.create_time || '');
       setInitializing(false);
     };
 
     loadSurvey();
   }, [id, navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+      if (autoSaveStateResetTimerRef.current) {
+        window.clearTimeout(autoSaveStateResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!dirty && autoSaveState !== 'saving') return;
+      event.preventDefault();
+      event.returnValue = '当前有未保存修改，确认离开吗？';
+      return event.returnValue;
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty, autoSaveState]);
+
+  const persistDraft = useCallback(
+    async (options?: { silent?: boolean; alertOnError?: boolean }) => {
+      const silent = options?.silent ?? false;
+      const alertOnError = options?.alertOnError ?? true;
+      if (!form) return false;
+      if (persistLockRef.current) return false;
+
+      persistLockRef.current = true;
+      if (silent) {
+        setAutoSaveState('saving');
+      } else {
+        setSaving(true);
+      }
+
+      try {
+        const currentUserId = getCurrentUserId();
+        const updated = await surveyService.updateSurvey(form.id, {
+          data: form.data,
+          status: form.status,
+          report_status: form.reportStatus,
+          submitter_id: currentUserId || undefined,
+        });
+
+        if (!updated) {
+          throw new Error('保存草稿失败');
+        }
+
+        const mapped = toSurveyForm(updated);
+        setForm(mapped);
+        syncLocalSurvey(mapped);
+        setDirty(false);
+        setLastSavedAt(new Date().toISOString());
+        setAutoSaveState('saved');
+
+        if (autoSaveStateResetTimerRef.current) {
+          window.clearTimeout(autoSaveStateResetTimerRef.current);
+        }
+        autoSaveStateResetTimerRef.current = window.setTimeout(() => {
+          setAutoSaveState('idle');
+        }, 1800);
+        return true;
+      } catch (error) {
+        console.error('保存草稿失败:', error);
+        setAutoSaveState('error');
+        if (alertOnError) {
+          alert('保存草稿失败，请重试');
+        }
+        return false;
+      } finally {
+        persistLockRef.current = false;
+        if (!silent) {
+          setSaving(false);
+        }
+      }
+    },
+    [form]
+  );
+
+  useEffect(() => {
+    if (!form || initializing || submitting) return;
+    if (!dirty) return;
+
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      void persistDraft({ silent: true, alertOnError: false });
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [dirty, form, initializing, submitting, persistDraft]);
 
   const template = useMemo(() => {
     if (!form) return null;
@@ -108,39 +227,27 @@ export const SurveyFill: React.FC = () => {
       data: { ...form.data, [fieldId]: value },
       status: SurveyStatus.FILLING,
     });
+    setDirty(true);
+    if (autoSaveState !== 'saving') {
+      setAutoSaveState('idle');
+    }
   };
 
   const saveDraft = async () => {
-    if (!form) return;
-    setSaving(true);
-    try {
-      const currentUserId = getCurrentUserId();
-      const updated = await surveyService.updateSurvey(form.id, {
-        data: form.data,
-        status: form.status,
-        report_status: form.reportStatus,
-        submitter_id: currentUserId || undefined,
-      });
-
-      if (!updated) {
-        throw new Error('保存草稿失败');
-      }
-
-      const mapped = toSurveyForm(updated);
-      setForm(mapped);
-      syncLocalSurvey(mapped);
-    } catch (error) {
-      console.error('保存草稿失败:', error);
-      alert('保存草稿失败，请重试');
-    } finally {
-      setSaving(false);
-    }
+    await persistDraft({ silent: false, alertOnError: true });
   };
 
   const handleSubmit = async () => {
     if (!form) return;
     setSubmitting(true);
     try {
+      if (dirty) {
+        const saved = await persistDraft({ silent: true, alertOnError: false });
+        if (!saved && dirty) {
+          throw new Error('自动保存失败，请先点击“保存草稿”');
+        }
+      }
+
       const report = await generateEnergyReport(form);
       const currentUserId = getCurrentUserId();
 
@@ -158,6 +265,9 @@ export const SurveyFill: React.FC = () => {
       const mapped = toSurveyForm(updated);
       setForm(mapped);
       syncLocalSurvey(mapped);
+      setDirty(false);
+      setLastSavedAt(new Date().toISOString());
+      setAutoSaveState('saved');
 
       const reports = JSON.parse(localStorage.getItem('ems_reports') || '{}');
       reports[form.id] = report;
@@ -166,11 +276,20 @@ export const SurveyFill: React.FC = () => {
       navigate(`/reports/${form.id}`);
     } catch (error) {
       console.error('提交并生成报告失败:', error);
-      alert('生成报告失败，请检查网络或 API 配置');
+      alert(error instanceof Error ? error.message : '生成报告失败，请检查网络或 API 配置');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const autoSaveMessage = useMemo(() => {
+    if (autoSaveState === 'saving') return '正在自动保存...';
+    if (autoSaveState === 'saved') return `已自动保存 ${formatTime(lastSavedAt)}`;
+    if (autoSaveState === 'error') return '自动保存失败，请点击“保存草稿”重试';
+    if (dirty) return '检测到变更，稍后将自动保存';
+    if (lastSavedAt) return `上次保存 ${formatTime(lastSavedAt)}`;
+    return '实时保存已开启';
+  }, [autoSaveState, dirty, lastSavedAt]);
 
   if (initializing || !form || !template) {
     return <div className="p-20 text-center">加载中...</div>;
@@ -195,8 +314,8 @@ export const SurveyFill: React.FC = () => {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting}
-            className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2"
+            disabled={submitting || autoSaveState === 'saving'}
+            className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70"
           >
             {submitting ? (
               <>
@@ -215,6 +334,18 @@ export const SurveyFill: React.FC = () => {
             )}
           </button>
         </div>
+      </div>
+
+      <div
+        className={`px-4 py-2 rounded-xl text-sm border ${
+          autoSaveState === 'error'
+            ? 'bg-rose-50 text-rose-700 border-rose-200'
+            : autoSaveState === 'saving'
+            ? 'bg-amber-50 text-amber-700 border-amber-200'
+            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        }`}
+      >
+        {autoSaveMessage}
       </div>
 
       <div className="space-y-8">
