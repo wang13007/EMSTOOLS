@@ -235,24 +235,29 @@ export const SurveyFill: React.FC = () => {
     if (!section.visibleWhen) return true;
     const { fieldId, values } = section.visibleWhen;
     const fieldValue = form.data[fieldId];
+
     if (!fieldValue) return false;
 
-    if (Array.isArray(fieldValue)) {
-      return values.some((v) => fieldValue.includes(v));
-    }
-    return values.includes(fieldValue);
+    const selectedEnergyTypes = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+
+    return selectedEnergyTypes.some((selected: string) => values.includes(selected));
   };
 
   const shouldShowField = (field: any): boolean => {
     if (!field.visibleWhen) return true;
     const { fieldId, values } = field.visibleWhen;
     const fieldValue = form.data[fieldId];
+
     if (!fieldValue) return false;
 
-    if (Array.isArray(fieldValue)) {
-      return values.some((v) => fieldValue.includes(v));
-    }
-    return values.includes(fieldValue);
+    const selectedEnergyTypes = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+
+    return selectedEnergyTypes.some((selected: string) => values.includes(selected));
+  };
+
+  const isFieldReadOnly = (fieldId: string): boolean => {
+    const readonlyFields = ['field_001_1', 'field_002_2', 'field_003_3', 'field_004_4', 'field_005_5', 'field_006_6'];
+    return readonlyFields.includes(fieldId);
   };
 
   const handleFieldChange = (fieldId: string, value: any) => {
@@ -400,16 +405,24 @@ export const SurveyFill: React.FC = () => {
                 {section.fields.map((field) => {
                   if (!shouldShowField(field)) return null;
 
+                  const readOnly = isFieldReadOnly(field.id);
+
                   return (
                     <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
                       <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
                         {field.label}
                         {field.required && <span className="text-red-500">*</span>}
+                        {readOnly && <span className="text-xs text-slate-400 ml-2">(已预填，不可修改)</span>}
                       </label>
 
                       {field.type === 'text' && (
                         <input
-                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          readOnly={readOnly}
+                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                            readOnly
+                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                          }`}
                           value={form.data[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                         />
@@ -418,7 +431,12 @@ export const SurveyFill: React.FC = () => {
                       {field.type === 'number' && (
                         <input
                           type="number"
-                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          readOnly={readOnly}
+                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                            readOnly
+                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                          }`}
                           value={form.data[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                         />
@@ -426,7 +444,12 @@ export const SurveyFill: React.FC = () => {
 
                       {field.type === 'select' && (
                         <select
-                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          disabled={readOnly}
+                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                            readOnly
+                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                          }`}
                           value={form.data[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                         >
@@ -448,13 +471,17 @@ export const SurveyFill: React.FC = () => {
                               <button
                                 type="button"
                                 key={opt}
+                                disabled={readOnly}
                                 onClick={() => {
+                                  if (readOnly) return;
                                   const next = isSelected ? current.filter((item: string) => item !== opt) : [...current, opt];
                                   handleFieldChange(field.id, next);
                                 }}
                                 className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
-                                  isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
-                                }`}
+                                  isSelected
+                                    ? 'bg-blue-600 border-blue-600 text-white'
+                                    : 'bg-white border-slate-200 text-slate-600'
+                                } ${readOnly ? 'cursor-not-allowed opacity-70' : 'hover:border-blue-300'}`}
                               >
                                 {opt}
                               </button>
@@ -465,8 +492,13 @@ export const SurveyFill: React.FC = () => {
 
                       {field.type === 'textarea' && (
                         <textarea
+                          readOnly={readOnly}
                           rows={4}
-                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                            readOnly
+                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                          }`}
                           value={form.data[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                         />

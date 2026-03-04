@@ -125,6 +125,10 @@ export const SurveyCreate: React.FC = () => {
 
       const dataPayload: Record<string, any> = {
         template_key: presetTemplate.id,
+        field_001_1: formData.customerName,
+        field_002_2: formData.projectName,
+        field_003_3: formData.region,
+        field_005_5: formData.industry,
       };
       if (createMode === 'link') {
         dataPayload.external_link_enabled = true;
