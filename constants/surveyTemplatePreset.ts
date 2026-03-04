@@ -1,230 +1,236 @@
 import { SurveyTemplate } from '../types';
 
+const ENERGY_FIELD_ID = 'field_014_14';
+
 export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
   "id": "tpl-ems-presales-001",
-  "name": "EMS\u552e\u524d\u8c03\u7814\u6807\u51c6\u6a21\u677f",
-  "industry": "\u901a\u7528",
+  "name": "EMS售前调研标准模板",
+  "industry": "通用",
   "createTime": "2026-02-26",
   "sections": [
     {
       "id": "section_01",
-      "title": "\u4f01\u4e1a&\u9879\u76ee\u57fa\u672c\u4fe1\u606f",
+      "title": "企业&项目基本信息",
       "fields": [
         {
           "id": "field_001_1",
-          "label": "\u4f01\u4e1a\u540d\u79f0",
+          "label": "企业名称",
           "type": "text",
           "required": true
         },
         {
           "id": "field_002_2",
-          "label": "\u9879\u76ee\u540d\u79f0",
+          "label": "项目名称",
           "type": "text",
           "required": true
         },
         {
           "id": "field_003_3",
-          "label": "\u9879\u76ee\u5730\u533a",
+          "label": "项目地区",
           "type": "select",
           "required": true,
           "options": [
-            "\u7701-\u5e02-\u533a\uff0c\u5728\u6570\u636e\u5b57\u5178\u4e2d\u7ef4\u62a4"
+            "省-市-区，在数据字典中维护"
           ]
         },
         {
           "id": "field_004_4",
-          "label": "\u8be6\u7ec6\u5730\u5740",
+          "label": "详细地址",
           "type": "text",
           "required": true
         },
         {
           "id": "field_005_5",
-          "label": "\u9879\u76ee\u7c7b\u578b",
+          "label": "项目类型",
           "type": "select",
           "required": true,
           "options": [
-            "\u5de5\u4e1a\u56ed\u533a",
-            "\u5355\u4f53\u5de5\u5382",
-            "\u5199\u5b57\u697c",
-            "\u5546\u4e1a\u7efc\u5408\u4f53",
-            "\u5546\u573a",
-            "\u9152\u5e97",
-            "\u533b\u9662",
-            "\u5b66\u6821",
-            "\u6570\u636e\u4e2d\u5fc3",
-            "\u7269\u6d41\u56ed\u533a",
-            "\u516c\u5171\u5efa\u7b51",
-            "\u5176\u4ed6"
+            "工业园区",
+            "单体工厂",
+            "写字楼",
+            "商业综合体",
+            "商场",
+            "酒店",
+            "医院",
+            "学校",
+            "数据中心",
+            "物流园区",
+            "公共建筑",
+            "其他"
           ]
         },
         {
           "id": "field_006_6",
-          "label": "\u6240\u5c5e\u884c\u4e1a",
+          "label": "所属行业",
           "type": "select",
           "required": true,
           "options": [
-            "\u7535\u5b50",
-            "\u673a\u68b0",
-            "\u6c7d\u8f66",
-            "\u5316\u5de5",
-            "\u533b\u836f",
-            "\u98df\u54c1",
-            "\u80fd\u6e90",
-            "\u5546\u4e1a\u5730\u4ea7",
-            "\u516c\u5efa",
+            "电子",
+            "机械",
+            "汽车",
+            "化工",
+            "医药",
+            "食品",
+            "能源",
+            "商业地产",
+            "建筑",
             "IT",
-            "\u5176\u4ed6"
+            "其他"
           ]
         },
         {
           "id": "field_007_7",
-          "label": "\u5efa\u7b51\u9762\u79ef",
+          "label": "建筑面积",
           "type": "number",
           "required": false
         },
         {
           "id": "field_008_8",
-          "label": "\u8054\u7cfb\u4eba",
+          "label": "联系人",
           "type": "text",
           "required": true
         },
         {
           "id": "field_009_9",
-          "label": "\u8054\u7cfb\u7535\u8bdd",
+          "label": "联系电话",
           "type": "text",
           "required": true
         },
         {
           "id": "field_010_10",
-          "label": "\u8054\u7cfb\u90ae\u7bb1",
+          "label": "联系邮箱",
           "type": "text",
           "required": false
         },
         {
           "id": "field_011_11",
-          "label": "\u9879\u76ee\u9884\u7b97",
+          "label": "项目预算",
           "type": "select",
           "required": true,
           "options": [
-            "<50\u4e07",
-            "50\u2013100\u4e07",
-            "100\u2013200\u4e07",
-            "200\u2013500\u4e07",
-            "500\u20131000\u4e07",
-            ">1000\u4e07",
-            "\u6682\u672a\u786e\u5b9a"
+            "<50万",
+            "50-100万",
+            "100-200万",
+            "200-500万",
+            "500-1000万",
+            ">1000万",
+            "尚未确定"
           ]
         },
         {
           "id": "field_012_12",
-          "label": "\u671f\u671b\u4e0a\u7ebf\u65f6\u95f4",
+          "label": "期望上线时间",
           "type": "select",
           "required": true,
           "options": [
-            "1\u20133\u4e2a\u6708",
-            "3\u20136\u4e2a\u6708",
-            ">6\u4e2a\u6708",
-            "\u4e0d\u786e\u5b9a"
+            "1-3个月",
+            "3-6个月",
+            ">6个月",
+            "不确定"
           ]
         },
         {
           "id": "field_013_13",
-          "label": "\u9879\u76ee\u4e3b\u8981\u76ee\u6807",
+          "label": "项目主要目标",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u964d\u672c",
-            "\u7cbe\u7ec6\u5316\u7ba1\u7406",
-            "\u5206\u9879\u8ba1\u91cf",
-            "\u8fd0\u7ef4\u4f18\u5316",
-            "\u8282\u80fd\u6539\u9020",
-            "\u78b3\u6392\u653e",
-            "\u5408\u89c4",
-            "\u5bf9\u5916\u62a5\u8868"
+            "降本",
+            "精细化管理",
+            "分项计量",
+            "运维优化",
+            "节能改造",
+            "碳排放",
+            "合规",
+            "对外报告"
           ]
         }
       ]
     },
     {
       "id": "section_02",
-      "title": "\u7528\u80fd\u603b\u4f53\u60c5\u51b5",
+      "title": "用能总体情况",
       "fields": [
         {
-          "id": "field_014_14",
-          "label": "\u4f7f\u7528\u7684\u80fd\u6e90\u7c7b\u578b",
+          "id": ENERGY_FIELD_ID,
+          "label": "使用的能源类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u7535\u529b",
-            "\u5929\u7136\u6c14",
-            "\u84b8\u6c7d",
-            "\u67f4\u6cb9",
-            "\u70ed\u6c34",
-            "\u51b7\u91cf",
-            "\u538b\u7f29\u7a7a\u6c14",
-            "\u5149\u4f0f",
-            "\u50a8\u80fd",
-            "\u5176\u4ed6"
+            "电力",
+            "天然气",
+            "蒸汽",
+            "煤炭",
+            "热水",
+            "冷量",
+            "压缩空气",
+            "光伏",
+            "储能",
+            "其他"
           ]
         },
         {
           "id": "field_015_15",
-          "label": "\u91cd\u70b9\u7528\u80fd\u7cfb\u7edf/\u8bbe\u5907",
+          "label": "重点用能系统/设备",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u4e2d\u592e\u7a7a\u8c03",
-            "\u51b7\u7ad9",
-            "\u9505\u7089",
-            "\u84b8\u6c7d\u7cfb\u7edf",
-            "\u538b\u7f29\u7a7a\u6c14\u7cfb\u7edf",
-            "\u9ad8\u8017\u80fd\u751f\u4ea7\u8bbe\u5907",
-            "\u5176\u4ed6"
+            "中央空调",
+            "冷站",
+            "锅炉",
+            "蒸汽系统",
+            "压缩空气系统",
+            "高耗能生产设备",
+            "其他"
           ]
         }
       ]
     },
     {
       "id": "section_03",
-      "title": "\u80fd\u6e90\u7c7b\u578b-\u7535\u529b",
+      "title": "能源类型-电力",
+      "visibleWhen": {
+        "fieldId": ENERGY_FIELD_ID,
+        "values": ["电力"]
+      },
       "fields": [
         {
           "id": "field_016_15",
-          "label": "\u5e74\u603b\u7528\u7535\u91cf\uff08kWh\uff09",
+          "label": "年总用电量（kWh）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_017_16",
-          "label": "\u5e74\u603b\u7528\u7535\u8d39\u7528\uff08\u4e07\u5143\uff09",
+          "label": "年总用电费用（万元）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_018_17",
-          "label": "\u6570\u636e\u91c7\u96c6\u65b9\u5f0f",
+          "label": "数据采集方式",
           "type": "select",
           "required": true,
           "options": [
-            "EMS\u76f4\u8fde",
-            "\u7b2c\u4e09\u65b9\u7cfb\u7edf\u5bf9\u63a5",
-            "\u4eba\u5de5\u6284\u8868"
+            "EMS直连",
+            "第三方系统对接",
+            "人工抄表"
           ]
         },
         {
           "id": "field_019_18",
-          "label": "\u4e3b\u8981\u8868\u5177\u7c7b\u578b",
+          "label": "主要表具类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u673a\u68b0\u8868",
-            "\u667a\u80fd\u7535\u8868",
-            "\u591a\u529f\u80fd\u7535\u8868"
+            "机械表",
+            "智能电表",
+            "多功能电表"
           ]
         },
         {
           "id": "field_020_19",
-          "label": "\u8868\u8ba1\u901a\u8baf\u534f\u8bae",
+          "label": "表计通讯协议",
           "type": "multiselect",
           "required": true,
           "options": [
@@ -232,262 +238,267 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
             "Modbus TCP",
             "DL/T645",
             "BACnet",
-            "\u5176\u4ed6"
+            "其他"
           ]
         },
         {
           "id": "field_021_20",
-          "label": "\u6570\u636e\u91c7\u96c6\u9891\u7387",
+          "label": "数据采集频率",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9e\u65f6(<1min)",
+            "实时(<1min)",
             "5min",
             "15min",
             "30min",
             "60min",
-            "\u5929"
+            "天"
           ]
         },
         {
           "id": "field_022_21",
-          "label": "\u7535\u529b\u8ba1\u91cf\u5c42\u7ea7",
+          "label": "电力计量层级",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u603b\u8868",
-            "\u53d8\u538b\u5668",
-            "\u9988\u7ebf",
-            "\u697c\u680b",
-            "\u697c\u5c42",
-            "\u79df\u6237",
-            "\u7cfb\u7edf\u7ea7/\u8bbe\u5907\u7ea7"
+            "总表",
+            "变压器",
+            "馈线",
+            "楼栋",
+            "楼层",
+            "租户",
+            "系统级/设备级"
           ]
         },
         {
           "id": "field_023_22",
-          "label": "\u662f\u5426\u533a\u5206\u5cf0\u5e73\u8c37",
+          "label": "是否区分峰平谷",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426"
+            "是",
+            "否"
           ]
         },
         {
           "id": "field_024_23",
-          "label": "\u662f\u5426\u5b58\u5728\u81ea\u53d1\u7535",
+          "label": "是否存在自发",
           "type": "select",
           "required": true,
           "options": [
-            "\u65e0",
-            "\u5149\u4f0f",
-            "\u67f4\u6cb9\u53d1\u7535",
-            "\u5176\u4ed6"
+            "无",
+            "光伏",
+            "燃油发电",
+            "其他"
           ]
         },
         {
           "id": "field_025_24",
-          "label": "\u662f\u5426\u5b58\u5728\u624b\u5de5\u6284\u8868",
+          "label": "是否存在手工抄表",
           "type": "select",
           "required": true,
           "options": [
-            "\u5168\u90e8\u624b\u5de5",
-            "\u90e8\u5206\u624b\u5de5",
-            "\u5168\u81ea\u52a8",
-            "\u4e0d\u6e05\u695a"
+            "全部手工",
+            "部分手工",
+            "全自动",
+            "不清楚"
           ]
         },
         {
           "id": "field_026_25",
-          "label": "\u624b\u5de5\u6284\u8868\u9891\u7387",
+          "label": "手工抄表频率",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9e\u65f6",
-            "\u65e5",
-            "\u5468",
-            "\u6708",
-            "\u4e0d\u56fa\u5b9a"
+            "实时",
+            "日",
+            "周",
+            "月",
+            "不固定"
           ]
         },
         {
           "id": "field_027_26",
-          "label": "\u5386\u53f2\u6570\u636e\u5e74\u9650",
+          "label": "历史数据年限",
           "type": "select",
           "required": true,
           "options": [
-            "\u22653\u5e74",
-            "1\u20133\u5e74",
-            "<1\u5e74",
-            "\u6ca1\u6709",
-            "\u4e0d\u6e05\u695a"
+            "≥3年",
+            "1-3年",
+            "<1年",
+            "没有",
+            "不清楚"
           ]
         },
         {
           "id": "field_028_27",
-          "label": "\u662f\u5426\u53ef\u5bfc\u51fa\u5386\u53f2\u6570\u636e",
+          "label": "是否可导出历史数据",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426",
-            "\u4e0d\u6e05\u695a"
+            "是",
+            "否",
+            "不清楚"
           ]
         },
         {
           "id": "field_029_28",
-          "label": "\u662f\u5426\u6709\u7535\u529b\u7cfb\u7edf\u63a5\u7ebf\u56fe",
+          "label": "是否有电力系统接线图",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426",
-            "\u4e0d\u6e05\u695a"
+            "是",
+            "否",
+            "不清楚"
           ]
         },
         {
           "id": "field_030_29",
-          "label": "\u6838\u5fc3\u529f\u80fd\u8bc9\u6c42",
+          "label": "核心功能诉求",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u80fd\u8017\u5206\u9879",
-            "\u8d1f\u8377\u5206\u6790",
-            "\u7535\u8d39\u5206\u6790",
-            "\u5f02\u5e38\u7528\u7535",
-            "\u5bf9\u6807\u5206\u6790",
-            "\u8282\u80fd\u8bc4\u4f30"
+            "能耗分项",
+            "负荷分析",
+            "电费分析",
+            "异常用电",
+            "对标分析",
+            "节能评估"
           ]
         }
       ]
     },
     {
       "id": "section_04",
-      "title": "\u80fd\u6e90\u7c7b\u578b-\u7535\u529b-\u5149\u4f0f",
+      "title": "能源类型-光伏",
+      "visibleWhen": {
+        "fieldId": ENERGY_FIELD_ID,
+        "values": ["光伏"]
+      },
       "fields": [
         {
           "id": "field_031_30",
-          "label": "\u662f\u5426\u5df2\u6295\u8fd0",
+          "label": "是否已投产",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426"
+            "是",
+            "否"
           ]
         },
         {
           "id": "field_032_32",
-          "label": "\u5149\u4f0f\u7ad9\u70b9\u6570\u91cf",
+          "label": "光伏站点数量",
           "type": "text",
           "required": true
         },
         {
           "id": "field_033_31",
-          "label": "\u603b\u88c5\u673a\u5bb9\u91cf\uff08kWp\uff09",
+          "label": "总装机容量（kWp）",
           "type": "number",
-          "required": true,
-          "options": [
-            "\u6570\u503c"
-          ]
+          "required": true
         },
         {
           "id": "field_034_32",
-          "label": "\u6570\u636e\u91c7\u96c6\u65b9\u5f0f",
+          "label": "数据采集方式",
           "type": "select",
           "required": true,
           "options": [
-            "\u9006\u53d8\u5668\u76f4\u8fde",
-            "\u7b2c\u4e09\u65b9\u5e73\u53f0",
-            "\u4eba\u5de5"
+            "逆变器直连",
+            "第三方平台",
+            "人工"
           ]
         },
         {
           "id": "field_035_33",
-          "label": "\u6570\u636e\u91c7\u96c6\u9891\u7387",
+          "label": "数据采集频率",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9e\u65f6",
+            "实时",
             "5min",
             "15min",
-            "\u65e5"
+            "日"
           ]
         },
         {
           "id": "field_036_34",
-          "label": "\u662f\u5426\u91c7\u96c6\u8f90\u7167\u5ea6",
+          "label": "是否采集辐照度",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426"
+            "是",
+            "否"
           ]
         },
         {
           "id": "field_037_37",
-          "label": "\u5149\u4f0f\u53d1\u7535\u4f7f\u7528",
+          "label": "光伏发电使用",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u81ea\u7528\u3001\u5e76\u7f51"
+            "自用、并网"
           ]
         },
         {
           "id": "field_038_35",
-          "label": "\u6838\u5fc3\u529f\u80fd\u8bc9\u6c42",
+          "label": "核心功能诉求",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u53d1\u7535\u91cf",
-            "\u81ea\u7528\u7387",
-            "\u6d88\u7eb3\u7387",
-            "\u53d1\u7535\u6548\u7387",
-            "\u51cf\u78b3\u91cf"
+            "发电量",
+            "自用率",
+            "消纳率",
+            "发电效率",
+            "减排量"
           ]
         }
       ]
     },
     {
       "id": "section_06",
-      "title": "\u80fd\u6e90\u7c7b\u578b-\u6c34",
+      "title": "能源类型-水/热水",
+      "visibleWhen": {
+        "fieldId": ENERGY_FIELD_ID,
+        "values": ["热水"]
+      },
       "fields": [
         {
           "id": "field_039_37",
-          "label": "\u5e74\u603b\u7528\u6c34\u91cf\uff08\u5428\uff09",
+          "label": "年总用水量（吨）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_040_38",
-          "label": "\u5e74\u603b\u7528\u6c34\u8d39\u7528\uff08\u4e07\u5143\uff09",
+          "label": "年总用水费用（万元）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_041_39",
-          "label": "\u6570\u636e\u91c7\u96c6\u65b9\u5f0f",
+          "label": "数据采集方式",
           "type": "select",
           "required": true,
           "options": [
-            "EMS\u76f4\u8fde",
-            "\u7b2c\u4e09\u65b9\u7cfb\u7edf\u5bf9\u63a5",
-            "\u4eba\u5de5\u6284\u8868"
+            "EMS直连",
+            "第三方系统对接",
+            "人工抄表"
           ]
         },
         {
           "id": "field_042_40",
-          "label": "\u4e3b\u8981\u8868\u5177\u7c7b\u578b",
+          "label": "主要表具类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u667a\u80fd\u6c34\u8868",
-            "\u673a\u68b0\u6c34\u8868"
+            "智能水表",
+            "机械水表"
           ]
         },
         {
           "id": "field_043_41",
-          "label": "\u8868\u8ba1\u901a\u8baf\u534f\u8bae",
+          "label": "表计通讯协议",
           "type": "multiselect",
           "required": true,
           "options": [
@@ -495,100 +506,104 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
             "Modbus TCP",
             "DL/T645",
             "BACnet",
-            "\u5176\u4ed6"
+            "其他"
           ]
         },
         {
           "id": "field_044_42",
-          "label": "\u6570\u636e\u91c7\u96c6\u9891\u7387",
+          "label": "数据采集频率",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9e\u65f6(<1min)",
+            "实时(<1min)",
             "5min",
             "15min",
             "30min",
             "60min",
-            "\u5929"
+            "天"
           ]
         },
         {
           "id": "field_045_43",
-          "label": "\u6c34\u8868\u8986\u76d6\u5c42\u7ea7",
+          "label": "水表覆盖层级",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u603b\u8868",
-            "\u697c\u680b",
-            "\u529f\u80fd\u533a",
-            "\u8bbe\u5907"
+            "总表",
+            "楼栋",
+            "功能区",
+            "设备"
           ]
         },
         {
           "id": "field_046_44",
-          "label": "\u662f\u5426\u533a\u5206\u7528\u6c34\u7c7b\u578b",
+          "label": "是否区分用水类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u751f\u6d3b\u7528\u6c34",
-            "\u5de5\u827a\u7528\u6c34",
-            "\u51b7\u5374\u7528\u6c34",
-            "\u7eff\u5316"
+            "生活用水",
+            "工艺用水",
+            "冷凝用水",
+            "绿化"
           ]
         },
         {
           "id": "field_047_45",
-          "label": "\u6838\u5fc3\u529f\u80fd\u8bc9\u6c42",
+          "label": "核心功能诉求",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u7528\u6c34\u5206\u6790",
-            "\u6f0f\u635f\u5206\u6790",
-            "\u9884\u7b97\u7ba1\u7406"
+            "用水分析",
+            "漏损分析",
+            "预算管理"
           ]
         }
       ]
     },
     {
       "id": "section_07",
-      "title": "\u80fd\u6e90\u7c7b\u578b-\u5929\u7136\u6c14",
+      "title": "能源类型-天然气",
+      "visibleWhen": {
+        "fieldId": ENERGY_FIELD_ID,
+        "values": ["天然气"]
+      },
       "fields": [
         {
           "id": "field_048_46",
-          "label": "\u5e74\u603b\u7528\u5929\u7136\u6c14\uff08m\u00b3\uff09",
+          "label": "年总用天然气（m³）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_049_47",
-          "label": "\u5e74\u603b\u7528\u5929\u7136\u6c14\u8d39\u7528\uff08\u4e07\u5143\uff09",
+          "label": "年总用天然气费用（万元）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_050_48",
-          "label": "\u6570\u636e\u91c7\u96c6\u65b9\u5f0f",
+          "label": "数据采集方式",
           "type": "select",
           "required": true,
           "options": [
-            "EMS\u76f4\u8fde",
-            "\u7b2c\u4e09\u65b9\u7cfb\u7edf\u5bf9\u63a5",
-            "\u4eba\u5de5\u6284\u8868"
+            "EMS直连",
+            "第三方系统对接",
+            "人工抄表"
           ]
         },
         {
           "id": "field_051_49",
-          "label": "\u4e3b\u8981\u8868\u5177\u7c7b\u578b",
+          "label": "主要表具类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u667a\u80fd\u6c14\u8868",
-            "\u673a\u68b0\u6c14\u8868"
+            "智能气表",
+            "机械气表"
           ]
         },
         {
           "id": "field_052_50",
-          "label": "\u8868\u8ba1\u901a\u8baf\u534f\u8bae",
+          "label": "表计通讯协议",
           "type": "multiselect",
           "required": true,
           "options": [
@@ -596,50 +611,50 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
             "Modbus TCP",
             "DL/T645",
             "BACnet",
-            "\u5176\u4ed6"
+            "其他"
           ]
         },
         {
           "id": "field_053_51",
-          "label": "\u6570\u636e\u91c7\u96c6\u9891\u7387",
+          "label": "数据采集频率",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9e\u65f6(<1min)",
+            "实时(<1min)",
             "5min",
             "15min",
             "30min",
             "60min",
-            "\u5929"
+            "天"
           ]
         },
         {
           "id": "field_054_52",
-          "label": "\u7528\u6c14\u4e3b\u8981\u7528\u9014",
+          "label": "用气主要用途",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u9505\u7089",
-            "\u98df\u5802",
-            "\u5de5\u827a",
-            "\u5176\u4ed6"
+            "锅炉",
+            "食堂",
+            "工艺",
+            "其他"
           ]
         },
         {
           "id": "field_055_53",
-          "label": "\u662f\u5426\u533a\u5206\u7528\u6c34\u7c7b\u578b",
+          "label": "是否区分用水类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u751f\u6d3b\u7528\u6c34",
-            "\u5de5\u827a\u7528\u6c34",
-            "\u51b7\u5374\u7528\u6c34",
-            "\u7eff\u5316"
+            "生活用水",
+            "工艺用水",
+            "冷凝用水",
+            "绿化"
           ]
         },
         {
           "id": "field_056_54",
-          "label": "\u6838\u5fc3\u529f\u80fd\u8bc9\u6c42",
+          "label": "核心功能诉求",
           "type": "textarea",
           "required": true
         }
@@ -647,44 +662,48 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
     },
     {
       "id": "section_08",
-      "title": "\u80fd\u6e90\u7c7b\u578b-\u84b8\u6c7d",
+      "title": "能源类型-蒸汽",
+      "visibleWhen": {
+        "fieldId": ENERGY_FIELD_ID,
+        "values": ["蒸汽"]
+      },
       "fields": [
         {
           "id": "field_057_55",
-          "label": "\u5e74\u603b\u7528\u84b8\u6c7d\uff08m\u00b3\uff09",
+          "label": "年总用蒸汽（m³）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_058_56",
-          "label": "\u5e74\u603b\u7528\u84b8\u6c7d\u8d39\u7528\uff08\u4e07\u5143\uff09",
+          "label": "年总用蒸汽费用（万元）",
           "type": "number",
           "required": true
         },
         {
           "id": "field_059_57",
-          "label": "\u6570\u636e\u91c7\u96c6\u65b9\u5f0f",
+          "label": "数据采集方式",
           "type": "select",
           "required": true,
           "options": [
-            "EMS\u76f4\u8fde",
-            "\u7b2c\u4e09\u65b9\u7cfb\u7edf\u5bf9\u63a5",
-            "\u4eba\u5de5\u6284\u8868"
+            "EMS直连",
+            "第三方系统对接",
+            "人工抄表"
           ]
         },
         {
           "id": "field_060_58",
-          "label": "\u4e3b\u8981\u8868\u5177\u7c7b\u578b",
+          "label": "主要表具类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u667a\u80fd\u6c14\u8868",
-            "\u673a\u68b0\u6c14\u8868"
+            "智能气表",
+            "机械气表"
           ]
         },
         {
           "id": "field_061_59",
-          "label": "\u8868\u8ba1\u901a\u8baf\u534f\u8bae",
+          "label": "表计通讯协议",
           "type": "multiselect",
           "required": true,
           "options": [
@@ -692,50 +711,50 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
             "Modbus TCP",
             "DL/T645",
             "BACnet",
-            "\u5176\u4ed6"
+            "其他"
           ]
         },
         {
           "id": "field_062_60",
-          "label": "\u6570\u636e\u91c7\u96c6\u9891\u7387",
+          "label": "数据采集频率",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9e\u65f6(<1min)",
+            "实时(<1min)",
             "5min",
             "15min",
             "30min",
             "60min",
-            "\u5929"
+            "天"
           ]
         },
         {
           "id": "field_063_61",
-          "label": "\u7528\u6c14\u4e3b\u8981\u7528\u9014",
+          "label": "用气主要用途",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u9505\u7089",
-            "\u98df\u5802",
-            "\u5de5\u827a",
-            "\u5176\u4ed6"
+            "锅炉",
+            "食堂",
+            "工艺",
+            "其他"
           ]
         },
         {
           "id": "field_064_62",
-          "label": "\u662f\u5426\u533a\u5206\u7528\u6c34\u7c7b\u578b",
+          "label": "是否区分用水类型",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u751f\u6d3b\u7528\u6c34",
-            "\u5de5\u827a\u7528\u6c34",
-            "\u51b7\u5374\u7528\u6c34",
-            "\u7eff\u5316"
+            "生活用水",
+            "工艺用水",
+            "冷凝用水",
+            "绿化"
           ]
         },
         {
           "id": "field_065_63",
-          "label": "\u6838\u5fc3\u529f\u80fd\u8bc9\u6c42",
+          "label": "核心功能诉求",
           "type": "textarea",
           "required": true
         }
@@ -743,139 +762,139 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
     },
     {
       "id": "section_12",
-      "title": "\u8fd0\u884c\u4e0e\u7ba1\u7406\u6a21\u5f0f",
+      "title": "运行与管理模式",
       "fields": [
         {
           "id": "field_066_71",
-          "label": "\u662f\u5426\u6709\u80fd\u6e90\u7ba1\u7406\u4eba\u5458",
+          "label": "是否有能源管理人员",
           "type": "select",
           "required": true,
           "options": [
-            "\u4e13\u804c",
-            "\u517c\u804c",
-            "\u6ca1\u6709"
+            "专职",
+            "兼职",
+            "没有"
           ]
         },
         {
           "id": "field_067_72",
-          "label": "\u662f\u5426\u8bbe\u5b9a\u80fd\u8017KPI",
+          "label": "是否设定能耗KPI",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426"
+            "是",
+            "否"
           ]
         },
         {
           "id": "field_068_73",
-          "label": "\u80fd\u6e90\u7528\u91cf\u5206\u6790\u9891\u7387",
+          "label": "能源用量分析频率",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9e\u65f6",
-            "\u65e5",
-            "\u5468",
-            "\u6708",
-            "\u4e0d\u5b9a\u671f",
-            "\u4ece\u4e0d"
+            "实时",
+            "日",
+            "周",
+            "月",
+            "不定期",
+            "从不"
           ]
         },
         {
           "id": "field_069_74",
-          "label": "\u662f\u5426\u5b9a\u671f\u8f93\u51fa\u62a5\u8868",
+          "label": "是否定期输出报告",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426"
+            "是",
+            "否"
           ]
         },
         {
           "id": "field_070_75",
-          "label": "\u5f53\u524d\u4e3b\u8981\u7ba1\u7406\u75db\u70b9",
+          "label": "当前主要管理痛点",
           "type": "multiselect",
           "required": true,
           "options": [
-            "\u770b\u4e0d\u6e05",
-            "\u4e0d\u51c6",
-            "\u4e0d\u53ca\u65f6",
-            "\u96be\u5b9a\u4f4d\u6d6a\u8d39",
-            "\u96be\u5bf9\u6807",
-            "\u65e0\u8003\u6838",
-            "\u62a5\u8868\u6210\u672c\u9ad8"
+            "看不清",
+            "不准",
+            "不及时",
+            "难定位浪废",
+            "难对标",
+            "无考核",
+            "报表成本高"
           ]
         }
       ]
     },
     {
       "id": "section_13",
-      "title": "\u78b3\u7ba1\u7406",
+      "title": "碳管理",
       "fields": [
         {
           "id": "field_071_76",
-          "label": "\u662f\u5426\u505a\u8fc7\u78b3\u76d8\u67e5",
+          "label": "是否做过碳盘查",
           "type": "select",
           "required": true,
           "options": [
-            "\u5b9a\u671f",
-            "\u505a\u8fc7\u4e00\u6b21",
-            "\u8ba1\u5212\u4e2d",
-            "\u6ca1\u6709"
+            "定期",
+            "做过一次",
+            "计划中",
+            "没有"
           ]
         },
         {
           "id": "field_072_77",
-          "label": "\u662f\u5426\u6709\u78b3\u51cf\u6392\u76ee\u6807",
+          "label": "是否有碳减排目标",
           "type": "select",
           "required": true,
           "options": [
-            "\u660e\u786e\u76ee\u6807",
-            "\u6709\u65b9\u5411\u65e0\u6307\u6807",
-            "\u6ca1\u6709"
+            "明确目标",
+            "有方向无指标",
+            "没有"
           ]
         },
         {
           "id": "field_073_78",
-          "label": "\u8986\u76d6\u6392\u653e\u8303\u56f4",
+          "label": "覆盖排放范围",
           "type": "multiselect",
           "required": true,
           "options": [
             "Scope1",
             "Scope2",
             "Scope3",
-            "\u4e0d\u660e\u786e"
+            "不明确"
           ]
         },
         {
           "id": "field_074_79",
-          "label": "\u662f\u5426\u9700\u8981\u78b3\u6392\u653e\u62a5\u8868",
+          "label": "是否需要碳排放报告",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426"
+            "是",
+            "否"
           ]
         },
         {
           "id": "field_075_80",
-          "label": "\u662f\u5426\u8003\u8651\u78b3\u4ea4\u6613",
+          "label": "是否考虑碳交易",
           "type": "select",
           "required": false,
           "options": [
-            "\u5df2\u53c2\u4e0e",
-            "\u8ba1\u5212\u53c2\u4e0e",
-            "\u4e0d\u8003\u8651"
+            "已参与",
+            "计划参与",
+            "不考虑"
           ]
         }
       ]
     },
     {
       "id": "section_14",
-      "title": "IT\u5efa\u8bbe",
+      "title": "IT建设",
       "fields": [
         {
           "id": "field_076_81",
-          "label": "\u73b0\u6709\u7cfb\u7edf",
+          "label": "现有系统",
           "type": "select",
           "required": true,
           "options": [
@@ -883,40 +902,40 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
             "BMS",
             "EMS+BMS",
             "SCADA",
-            "\u65e0"
+            "无"
           ]
         },
         {
           "id": "field_077_82",
-          "label": "\u662f\u5426\u652f\u6301\u7b2c\u4e09\u65b9\u63a5\u53e3",
+          "label": "是否支持第三方接口",
           "type": "select",
           "required": true,
           "options": [
-            "\u6807\u51c6\u63a5\u53e3",
-            "\u5b9a\u5236\u63a5\u53e3",
-            "\u4e0d\u652f\u6301"
+            "标准接口",
+            "定制接口",
+            "不支持"
           ]
         },
         {
           "id": "field_078_83",
-          "label": "\u662f\u5426\u5141\u8bb8\u4e91\u90e8\u7f72",
+          "label": "是否允许云部署",
           "type": "select",
           "required": true,
           "options": [
-            "\u516c\u6709\u4e91",
-            "\u79c1\u6709\u4e91",
-            "\u672c\u5730\u90e8\u7f72",
-            "\u4e0d\u5141\u8bb8"
+            "公有云",
+            "私有云",
+            "本地部署",
+            "不允许"
           ]
         },
         {
           "id": "field_079_84",
-          "label": "\u662f\u5426\u6709IT\u5bf9\u63a5\u4eba",
+          "label": "是否有IT对接人",
           "type": "select",
           "required": true,
           "options": [
-            "\u662f",
-            "\u5426"
+            "是",
+            "否"
           ]
         }
       ]

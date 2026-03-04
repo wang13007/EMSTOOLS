@@ -231,6 +231,30 @@ export const SurveyFill: React.FC = () => {
     return SURVEY_TEMPLATES.find((item) => item.id === form.templateId) || SURVEY_TEMPLATES[0];
   }, [form]);
 
+  const shouldShowSection = (section: any): boolean => {
+    if (!section.visibleWhen) return true;
+    const { fieldId, values } = section.visibleWhen;
+    const fieldValue = form.data[fieldId];
+    if (!fieldValue) return false;
+
+    if (Array.isArray(fieldValue)) {
+      return values.some((v) => fieldValue.includes(v));
+    }
+    return values.includes(fieldValue);
+  };
+
+  const shouldShowField = (field: any): boolean => {
+    if (!field.visibleWhen) return true;
+    const { fieldId, values } = field.visibleWhen;
+    const fieldValue = form.data[fieldId];
+    if (!fieldValue) return false;
+
+    if (Array.isArray(fieldValue)) {
+      return values.some((v) => fieldValue.includes(v));
+    }
+    return values.includes(fieldValue);
+  };
+
   const handleFieldChange = (fieldId: string, value: any) => {
     if (!form) return;
     setForm({
@@ -364,88 +388,96 @@ export const SurveyFill: React.FC = () => {
       </div>
 
       <div className="max-w-4xl mx-auto pt-6 space-y-8">
-        {template.sections.map((section) => (
-          <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
-              <h3 className="font-bold text-slate-800">{section.title}</h3>
-            </div>
-            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {section.fields.map((field) => (
-                <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
-                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                    {field.label}
-                    {field.required && <span className="text-red-500">*</span>}
-                  </label>
+        {template.sections.map((section) => {
+          if (!shouldShowSection(section)) return null;
 
-                  {field.type === 'text' && (
-                    <input
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={form.data[field.id] || ''}
-                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                    />
-                  )}
+          return (
+            <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
+                <h3 className="font-bold text-slate-800">{section.title}</h3>
+              </div>
+              <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {section.fields.map((field) => {
+                  if (!shouldShowField(field)) return null;
 
-                  {field.type === 'number' && (
-                    <input
-                      type="number"
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={form.data[field.id] || ''}
-                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                    />
-                  )}
+                  return (
+                    <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
+                      <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                        {field.label}
+                        {field.required && <span className="text-red-500">*</span>}
+                      </label>
 
-                  {field.type === 'select' && (
-                    <select
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={form.data[field.id] || ''}
-                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                    >
-                      <option value="">请选择</option>
-                      {field.options?.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                      {field.type === 'text' && (
+                        <input
+                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          value={form.data[field.id] || ''}
+                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                        />
+                      )}
 
-                  {field.type === 'multiselect' && (
-                    <div className="flex flex-wrap gap-2">
-                      {field.options?.map((opt) => {
-                        const current = Array.isArray(form.data[field.id]) ? form.data[field.id] : [];
-                        const isSelected = current.includes(opt);
-                        return (
-                          <button
-                            type="button"
-                            key={opt}
-                            onClick={() => {
-                              const next = isSelected ? current.filter((item: string) => item !== opt) : [...current, opt];
-                              handleFieldChange(field.id, next);
-                            }}
-                            className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
-                              isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
-                            }`}
-                          >
-                            {opt}
-                          </button>
-                        );
-                      })}
+                      {field.type === 'number' && (
+                        <input
+                          type="number"
+                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          value={form.data[field.id] || ''}
+                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                        />
+                      )}
+
+                      {field.type === 'select' && (
+                        <select
+                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          value={form.data[field.id] || ''}
+                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                        >
+                          <option value="">请选择</option>
+                          {field.options?.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {field.type === 'multiselect' && (
+                        <div className="flex flex-wrap gap-2">
+                          {field.options?.map((opt) => {
+                            const current = Array.isArray(form.data[field.id]) ? form.data[field.id] : [];
+                            const isSelected = current.includes(opt);
+                            return (
+                              <button
+                                type="button"
+                                key={opt}
+                                onClick={() => {
+                                  const next = isSelected ? current.filter((item: string) => item !== opt) : [...current, opt];
+                                  handleFieldChange(field.id, next);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
+                                  isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'
+                                }`}
+                              >
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {field.type === 'textarea' && (
+                        <textarea
+                          rows={4}
+                          className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          value={form.data[field.id] || ''}
+                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                        />
+                      )}
                     </div>
-                  )}
-
-                  {field.type === 'textarea' && (
-                    <textarea
-                      rows={4}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={form.data[field.id] || ''}
-                      onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                    />
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

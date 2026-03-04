@@ -155,6 +155,10 @@ export interface SurveySection {
   id: string;
   title: string;
   fields: SurveyField[];
+  visibleWhen?: {
+    fieldId: string;
+    values: string[];
+  };
 }
 
 export interface SurveyField {
@@ -163,6 +167,10 @@ export interface SurveyField {
   type: 'text' | 'number' | 'select' | 'multiselect' | 'textarea';
   options?: string[];
   required?: boolean;
+  visibleWhen?: {
+    fieldId: string;
+    values: string[];
+  };
 }
 
 export interface PreSalesRegion {
