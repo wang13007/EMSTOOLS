@@ -269,7 +269,6 @@ export const UserManagement: React.FC = () => {
         }
         alert(`新用户已创建成功，初始密码：${generatedPassword}（请告知用户修改密码）`);
       } else {
-      } else {
         if (!editingUserId) {
           throw new Error('编辑用户ID不存在');
         }
