@@ -36,11 +36,12 @@ export interface UserInfo {
   phone?: string;
 }
 
-import { v4 as uuidv4 } from 'uuid';
-
 const generateSecureToken = (): string => {
   const timestamp = Date.now();
-  const uuid = uuidv4().replace(/-/g, '');
+  const uuid =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().replace(/-/g, '')
+      : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   return `ems_${timestamp}_${uuid}`;
 };
 
