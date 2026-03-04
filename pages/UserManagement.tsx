@@ -257,15 +257,18 @@ export const UserManagement: React.FC = () => {
       };
 
       if (modalMode === 'create') {
+        const generatedPassword = Math.random().toString(36).slice(-8);
         const created = await userService.createUser({
           ...basePayload,
           user_id: generateUserId(),
-          password_hash: '1234',
+          password_hash: generatedPassword,
           status: UserStatus.ENABLED,
         });
         if (!created) {
           throw new Error('用户创建失败');
         }
+        alert(`新用户已创建成功，初始密码：${generatedPassword}（请告知用户修改密码）`);
+      } else {
       } else {
         if (!editingUserId) {
           throw new Error('编辑用户ID不存在');

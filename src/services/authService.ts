@@ -8,7 +8,7 @@ export interface LoginOptions {
 }
 
 export interface RegisterRequest {
-  user_name: string;
+  name: string;
   username: string;
   phone?: string;
   email?: string;
@@ -36,7 +36,13 @@ export interface UserInfo {
   phone?: string;
 }
 
-const LEGACY_DEFAULT_HASH_PREFIX = '$2';
+import { v4 as uuidv4 } from 'uuid';
+
+const generateSecureToken = (): string => {
+  const timestamp = Date.now();
+  const uuid = uuidv4().replace(/-/g, '');
+  return `ems_${timestamp}_${uuid}`;
+};
 
 export const authService = {
   async login(data: LoginRequest, options?: LoginOptions): Promise<{ user: UserInfo; token: string }> {
@@ -78,11 +84,12 @@ export const authService = {
       }
 
       const stored = String(currentUser.password_hash || '');
-      const plainMatch = stored === data.password;
-      const legacyHash = stored.startsWith(LEGACY_DEFAULT_HASH_PREFIX);
-      const legacyFallbackMatch = legacyHash && (data.password === data.username || data.password === '123456');
 
-      if (!plainMatch && !legacyFallbackMatch) {
+      if (stored === data.password) {
+        console.warn('检测到明文密码，建议使用哈希值');
+      }
+
+      if (stored !== data.password) {
         throw new Error('账号或密码错误');
       }
 
@@ -100,7 +107,11 @@ export const authService = {
         phone: currentUser.phone,
       };
 
-      const token = `token_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      const token = generateSecureToken();
+
+      await userService.updateUser(currentUser.id, {
+        last_login_time: new Date().toISOString(),
+      });
 
       localStorage.setItem('ems_user', JSON.stringify(userInfo));
       localStorage.setItem('ems_token', token);
@@ -154,14 +165,14 @@ export const authService = {
       const userInfo: UserInfo = {
         id: createdUser.id,
         username: createdUser.username,
-        name: createdUser.user_name || data.user_name,
+        name: createdUser.name || data.name,
         type: createdUser.user_type || createdUser.type || 'external',
         role: customerRole.name || '外部客户',
         email: createdUser.email || data.email,
         phone: createdUser.phone || data.phone,
       };
 
-      const token = `token_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      const token = generateSecureToken();
 
       localStorage.setItem('ems_user', JSON.stringify(userInfo));
       localStorage.setItem('ems_token', token);

@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- 3. 创建索引
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_user_name ON users(user_name);
 CREATE INDEX IF NOT EXISTS idx_users_type ON users(type);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_survey_forms_status ON survey_forms(status);
@@ -173,11 +173,11 @@ INSERT INTO roles (name, description, permissions, status) VALUES
 ('客户用户', '客户填写权限', '{"surveys": true, "messages": true}', 'enabled');
 
 -- 插入默认用户（密码哈希值为 'password' 的哈希值）
-INSERT INTO users (name, username, password_hash, type, role_id, customer, status) VALUES
-('系统管理员', 'admin', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'internal', (SELECT id FROM roles WHERE name = '超级管理员'), NULL, 'enabled'),
-('张三', 'zhangsan', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'internal', (SELECT id FROM roles WHERE name = '售前工程师'), NULL, 'enabled'),
-('李四', 'lisi', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'external', (SELECT id FROM roles WHERE name = '客户用户'), '某制造有限公司', 'enabled'),
-('王五', 'wangwu', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'external', (SELECT id FROM roles WHERE name = '客户用户'), '某能源公司', 'enabled');
+INSERT INTO users (name, user_name, password_hash, type, role_id, status) VALUES
+('系统管理员', 'admin', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'internal', (SELECT id FROM roles WHERE name = '超级管理员'), 'enabled'),
+('张三', 'zhangsan', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'internal', (SELECT id FROM roles WHERE name = '售前工程师'), 'enabled'),
+('李四', 'lisi', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'external', (SELECT id FROM roles WHERE name = '客户用户'), 'enabled'),
+('王五', 'wangwu', '$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'external', (SELECT id FROM roles WHERE name = '客户用户'), 'enabled');
 
 -- 插入默认模板
 INSERT INTO survey_templates (name, industry, sections) VALUES
@@ -191,13 +191,13 @@ INSERT INTO dict_types (type_name, type_code, description, status, creator_id) V
 
 -- 插入默认字典项
 INSERT INTO dict_items (type_id, item_label, item_value, status, creator_id) VALUES
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '制造业', 'manufacturing', 'enabled', (SELECT id FROM users WHERE username = 'admin')),
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '能源', 'energy', 'enabled', (SELECT id FROM users WHERE username = 'admin')),
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '建筑', 'construction', 'enabled', (SELECT id FROM users WHERE username = 'admin')),
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '交通', 'transportation', 'enabled', (SELECT id FROM users WHERE username = 'admin')),
-((SELECT type_id FROM dict_types WHERE type_code = 'region'), '北京市', 'beijing', 'enabled', (SELECT id FROM users WHERE username = 'admin')),
-((SELECT type_id FROM dict_types WHERE type_code = 'region'), '上海市', 'shanghai', 'enabled', (SELECT id FROM users WHERE username = 'admin')),
-((SELECT type_id FROM dict_types WHERE type_code = 'region'), '广东省', 'guangdong', 'enabled', (SELECT id FROM users WHERE username = 'admin'));
+((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '制造业', 'manufacturing', 'enabled', (SELECT id FROM users WHERE user_name = 'admin')),
+((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '能源', 'energy', 'enabled', (SELECT id FROM users WHERE user_name = 'admin')),
+((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '建筑', 'construction', 'enabled', (SELECT id FROM users WHERE user_name = 'admin')),
+((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '交通', 'transportation', 'enabled', (SELECT id FROM users WHERE user_name = 'admin')),
+((SELECT type_id FROM dict_types WHERE type_code = 'region'), '北京市', 'beijing', 'enabled', (SELECT id FROM users WHERE user_name = 'admin')),
+((SELECT type_id FROM dict_types WHERE type_code = 'region'), '上海市', 'shanghai', 'enabled', (SELECT id FROM users WHERE user_name = 'admin')),
+((SELECT type_id FROM dict_types WHERE type_code = 'region'), '广东省', 'guangdong', 'enabled', (SELECT id FROM users WHERE user_name = 'admin'));
 
 -- 插入默认区域
 INSERT INTO region_dicts (region_name, region_code, region_level, status, is_system) VALUES
@@ -246,10 +246,10 @@ INSERT INTO survey_reports (form_id, content) VALUES
 
 -- 插入模拟系统日志
 INSERT INTO system_logs (operator_id, type, content, ip_address, result) VALUES
-((SELECT id FROM users WHERE username = 'admin'), 'login', '用户 admin 登录系统', '192.168.1.1', '成功'),
-((SELECT id FROM users WHERE username = 'zhangsan'), 'survey', '创建调研表单 "2024Q1 某工厂能效调研"', '192.168.1.2', '成功'),
-((SELECT id FROM users WHERE username = 'lisi'), 'survey', '提交调研表单 "2024Q1 某工厂能效调研"', '192.168.1.3', '成功'),
-((SELECT id FROM users WHERE username = 'admin'), 'user', '创建用户 "王五"', '192.168.1.1', '成功');
+((SELECT id FROM users WHERE user_name = 'admin'), 'login', '用户 admin 登录系统', '192.168.1.1', '成功'),
+((SELECT id FROM users WHERE user_name = 'zhangsan'), 'survey', '创建调研表单 "2024Q1 某工厂能效调研"', '192.168.1.2', '成功'),
+((SELECT id FROM users WHERE user_name = 'lisi'), 'survey', '提交调研表单 "2024Q1 某工厂能效调研"', '192.168.1.3', '成功'),
+((SELECT id FROM users WHERE user_name = 'admin'), 'user', '创建用户 "王五"', '192.168.1.1', '成功');
 
 -- 插入模拟消息
 INSERT INTO messages (title, content, type, target_user_id, project_id) VALUES

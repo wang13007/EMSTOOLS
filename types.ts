@@ -89,7 +89,8 @@ export interface RegionDict {
 export interface User {
   id: string;
   user_id?: string;
-  user_name?: string;
+  user_name: string;
+  name: string;
   username: string;
   phone?: string;
   email?: string;
@@ -97,12 +98,10 @@ export interface User {
   user_type?: UserType;
   role: string;
   role_id?: string;
-  role_ids?: string[];
-  customer?: string;
   status: UserStatus;
   last_login_time?: string;
   create_time?: string;
-  createTime: string;
+  createTime?: string;
   creator?: string;
   is_deleted?: boolean;
 }

@@ -7,14 +7,19 @@
 | 字段名 | 数据类型 | 约束 | 描述 |
 |-------|---------|------|------|
 | `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 用户ID |
-| `name` | `varchar(100)` | `NOT NULL` | 用户姓名 |
-| `username` | `varchar(50)` | `UNIQUE NOT NULL` | 用户名/账号 |
+| `user_id` | `uuid` | `DEFAULT gen_random_uuid()` | 用户唯一标识ID |
+| `user_name` | `varchar(50)` | `UNIQUE NOT NULL` | 用户名/账号 |
+| `name` | `varchar(50)` | | 用户真实姓名 |
 | `password_hash` | `varchar(255)` | `NOT NULL` | 密码哈希值 |
 | `type` | `varchar(20)` | `NOT NULL CHECK (type IN ('internal', 'external'))` | 用户类型 |
 | `role_id` | `uuid` | `REFERENCES roles(id)` | 角色ID |
-| `customer` | `varchar(100)` | | 所属客户（外部用户） |
+| `phone` | `varchar(20)` | | 手机号码 |
+| `email` | `varchar(100)` | | 电子邮箱 |
 | `status` | `varchar(20)` | `NOT NULL CHECK (status IN ('enabled', 'disabled'))` | 用户状态 |
+| `last_login_time` | `timestamp with time zone` | | 最后登录时间 |
 | `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
+| `create_by` | `varchar(100)` | | 创建人 |
+| `is_deleted` | `boolean` | `DEFAULT false` | 是否已删除 |
 | `update_time` | `timestamp with time zone` | `DEFAULT NOW()` | 更新时间 |
 
 ### 1.2 角色表 (`roles`)
@@ -153,7 +158,7 @@
 ## 2. 索引设计
 
 ### 2.1 用户表索引
-- `CREATE INDEX idx_users_username ON users(username);`
+- `CREATE INDEX idx_users_username ON users(user_name);`
 - `CREATE INDEX idx_users_type ON users(type);`
 - `CREATE INDEX idx_users_status ON users(status);`
 
@@ -220,14 +225,19 @@ CREATE TABLE IF NOT EXISTS roles (
 -- 创建用户表
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) NOT NULL,
-  username VARCHAR(50) UNIQUE NOT NULL,
+  user_id UUID DEFAULT gen_random_uuid(),
+  user_name VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(50),
   password_hash VARCHAR(255) NOT NULL,
   type VARCHAR(20) NOT NULL CHECK (type IN ('internal', 'external')),
   role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-  customer VARCHAR(100),
+  phone VARCHAR(20),
+  email VARCHAR(100),
   status VARCHAR(20) NOT NULL CHECK (status IN ('enabled', 'disabled')),
+  last_login_time TIMESTAMP WITH TIME ZONE,
   create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  create_by VARCHAR(100),
+  is_deleted BOOLEAN DEFAULT false,
   update_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -344,7 +354,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- 创建索引
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(user_name);
 CREATE INDEX IF NOT EXISTS idx_users_type ON users(type);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_survey_forms_status ON survey_forms(status);

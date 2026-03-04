@@ -207,8 +207,8 @@ export const userService = {
 
       const baseUser: any = {
         user_id: user.user_id,
-        username: user.username || user.user_name,
-        user_realname: user.user_name || user.name || user.username,
+        user_name: user.user_name || user.username,
+        name: user.user_name || user.name || user.username,
         password_hash: user.password_hash || user.password,
         role_id: roleId,
         status: user.status || 'enabled',
@@ -264,10 +264,10 @@ export const userService = {
       const roleIds = dedupeStringArray([...(user.role_ids || []), user.role_id]);
 
       if (user.username || user.user_name) {
-        baseUser.username = user.username || user.user_name;
+        baseUser.user_name = user.user_name || user.username;
       }
       if (user.name || user.user_realname || user.user_name) {
-        baseUser.user_realname = user.name || user.user_realname || user.user_name;
+        baseUser.name = user.name || user.user_name || user.username;
       }
       if (user.password || user.password_hash) {
         baseUser.password_hash = user.password || user.password_hash;
