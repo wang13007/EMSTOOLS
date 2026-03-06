@@ -98,6 +98,7 @@ export interface User {
   user_type?: UserType;
   role: string;
   role_id?: string;
+  role_ids?: string[];
   status: UserStatus;
   last_login_time?: string;
   create_time?: string;

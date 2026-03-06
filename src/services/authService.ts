@@ -1,4 +1,4 @@
-﻿export interface LoginRequest {
+export interface LoginRequest {
   username: string;
   password: string;
 }
@@ -32,6 +32,8 @@ export interface UserInfo {
   name: string;
   type: string;
   role: string;
+  role_id?: string;
+  role_ids?: string[];
   email?: string;
   phone?: string;
 }
@@ -104,6 +106,10 @@ export const authService = {
         name: currentUser.user_name || currentUser.name || currentUser.username,
         type: userType,
         role: roleName,
+        role_id: currentUser.role_id,
+        role_ids: Array.isArray(currentUser.role_ids)
+          ? currentUser.role_ids.filter(Boolean)
+          : [currentUser.role_id].filter(Boolean),
         email: currentUser.email,
         phone: currentUser.phone,
       };
@@ -147,7 +153,7 @@ export const authService = {
       }
 
       const userData = {
-        user_name: data.user_name,
+        user_name: data.name,
         username: data.username,
         password_hash: data.password,
         type: 'external',
@@ -169,6 +175,10 @@ export const authService = {
         name: createdUser.name || data.name,
         type: createdUser.user_type || createdUser.type || 'external',
         role: customerRole.name || '外部客户',
+        role_id: createdUser.role_id,
+        role_ids: Array.isArray(createdUser.role_ids)
+          ? createdUser.role_ids.filter(Boolean)
+          : [createdUser.role_id].filter(Boolean),
         email: createdUser.email || data.email,
         phone: createdUser.phone || data.phone,
       };

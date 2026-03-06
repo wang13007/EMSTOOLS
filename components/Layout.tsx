@@ -1,11 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { UserType } from '../types';
+import { messageService } from '../src/services/supabaseService';
 
 interface LayoutProps {
   children: React.ReactNode;
+}
+
+interface HeaderMessagePreview {
+  id: string;
+  title: string;
+  read: boolean;
+  time: string;
 }
 
 const SidebarItem = ({ to, icon: Icon, label, isActive, isExpanded, onClick }: { to?: string; icon?: any; label: string; isActive?: boolean; isExpanded?: boolean; onClick?: () => void }) => {
@@ -57,6 +65,48 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const [openMenus, setOpenMenus] = useState<string[]>(['survey', 'product', 'settings']);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [messagePanelOpen, setMessagePanelOpen] = useState(false);
+  const [recentMessages, setRecentMessages] = useState<HeaderMessagePreview[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [messageLoading, setMessageLoading] = useState(false);
+  const messagePanelRef = useRef<HTMLDivElement | null>(null);
+
+  const formatRelativeTime = (time?: string) => {
+    if (!time) return '刚刚';
+    const diffMinutes = Math.floor((Date.now() - new Date(time).getTime()) / (1000 * 60));
+    if (diffMinutes < 1) return '刚刚';
+    if (diffMinutes < 60) return `${diffMinutes}分钟前`;
+    if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}小时前`;
+    return `${Math.floor(diffMinutes / 1440)}天前`;
+  };
+
+  const refreshMessageSummary = async () => {
+    if (!currentUser?.id) {
+      setRecentMessages([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    setMessageLoading(true);
+    try {
+      const [messages, unread] = await Promise.all([
+        messageService.getCurrentUserMessages(5),
+        messageService.getCurrentUserUnreadCount(),
+      ]);
+
+      setRecentMessages(
+        (messages || []).map((message: any) => ({
+          id: message.id,
+          title: message.title,
+          read: !!message.read,
+          time: formatRelativeTime(message.create_time),
+        }))
+      );
+      setUnreadCount(unread);
+    } finally {
+      setMessageLoading(false);
+    }
+  };
 
   // 获取当前登录用户信息
   useEffect(() => {
@@ -83,12 +133,48 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
+  useEffect(() => {
+    refreshMessageSummary();
+  }, [currentUser?.id, currentUser?.role_id, currentUser?.role]);
+
+  useEffect(() => {
+    if (!messagePanelOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!messagePanelRef.current) return;
+      if (!messagePanelRef.current.contains(event.target as Node)) {
+        setMessagePanelOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [messagePanelOpen]);
+
+  const handleMessageIconClick = () => {
+    setMessagePanelOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        void refreshMessageSummary();
+      }
+      return next;
+    });
+  };
+
+  const handleGoToMessageCenter = () => {
+    setMessagePanelOpen(false);
+    navigate('/settings/messages');
+  };
+
   // 退出登录函数
   const handleLogout = () => {
     // 清除登录状态
     localStorage.removeItem('ems_user');
     localStorage.removeItem('ems_token');
     setCurrentUser(null);
+    setMessagePanelOpen(false);
+    setRecentMessages([]);
+    setUnreadCount(0);
     // 跳转到登录页面
     navigate('/login');
   };
@@ -205,11 +291,62 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="flex items-center gap-4">
           </div>
           <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer">
-               <div className="text-slate-400 group-hover:text-blue-600 transition-colors">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-               </div>
-               <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></div>
+            <div className="relative" ref={messagePanelRef}>
+              <button
+                type="button"
+                onClick={handleMessageIconClick}
+                className="relative text-slate-400 hover:text-blue-600 transition-colors"
+                aria-label="消息通知"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] leading-5 text-center border border-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {messagePanelOpen && (
+                <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-20">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{currentUser?.name || currentUser?.username || '当前用户'}</p>
+                      <p className="text-xs text-slate-500">未读消息 {unreadCount} 条</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGoToMessageCenter}
+                      className="text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      查看全部
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {messageLoading ? (
+                      <p className="text-xs text-slate-400 py-4 text-center">消息加载中...</p>
+                    ) : recentMessages.length > 0 ? (
+                      recentMessages.map((message) => (
+                        <button
+                          key={message.id}
+                          type="button"
+                          onClick={handleGoToMessageCenter}
+                          className="w-full text-left p-2 rounded-lg hover:bg-slate-50"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className={`text-sm truncate ${message.read ? 'text-slate-600' : 'text-slate-900 font-semibold'}`}>
+                              {message.title}
+                            </p>
+                            <span className="text-[10px] text-slate-400 shrink-0">{message.time}</span>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 py-4 text-center">暂无消息</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="h-8 w-px bg-slate-200"></div>
             <div className="flex items-center gap-3">

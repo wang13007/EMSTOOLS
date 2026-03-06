@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿import supabase from '../config/supabase';
+import supabase from '../config/supabase';
 import { SurveyForm, SurveyTemplate, SystemLog } from '../../types';
 
 const isMissingColumn = (error: any, column: string) => {
@@ -36,9 +36,15 @@ const getLocalUserContext = () => {
     const raw = window.localStorage.getItem('ems_user');
     if (!raw) return null;
     const user = JSON.parse(raw);
+    const roleIds = Array.isArray(user?.role_ids)
+      ? dedupeStringArray(user.role_ids)
+      : dedupeStringArray([user?.role_id]);
     return {
       id: user?.id || user?.user_id || '',
       type: user?.type || user?.user_type || '',
+      role: user?.role || '',
+      role_id: user?.role_id || roleIds[0] || '',
+      role_ids: roleIds,
     };
   } catch {
     return null;
@@ -569,19 +575,127 @@ export const logService = {
   },
 };
 
-export const messageService = {
-  async getMessages(userId: string) {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('target_user_id', userId)
-      .order('create_time', { ascending: false });
+const mergeAndSortMessages = (messageGroups: any[][]) => {
+  const merged = new Map<string, any>();
+  messageGroups.forEach((group) => {
+    (group || []).forEach((message: any) => {
+      if (!message?.id) return;
+      merged.set(message.id, message);
+    });
+  });
 
-    if (error) {
-      console.error('获取消息列表失败:', error);
-      return [];
+  return Array.from(merged.values()).sort((a: any, b: any) => {
+    const aTime = new Date(a?.create_time || 0).getTime();
+    const bTime = new Date(b?.create_time || 0).getTime();
+    return bTime - aTime;
+  });
+};
+
+const resolveCurrentUserRoleIds = async (roleIds: string[], roleName?: string) => {
+  const existing = dedupeStringArray(roleIds);
+  if (existing.length || !roleName) return existing;
+
+  const { data, error } = await supabase.from('roles').select('id').eq('name', roleName).limit(1);
+  if (error || !data?.length) {
+    return existing;
+  }
+
+  return dedupeStringArray([...existing, data[0].id]);
+};
+
+const queryMessagesByTargetUser = async (userId: string, limit?: number) => {
+  if (!userId) return [];
+  let query: any = supabase
+    .from('messages')
+    .select('*')
+    .eq('target_user_id', userId)
+    .order('create_time', { ascending: false });
+
+  if (typeof limit === 'number') {
+    query = query.limit(limit);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('按用户查询消息失败:', error);
+    return [];
+  }
+  return data || [];
+};
+
+const queryMessagesByTargetRoles = async (roleIds: string[], limit?: number) => {
+  if (!roleIds.length) return [];
+  let query: any = supabase
+    .from('messages')
+    .select('*')
+    .in('target_role_id', roleIds)
+    .order('create_time', { ascending: false });
+
+  if (typeof limit === 'number') {
+    query = query.limit(limit);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('按角色查询消息失败:', error);
+    return [];
+  }
+  return data || [];
+};
+
+const queryBroadcastMessages = async (limit?: number) => {
+  let query: any = supabase
+    .from('messages')
+    .select('*')
+    .is('target_user_id', null)
+    .is('target_role_id', null)
+    .order('create_time', { ascending: false });
+
+  if (typeof limit === 'number') {
+    query = query.limit(limit);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('查询广播消息失败:', error);
+    return [];
+  }
+  return data || [];
+};
+
+export const messageService = {
+  async getMessages(userId: string, options?: { roleIds?: string[]; includeBroadcast?: boolean; limit?: number }) {
+    const includeBroadcast = options?.includeBroadcast !== false;
+    const roleIds = dedupeStringArray(options?.roleIds || []);
+
+    const [userMessages, roleMessages, broadcastMessages] = await Promise.all([
+      queryMessagesByTargetUser(userId, options?.limit),
+      queryMessagesByTargetRoles(roleIds, options?.limit),
+      includeBroadcast ? queryBroadcastMessages(options?.limit) : Promise.resolve([]),
+    ]);
+
+    const merged = mergeAndSortMessages([userMessages, roleMessages, broadcastMessages]);
+    if (typeof options?.limit === 'number') {
+      return merged.slice(0, options.limit);
     }
-    return data;
+    return merged;
+  },
+
+  async getCurrentUserMessages(limit?: number) {
+    const currentUser = getLocalUserContext();
+    if (!currentUser?.id) return [];
+
+    const roleIds = await resolveCurrentUserRoleIds(currentUser.role_ids || [], currentUser.role);
+    return messageService.getMessages(currentUser.id, {
+      roleIds,
+      includeBroadcast: true,
+      limit,
+    });
+  },
+
+  async getCurrentUserUnreadCount() {
+    const messages = await messageService.getCurrentUserMessages();
+    return messages.filter((message: any) => !message.read).length;
   },
 
   async markAsRead(id: string) {
