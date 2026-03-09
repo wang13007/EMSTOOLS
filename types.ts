@@ -24,7 +24,8 @@ export enum OperationResult {
 export enum ProductType {
   SOFTWARE = '软件',
   HARDWARE = '硬件',
-  CONSULTING = '咨询'
+  CONSULTING = '咨询',
+  RETROFIT = '改造施工'
 }
 
 export enum SurveyStatus {

@@ -31,6 +31,7 @@ const DEFAULT_FORM: FormState = {
   type: UserType.EXTERNAL,
   roleIds: [],
 };
+const RESET_PASSWORD_DEFAULT = '1234';
 
 const inferRoleType = (role: any): UserType => {
   const directType = role?.type || role?.user_type;
@@ -303,6 +304,19 @@ export const UserManagement: React.FC = () => {
     }
   };
 
+  const handleResetPassword = async (u: UserRow) => {
+    if (!window.confirm(`确认将用户 ${u.username} 的密码重置为 ${RESET_PASSWORD_DEFAULT} 吗？`)) return;
+    const updated = await userService.updateUser(u.id, {
+      status: u.status,
+      password_hash: RESET_PASSWORD_DEFAULT,
+    });
+    if (updated) {
+      alert(`用户 ${u.username} 的密码已重置为 ${RESET_PASSWORD_DEFAULT}`);
+      return;
+    }
+    alert('重置密码失败，请稍后重试');
+  };
+
   const handleDelete = async (u: UserRow) => {
     if (!window.confirm(`确定删除用户 ${u.username} 吗？`)) return;
     const ok = await userService.deleteUser(u.id);
@@ -397,6 +411,9 @@ export const UserManagement: React.FC = () => {
                     <td className="px-6 py-4 text-right space-x-3">
                       <button onClick={() => openEditModal(u)} className="text-blue-600 font-bold text-sm hover:underline">
                         编辑
+                      </button>
+                      <button onClick={() => handleResetPassword(u)} className="text-amber-600 font-bold text-sm hover:underline">
+                        重置密码
                       </button>
                       <button
                         onClick={() => handleToggleStatus(u)}

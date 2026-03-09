@@ -17,8 +17,6 @@ import { LogManagement } from './pages/LogManagement';
 import { Dictionaries } from './pages/Dictionaries';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { ForgotPassword } from './pages/ForgotPassword';
-import { ResetPassword } from './pages/ResetPassword';
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20 animate-fadeIn">
@@ -54,8 +52,6 @@ const App: React.FC = () => {
         {/* 公共路由 */}
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-        <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
 
         {/* 受保护的路由 */}
         <Route path="/" element={

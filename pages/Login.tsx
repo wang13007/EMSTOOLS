@@ -139,9 +139,7 @@ export const Login: React.FC = () => {
                   记住我
                 </label>
               </div>
-              <Link to="/forgot-password" className="text-blue-600 hover:text-blue-800 font-medium">
-                忘记密码?
-              </Link>
+              <span className="text-slate-400">忘记密码请联系管理员</span>
             </div>
           </form>
 

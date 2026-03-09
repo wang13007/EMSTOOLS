@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   DictType, DictItem, DictStatus, RegionDict, RegionLevel 
@@ -9,6 +9,8 @@ import Portal from '../src/components/Portal';
 import { INITIAL_REGIONS } from '../constants/regions';
 
 const REGION_STORAGE_KEY = 'ems_regions';
+const DICT_TYPES_STORAGE_KEY = 'ems_dict_types';
+const DICT_ITEMS_STORAGE_KEY = 'ems_dict_items';
 
 const buildPresetRegions = (): RegionDict[] => {
   const source = INITIAL_REGIONS.filter((item) => {
@@ -45,6 +47,113 @@ const isRegionCacheUsable = (data: unknown): data is RegionDict[] => {
   return codeSet.has('CN') && codeSet.has('110000') && codeSet.has('810000') && codeSet.has('820000');
 };
 
+const readCachedJson = <T,>(key: string, fallback: T): T => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const normalizeTypeCode = (typeCode?: string) => (typeCode || '').trim().toLowerCase();
+const normalizeTypeName = (typeName?: string) => (typeName || '').trim().toLowerCase();
+
+const isIndustryType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
+  const code = normalizeTypeCode(type.typeCode);
+  const name = normalizeTypeName(type.typeName);
+  return code === 'industry'
+    || name === '行业类型'
+    || name === '行业分类'
+    || name === 'industry type'
+    || name === 'industry category';
+};
+
+const isScenarioType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
+  const code = normalizeTypeCode(type.typeCode);
+  const name = normalizeTypeName(type.typeName);
+  return code === 'scenario'
+    || name === '场景分类'
+    || name === 'scenario category';
+};
+
+const isCapabilityType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
+  const code = normalizeTypeCode(type.typeCode);
+  const name = normalizeTypeName(type.typeName);
+  return code === 'capability_type'
+    || code === 'product_type'
+    || name === '能力类型'
+    || name === '产品类型'
+    || name === 'capability type'
+    || name === 'product type';
+};
+
+const mergeDictTypes = (...groups: DictType[][]) => {
+  const map = new Map<string, DictType>();
+  groups.forEach((types) => {
+    types.forEach((type) => {
+      const code = normalizeTypeCode(type.typeCode);
+      const name = normalizeTypeName(type.typeName);
+      const key = code ? `code:${code}` : (name ? `name:${name}` : `id:${type.typeId}`);
+      if (!map.has(key)) {
+        map.set(key, type);
+      }
+    });
+  });
+  return Array.from(map.values());
+};
+
+const mergeDictItems = (...groups: DictItem[][]) => {
+  const map = new Map<string, DictItem>();
+  groups.forEach((items) => {
+    items.forEach((item) => map.set(item.itemId, item));
+  });
+  return Array.from(map.values());
+};
+
+const ensureRequiredDictTypes = (types: DictType[]) => {
+  const next = [...types];
+  const now = new Date().toISOString();
+
+  if (!next.some(isIndustryType)) {
+    next.push({
+      typeId: 'preset-industry',
+      typeName: '行业类型',
+      typeCode: 'industry',
+      description: '用于产品能力维护中的适用行业选项',
+      status: DictStatus.ENABLED,
+      creator: 'System',
+      createTime: now,
+    });
+  }
+
+  if (!next.some(isScenarioType)) {
+    next.push({
+      typeId: 'preset-scenario',
+      typeName: '场景分类',
+      typeCode: 'scenario',
+      description: '用于产品能力维护中的适用场景选项',
+      status: DictStatus.ENABLED,
+      creator: 'System',
+      createTime: now,
+    });
+  }
+
+  if (!next.some(isCapabilityType)) {
+    next.push({
+      typeId: 'preset-capability-type',
+      typeName: '能力类型',
+      typeCode: 'capability_type',
+      description: '用于产品能力维护中的能力类型选项',
+      status: DictStatus.ENABLED,
+      creator: 'System',
+      createTime: now,
+    });
+  }
+
+  return next;
+};
+
 export const Dictionaries: React.FC = () => {
   const [selectedType, setSelectedType] = useState<DictType | null>(null);
   const [dictTypes, setDictTypes] = useState<DictType[]>([]);
@@ -61,25 +170,38 @@ export const Dictionaries: React.FC = () => {
 
   // Load data
   useEffect(() => {
+    const cachedTypes = readCachedJson<DictType[]>(DICT_TYPES_STORAGE_KEY, []);
+    const cachedItems = readCachedJson<DictItem[]>(DICT_ITEMS_STORAGE_KEY, []);
+    setDictItems(cachedItems);
+
     // 从数据库获取字典类型列表
     const fetchDictTypes = async () => {
-      const typeList = await dictService.getDictTypes();
-      // 转换数据格式以匹配前端类型
-      const formattedTypes = typeList.map(type => ({
-        typeId: type.type_id,
-        typeName: type.type_name,
-        typeCode: type.type_code,
-        description: type.description,
-        status: type.status,
-        sortOrder: type.sort_order,
-        creator: '系统用户', // 需要根据creator_id获取用户名
-        createTime: type.create_time ? new Date(type.create_time).toISOString() : ''
-      }));
-      setDictTypes(formattedTypes);
-      
-      if (formattedTypes.length > 0 && !selectedType) {
-        setSelectedType(formattedTypes[0]);
+      let formattedTypes: DictType[] = [];
+      try {
+        const typeList = await dictService.getDictTypes();
+        // 转换数据格式以匹配前端类型
+        formattedTypes = typeList.map(type => ({
+          typeId: type.type_id,
+          typeName: type.type_name,
+          typeCode: type.type_code,
+          description: type.description,
+          status: type.status,
+          sortOrder: type.sort_order,
+          creator: '系统用户', // 需要根据creator_id获取用户名
+          createTime: type.create_time ? new Date(type.create_time).toISOString() : ''
+        })) as DictType[];
+      } catch (error) {
+        console.warn('加载字典类型失败，使用本地缓存回退', error);
       }
+
+      const mergedTypes = ensureRequiredDictTypes(mergeDictTypes(formattedTypes, cachedTypes));
+      setDictTypes(mergedTypes);
+      setSelectedType((prev) => {
+        if (prev) {
+          return mergedTypes.find((type) => type.typeId === prev.typeId) || mergedTypes[0] || null;
+        }
+        return mergedTypes[0] || null;
+      });
     };
 
     fetchDictTypes();
@@ -87,8 +209,10 @@ export const Dictionaries: React.FC = () => {
 
   // 当选择的字典类型变化时，获取对应的字典项
   useEffect(() => {
-    if (selectedType) {
-      const fetchDictItems = async () => {
+    if (!selectedType || selectedType.typeCode === 'region') return;
+
+    const fetchDictItems = async () => {
+      try {
         const itemList = await dictService.getDictItems(selectedType.typeId);
         // 转换数据格式以匹配前端类型
         const formattedItems = itemList.map(item => ({
@@ -102,13 +226,23 @@ export const Dictionaries: React.FC = () => {
           ext2: item.ext2,
           creator: '系统用户', // 需要根据creator_id获取用户名
           createTime: item.create_time ? new Date(item.create_time).toISOString() : ''
-        }));
-        setDictItems(formattedItems);
-      };
+        })) as DictItem[];
+        setDictItems((prev) => mergeDictItems(prev, formattedItems));
+      } catch (error) {
+        console.warn(`加载字典项失败: ${selectedType.typeCode}`, error);
+      }
+    };
 
-      fetchDictItems();
-    }
+    fetchDictItems();
   }, [selectedType]);
+
+  useEffect(() => {
+    localStorage.setItem(DICT_TYPES_STORAGE_KEY, JSON.stringify(dictTypes));
+  }, [dictTypes]);
+
+  useEffect(() => {
+    localStorage.setItem(DICT_ITEMS_STORAGE_KEY, JSON.stringify(dictItems));
+  }, [dictItems]);
 
   // Load preset region dictionary (with local cache fallback)
   useEffect(() => {
