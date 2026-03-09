@@ -26,12 +26,21 @@ type DictionaryItemLike = Partial<DictItem> & {
   item_label?: string;
 };
 
-const INDUSTRY_TYPE_CODES = ['industry'];
-const SCENARIO_TYPE_CODES = ['scenario', 'scenarios', 'scene', 'application_scenario', 'use_case'];
-const CAPABILITY_TYPE_CODES = ['capability_type', 'product_type'];
-const INDUSTRY_TYPE_NAMES = ['琛屼笟绫诲瀷', '琛屼笟鍒嗙被', 'industry type', 'industry category'];
-const SCENARIO_TYPE_NAMES = ['鍦烘櫙鍒嗙被', 'scenario category'];
+const LEGACY_LABEL_MAP: Record<string, string> = {
+  '杞欢': '软件',
+  '纭欢': '硬件',
+  '鍜ㄨ': '咨询',
+  '鏀归€犳柦宸?': '改造施工',
+  '鍒堕€犱笟': '制造业',
+  '鍟嗕笟鍦颁骇': '商业地产',
+  '鍥尯': '园区',
+};
 
+const INDUSTRY_TYPE_CODES = ['industry', 'industry_type', 'industry_category'];
+const SCENARIO_TYPE_CODES = ['scenario', 'scenarios', 'scene', 'scenario_type', 'scenario_category', 'application_scenario', 'use_case'];
+const CAPABILITY_TYPE_CODES = ['capability_type', 'product_type', 'capability', 'product_capability_type'];
+const INDUSTRY_TYPE_NAMES = ['行业类型', '行业分类', 'industry type', 'industry category'];
+const SCENARIO_TYPE_NAMES = ['场景分类', '场景类型', 'scenario category', 'scenario type'];
 const CAPABILITY_TYPE_NAMES = ['能力类型', '产品类型', 'capability type', 'product type'];
 
 const BUTTON_BASE = 'h-10 px-4 rounded-xl inline-flex items-center gap-2 text-sm font-semibold transition-all';
@@ -56,7 +65,8 @@ const getTypeId = (type: DictionaryTypeLike) => String(type.typeId ?? type.type_
 const getTypeCode = (type: DictionaryTypeLike) => String(type.typeCode ?? type.type_code ?? '').trim().toLowerCase();
 const getTypeName = (type: DictionaryTypeLike) => String(type.typeName ?? type.type_name ?? '').trim().toLowerCase();
 const getItemTypeId = (item: DictionaryItemLike) => String(item.typeId ?? item.type_id ?? '');
-const getItemLabel = (item: DictionaryItemLike) => String(item.itemLabel ?? item.item_label ?? '');
+const normalizeLabel = (value: string) => LEGACY_LABEL_MAP[value.trim()] || value.trim();
+const getItemLabel = (item: DictionaryItemLike) => normalizeLabel(String(item.itemLabel ?? item.item_label ?? ''));
 
 const getLocalDictionary = () => {
   try {
@@ -119,6 +129,18 @@ const normalizeImportedType = (rawType: unknown): ProductType => {
   }
 
   const normalized = value.toLowerCase();
+  const legacyTypeMap: Record<string, ProductType> = {
+    '软件': ProductType.SOFTWARE,
+    '杞欢': ProductType.SOFTWARE,
+    '硬件': ProductType.HARDWARE,
+    '纭欢': ProductType.HARDWARE,
+    '咨询': ProductType.CONSULTING,
+    '鍜ㄨ': ProductType.CONSULTING,
+    '改造施工': ProductType.RETROFIT,
+    '鏀归€犳柦宸?': ProductType.RETROFIT,
+  };
+  if (legacyTypeMap[normalized]) return legacyTypeMap[normalized];
+
   if (['software', 'soft'].includes(normalized)) return ProductType.SOFTWARE;
   if (['hardware', 'hard'].includes(normalized)) return ProductType.HARDWARE;
   if (['consulting', 'consult', 'advisory'].includes(normalized)) return ProductType.CONSULTING;
@@ -171,20 +193,30 @@ const MultiSelectDropdown: React.FC<{
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
+    const viewportPadding = 8;
+    const panelWidth = Math.max(rect.width, 220);
+
+    let left = rect.left;
+    if (left + panelWidth > window.innerWidth - viewportPadding) {
+      left = window.innerWidth - panelWidth - viewportPadding;
+    }
+    if (left < viewportPadding) {
+      left = viewportPadding;
+    }
 
     let top = rect.bottom + 6;
-    let maxHeight = window.innerHeight - top - 8;
+    let maxHeight = window.innerHeight - top - viewportPadding;
 
     if (maxHeight < 160) {
       const upwardHeight = rect.top - 14;
       maxHeight = Math.max(120, upwardHeight);
-      top = Math.max(8, rect.top - maxHeight - 6);
+      top = Math.max(viewportPadding, rect.top - maxHeight - 6);
     }
 
     setPanelStyle({
-      left: rect.left,
+      left,
       top,
-      width: rect.width,
+      width: panelWidth,
       maxHeight,
     });
   }, []);
@@ -241,9 +273,9 @@ const MultiSelectDropdown: React.FC<{
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100 mb-1">
-              <span className="text-xs font-semibold text-slate-500">宸查€?{value.length}</span>
+              <span className="text-xs font-semibold text-slate-500">已选 {value.length}</span>
               <button type="button" onClick={clearAll} className="text-xs text-blue-600 hover:underline">
-                娓呯┖
+                清空
               </button>
             </div>
 
@@ -263,7 +295,7 @@ const MultiSelectDropdown: React.FC<{
                   ))}
                 </div>
               ) : (
-                <div className="px-2 py-3 text-xs text-slate-400">鏆傛棤鍙€夐」</div>
+                <div className="px-2 py-3 text-xs text-slate-400">暂无可选项</div>
               )}
             </div>
           </div>

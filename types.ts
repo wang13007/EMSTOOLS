@@ -1,47 +1,46 @@
-
 export enum UserType {
   INTERNAL = 'internal',
-  EXTERNAL = 'external'
+  EXTERNAL = 'external',
 }
 
 export enum UserStatus {
   ENABLED = 'enabled',
-  DISABLED = 'disabled'
+  DISABLED = 'disabled',
 }
 
 export enum LogType {
   LOGIN = 'login',
   SURVEY = 'survey',
   USER = 'user',
-  SYSTEM = 'system'
+  SYSTEM = 'system',
 }
 
 export enum OperationResult {
   SUCCESS = '成功',
-  FAILURE = '失败'
+  FAILURE = '失败',
 }
 
 export enum ProductType {
   SOFTWARE = '软件',
   HARDWARE = '硬件',
   CONSULTING = '咨询',
-  RETROFIT = '改造施工'
+  RETROFIT = '改造施工',
 }
 
 export enum SurveyStatus {
   DRAFT = '草稿',
   FILLING = '填写中',
-  COMPLETED = '已完成'
+  COMPLETED = '已完成',
 }
 
 export enum ReportStatus {
   NOT_GENERATED = '未生成',
-  GENERATED = '已生成'
+  GENERATED = '已生成',
 }
 
 export enum DictStatus {
   ENABLED = 'enabled',
-  DISABLED = 'disabled'
+  DISABLED = 'disabled',
 }
 
 export interface DictType {
@@ -72,7 +71,7 @@ export enum RegionLevel {
   COUNTRY = 1,
   REGION = 2,
   PROVINCE = 3,
-  CITY = 4
+  CITY = 4,
 }
 
 export interface RegionDict {
