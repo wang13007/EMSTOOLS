@@ -7,8 +7,6 @@ export const INITIAL_DICT_TYPES: DictType[] = [
   { typeId: '2', typeName: '区域信息', typeCode: 'region', status: DictStatus.ENABLED, creator: 'System', createTime: now() },
   { typeId: '3', typeName: '能力类型', typeCode: 'capability_type', status: DictStatus.ENABLED, creator: 'System', createTime: now() },
   { typeId: '4', typeName: '场景分类', typeCode: 'scenario', status: DictStatus.ENABLED, creator: 'System', createTime: now() },
-  { typeId: '5', typeName: '表单状态', typeCode: 'form_status', status: DictStatus.ENABLED, creator: 'System', createTime: now() },
-  { typeId: '6', typeName: '用户状态', typeCode: 'user_status', status: DictStatus.ENABLED, creator: 'System', createTime: now() },
 ];
 
 export const INITIAL_DICT_ITEMS: DictItem[] = [

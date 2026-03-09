@@ -12,6 +12,7 @@ import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionarie
 const REGION_STORAGE_KEY = 'ems_regions';
 const DICT_TYPES_STORAGE_KEY = 'ems_dict_types';
 const DICT_ITEMS_STORAGE_KEY = 'ems_dict_items';
+const REMOVED_TYPE_CODES = new Set(['form_status', 'user_status']);
 
 const PRESET_SCENARIO_ITEMS = [
   { label: '工业园区', value: 'industrial_park' },
@@ -76,6 +77,7 @@ const readCachedJson = <T,>(key: string, fallback: T): T => {
 const normalizeTypeCode = (typeCode?: string) => (typeCode || '').trim().toLowerCase();
 const normalizeTypeName = (typeName?: string) => (typeName || '').trim().toLowerCase();
 const normalizeLabel = (label?: string) => (label || '').trim().toLowerCase();
+const isRemovedTypeCode = (typeCode?: string) => REMOVED_TYPE_CODES.has(normalizeTypeCode(typeCode));
 
 const isIndustryType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
   const code = normalizeTypeCode(type.typeCode);
@@ -110,6 +112,7 @@ const mergeDictTypes = (...groups: DictType[][]) => {
   const map = new Map<string, DictType>();
   groups.forEach((types) => {
     types.forEach((type) => {
+      if (isRemovedTypeCode(type.typeCode)) return;
       const code = normalizeTypeCode(type.typeCode);
       const name = normalizeTypeName(type.typeName);
       const key = code ? `code:${code}` : (name ? `name:${name}` : `id:${type.typeId}`);
@@ -170,6 +173,15 @@ const ensureRequiredDictTypes = (types: DictType[]) => {
   }
 
   return next;
+};
+
+const pruneRemovedTypes = (types: DictType[]) => {
+  return types.filter((type) => !isRemovedTypeCode(type.typeCode));
+};
+
+const pruneItemsByTypes = (items: DictItem[], types: DictType[]) => {
+  const typeIdSet = new Set(types.map((type) => type.typeId));
+  return items.filter((item) => typeIdSet.has(item.typeId));
 };
 
 const ensureRequiredDictItems = (types: DictType[], items: DictItem[]) => {
@@ -253,10 +265,12 @@ export const Dictionaries: React.FC = () => {
         console.warn('加载字典类型失败，使用本地缓存回退', error);
       }
 
-      const mergedTypes = ensureRequiredDictTypes(mergeDictTypes(formattedTypes, cachedTypes, INITIAL_DICT_TYPES));
+      const mergedTypes = ensureRequiredDictTypes(
+        pruneRemovedTypes(mergeDictTypes(formattedTypes, cachedTypes, INITIAL_DICT_TYPES)),
+      );
       const mergedItems = ensureRequiredDictItems(
         mergedTypes,
-        mergeDictItems(cachedItems, INITIAL_DICT_ITEMS),
+        pruneItemsByTypes(mergeDictItems(cachedItems, INITIAL_DICT_ITEMS), mergedTypes),
       );
 
       setDictTypes(mergedTypes);
@@ -274,7 +288,7 @@ export const Dictionaries: React.FC = () => {
 
   // 当选择的字典类型变化时，获取对应的字典项
   useEffect(() => {
-    if (!selectedType || selectedType.typeCode === 'region') return;
+    if (!selectedType || selectedType.typeCode === 'region' || isRemovedTypeCode(selectedType.typeCode)) return;
 
     const fetchDictItems = async () => {
       try {
@@ -292,7 +306,11 @@ export const Dictionaries: React.FC = () => {
           creator: '系统用户', // 需要根据creator_id获取用户名
           createTime: item.create_time ? new Date(item.create_time).toISOString() : ''
         })) as DictItem[];
-        setDictItems((prev) => ensureRequiredDictItems(dictTypes, mergeDictItems(prev, formattedItems)));
+        setDictItems((prev) => {
+          const merged = mergeDictItems(prev, formattedItems);
+          const pruned = pruneItemsByTypes(merged, dictTypes);
+          return ensureRequiredDictItems(dictTypes, pruned);
+        });
       } catch (error) {
         console.warn(`加载字典项失败: ${selectedType.typeCode}`, error);
       }
@@ -342,6 +360,10 @@ export const Dictionaries: React.FC = () => {
   const handleSaveType = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingType?.typeName || !editingType?.typeCode) return;
+    if (isRemovedTypeCode(editingType.typeCode)) {
+      alert('表单状态和用户状态字典已下线，不可创建。');
+      return;
+    }
 
     if (editingType.typeId) {
       setDictTypes(dictTypes.map(t => t.typeId === editingType.typeId ? { ...t, ...editingType } as DictType : t));
