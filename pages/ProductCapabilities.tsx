@@ -154,13 +154,29 @@ const IMPORT_FIELD_ALIASES = {
   id: ['ID', 'id', 'Id', '能力ID', 'productId'],
   name: ['能力名称', 'name', 'Name', 'capabilityName'],
   type: ['类型', '能力类型', '产品类型', 'type', 'Type'],
-  industries: ['适用行业', 'industries', 'industry', '行业'],
-  scenarios: ['适用场景', 'scenarios', 'scenario', '场景'],
+  industries: ['适用行业', '适用行业(下拉选项1)', 'industries', 'industry', '行业'],
+  industries2: ['适用行业(下拉选项2)', 'industries_2', 'industry_2'],
+  industries3: ['适用行业(下拉选项3)', 'industries_3', 'industry_3'],
+  scenarios: ['适用场景', '适用场景(下拉选项1)', 'scenarios', 'scenario', '场景'],
+  scenarios2: ['适用场景(下拉选项2)', 'scenarios_2', 'scenario_2'],
+  scenarios3: ['适用场景(下拉选项3)', 'scenarios_3', 'scenario_3'],
   description: ['详细描述', 'description', 'detailDescription', '描述'],
   createTime: ['创建时间', '创建时间（导入时无需填写，系统自动生成）', 'createTime', 'create_time'],
 };
 
-const EXCEL_EXPORT_HEADERS = ['ID', '能力名称', '类型', '适用行业', '适用场景', '详细描述', '创建时间（导入时无需填写，系统自动生成）'];
+const EXCEL_EXPORT_HEADERS = [
+  'ID',
+  '能力名称',
+  '类型',
+  '适用行业(下拉选项1)',
+  '适用行业(下拉选项2)',
+  '适用行业(下拉选项3)',
+  '适用场景(下拉选项1)',
+  '适用场景(下拉选项2)',
+  '适用场景(下拉选项3)',
+  '详细描述',
+  '创建时间（导入时无需填写，系统自动生成）',
+];
 
 const getImportCellValue = (row: Record<string, unknown>, aliases: string[]) => {
   for (const alias of aliases) {
@@ -538,12 +554,22 @@ export const ProductCapabilities: React.FC = () => {
 
     worksheet.addRow(EXCEL_EXPORT_HEADERS);
     products.forEach((item) => {
+      const industry1 = item.industries[0] || '';
+      const industry2 = item.industries[1] || '';
+      const industry3 = item.industries[2] || '';
+      const scenario1 = item.scenarios[0] || '';
+      const scenario2 = item.scenarios[1] || '';
+      const scenario3 = item.scenarios[2] || '';
       worksheet.addRow([
         item.id,
         item.name,
         item.type,
-        item.industries.join('，'),
-        item.scenarios.join('，'),
+        industry1,
+        industry2,
+        industry3,
+        scenario1,
+        scenario2,
+        scenario3,
         item.description,
         item.createTime,
       ]);
@@ -553,6 +579,10 @@ export const ProductCapabilities: React.FC = () => {
       { width: 18 },
       { width: 24 },
       { width: 16 },
+      { width: 24 },
+      { width: 24 },
+      { width: 24 },
+      { width: 24 },
       { width: 24 },
       { width: 24 },
       { width: 36 },
@@ -593,22 +623,26 @@ export const ProductCapabilities: React.FC = () => {
         errorTitle: '类型无效',
         error: '请从下拉选项中选择类型。',
       };
-      worksheet.getCell(`D${rowIndex}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [`'下拉选项'!$B$2:$B$${industryLastRow}`],
-        showErrorMessage: true,
-        errorTitle: '适用行业无效',
-        error: '请从下拉选项中选择适用行业。',
-      };
-      worksheet.getCell(`E${rowIndex}`).dataValidation = {
-        type: 'list',
-        allowBlank: true,
-        formulae: [`'下拉选项'!$C$2:$C$${scenarioLastRow}`],
-        showErrorMessage: true,
-        errorTitle: '适用场景无效',
-        error: '请从下拉选项中选择适用场景。',
-      };
+      ['D', 'E', 'F'].forEach((col) => {
+        worksheet.getCell(`${col}${rowIndex}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`'下拉选项'!$B$2:$B$${industryLastRow}`],
+          showErrorMessage: true,
+          errorTitle: '适用行业无效',
+          error: '请从下拉选项中选择适用行业。',
+        };
+      });
+      ['G', 'H', 'I'].forEach((col) => {
+        worksheet.getCell(`${col}${rowIndex}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`'下拉选项'!$C$2:$C$${scenarioLastRow}`],
+          showErrorMessage: true,
+          errorTitle: '适用场景无效',
+          error: '请从下拉选项中选择适用场景。',
+        };
+      });
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -654,13 +688,21 @@ export const ProductCapabilities: React.FC = () => {
         const rawName = getImportCellValue(row, IMPORT_FIELD_ALIASES.name);
         const rawType = getImportCellValue(row, IMPORT_FIELD_ALIASES.type);
         const rawIndustries = getImportCellValue(row, IMPORT_FIELD_ALIASES.industries);
+        const rawIndustries2 = getImportCellValue(row, IMPORT_FIELD_ALIASES.industries2);
+        const rawIndustries3 = getImportCellValue(row, IMPORT_FIELD_ALIASES.industries3);
         const rawScenarios = getImportCellValue(row, IMPORT_FIELD_ALIASES.scenarios);
+        const rawScenarios2 = getImportCellValue(row, IMPORT_FIELD_ALIASES.scenarios2);
+        const rawScenarios3 = getImportCellValue(row, IMPORT_FIELD_ALIASES.scenarios3);
         const rawDescription = getImportCellValue(row, IMPORT_FIELD_ALIASES.description);
 
         const name = normalizeLabel(String(rawName || '').trim());
         const type = normalizeImportedType(rawType);
-        const industries = parseMultiValues(rawIndustries);
-        const scenarios = parseMultiValues(rawScenarios);
+        const industries = dedupeStrings(
+          [rawIndustries, rawIndustries2, rawIndustries3].flatMap((value) => parseMultiValues(value)),
+        );
+        const scenarios = dedupeStrings(
+          [rawScenarios, rawScenarios2, rawScenarios3].flatMap((value) => parseMultiValues(value)),
+        );
         const description = String(rawDescription || '').trim();
 
         const rowHasContent = Boolean(
@@ -678,6 +720,18 @@ export const ProductCapabilities: React.FC = () => {
         }
         if (!type) {
           rowErrors.push(`第 ${rowNo} 行：类型无效，请填写“软件/硬件/咨询/改造施工”。`);
+        }
+        if (industryOptions.length) {
+          const invalidIndustries = industries.filter((item) => !industryOptions.includes(item));
+          if (invalidIndustries.length) {
+            rowErrors.push(`第 ${rowNo} 行：适用行业无效（${invalidIndustries.join('、')}），请从模板下拉选项中选择。`);
+          }
+        }
+        if (scenarioOptions.length) {
+          const invalidScenarios = scenarios.filter((item) => !scenarioOptions.includes(item));
+          if (invalidScenarios.length) {
+            rowErrors.push(`第 ${rowNo} 行：适用场景无效（${invalidScenarios.join('、')}），请从模板下拉选项中选择。`);
+          }
         }
         if (rowErrors.length) {
           errors.push(...rowErrors);

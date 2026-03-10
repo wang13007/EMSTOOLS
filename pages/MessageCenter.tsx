@@ -8,9 +8,9 @@ const formatRelativeTime = (createTime?: string) => {
   const diffMinutes = Math.floor((Date.now() - new Date(createTime).getTime()) / (1000 * 60));
 
   if (diffMinutes < 1) return '刚刚';
-  if (diffMinutes < 60) return `${diffMinutes}分钟前`;
-  if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}小时前`;
-  return `${Math.floor(diffMinutes / 1440)}天前`;
+  if (diffMinutes < 60) return `${diffMinutes} 分钟前`;
+  if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)} 小时前`;
+  return `${Math.floor(diffMinutes / 1440)} 天前`;
 };
 
 export const MessageCenter: React.FC = () => {
@@ -43,24 +43,21 @@ export const MessageCenter: React.FC = () => {
   }, []);
 
   const markAllRead = async () => {
-    for (const msg of messages) {
-      if (!msg.read) {
-        await messageService.markAsRead(msg.id);
-      }
-    }
+    const unread = messages.filter((msg) => !msg.read);
+    await Promise.all(unread.map((msg) => messageService.markAsRead(msg.id)));
     setMessages(messages.map((m) => ({ ...m, read: true })));
   };
 
   const toggleRead = async (id: string) => {
     const message = messages.find((m) => m.id === id);
-    if (!message) return;
+    if (!message || message.read) return;
 
     await messageService.markAsRead(id);
     setMessages(messages.map((m) => (m.id === id ? { ...m, read: true } : m)));
   };
 
   return (
-    <div className="max-w-4xl space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">消息中心</h2>
@@ -93,7 +90,7 @@ export const MessageCenter: React.FC = () => {
                 </div>
                 <p className="text-sm text-slate-600 line-clamp-2">{msg.content}</p>
               </div>
-              {!msg.read && <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>}
+              {!msg.read && <div className="w-2 h-2 bg-blue-600 rounded-full mt-2" />}
             </div>
           ))
         ) : (

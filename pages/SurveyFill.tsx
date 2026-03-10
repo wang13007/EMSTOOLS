@@ -5,6 +5,7 @@ import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { generateEnergyReport } from '../services/geminiService';
 import { buildReportBundle, PreSalesContactInfo } from '../services/reportService';
 import { surveyService, userService } from '../src/services/supabaseService';
+import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -98,6 +99,7 @@ export const SurveyFill: React.FC = () => {
   const [dirty, setDirty] = useState(false);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState('');
+  const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(SURVEY_TEMPLATES), []);
 
   const persistLockRef = useRef(false);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -256,8 +258,8 @@ export const SurveyFill: React.FC = () => {
 
   const template = useMemo(() => {
     if (!form) return null;
-    return SURVEY_TEMPLATES.find((item) => item.id === form.templateId) || SURVEY_TEMPLATES[0];
-  }, [form]);
+    return surveyTemplates.find((item) => item.id === form.templateId) || surveyTemplates[0];
+  }, [form, surveyTemplates]);
 
   const shouldShowSection = (section: any): boolean => {
     if (!section.visibleWhen) return true;
