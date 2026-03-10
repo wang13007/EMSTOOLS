@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ICONS } from '../constants';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { DictItem, DictType, ProductCapability, ProductType } from '../types';
 import { dictService } from '../src/services/supabaseService';
 import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
@@ -156,10 +157,10 @@ const IMPORT_FIELD_ALIASES = {
   industries: ['适用行业', 'industries', 'industry', '行业'],
   scenarios: ['适用场景', 'scenarios', 'scenario', '场景'],
   description: ['详细描述', 'description', 'detailDescription', '描述'],
-  createTime: ['创建时间', 'createTime', 'create_time'],
+  createTime: ['创建时间', '创建时间（导入时无需填写，系统自动生成）', 'createTime', 'create_time'],
 };
 
-const EXCEL_EXPORT_HEADERS = ['ID', '能力名称', '类型', '适用行业', '适用场景', '详细描述', '创建时间'];
+const EXCEL_EXPORT_HEADERS = ['ID', '能力名称', '类型', '适用行业', '适用场景', '详细描述', '创建时间（导入时无需填写，系统自动生成）'];
 
 const getImportCellValue = (row: Record<string, unknown>, aliases: string[]) => {
   for (const alias of aliases) {
@@ -177,20 +178,6 @@ const getImportCellValue = (row: Record<string, unknown>, aliases: string[]) => 
   }
 
   return '';
-};
-
-const parseImportedTime = (value: unknown) => {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString();
-  }
-
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    const unixMs = Math.round((value - 25569) * 86400 * 1000);
-    return new Date(unixMs).toISOString();
-  }
-
-  const text = String(value || '').trim();
-  return text || new Date().toISOString();
 };
 
 const IconEdit = () => (
@@ -544,21 +531,95 @@ export const ProductCapabilities: React.FC = () => {
     setSelectedIds(checked ? products.map((item) => item.id) : []);
   };
 
-  const handleExport = () => {
-    const sheetRows = products.map((item) => [
-      item.id,
-      item.name,
-      item.type,
-      item.industries.join('，'),
-      item.scenarios.join('，'),
-      item.description,
-      item.createTime,
-    ]);
-    const worksheet = XLSX.utils.aoa_to_sheet([EXCEL_EXPORT_HEADERS, ...sheetRows]);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, '产品能力');
+  const handleExport = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('产品能力');
+    const optionsSheet = workbook.addWorksheet('下拉选项');
+
+    worksheet.addRow(EXCEL_EXPORT_HEADERS);
+    products.forEach((item) => {
+      worksheet.addRow([
+        item.id,
+        item.name,
+        item.type,
+        item.industries.join('，'),
+        item.scenarios.join('，'),
+        item.description,
+        item.createTime,
+      ]);
+    });
+
+    worksheet.columns = [
+      { width: 18 },
+      { width: 24 },
+      { width: 16 },
+      { width: 24 },
+      { width: 24 },
+      { width: 36 },
+      { width: 34 },
+    ];
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 24;
+
+    optionsSheet.getCell('A1').value = '类型';
+    capabilityTypeOptions.forEach((item, index) => {
+      optionsSheet.getCell(`A${index + 2}`).value = item;
+    });
+    optionsSheet.getCell('B1').value = '适用行业';
+    industryOptions.forEach((item, index) => {
+      optionsSheet.getCell(`B${index + 2}`).value = item;
+    });
+    optionsSheet.getCell('C1').value = '适用场景';
+    scenarioOptions.forEach((item, index) => {
+      optionsSheet.getCell(`C${index + 2}`).value = item;
+    });
+
+    optionsSheet.state = 'veryHidden';
+
+    const maxDataRows = Math.max(products.length + 100, 300);
+    const typeLastRow = Math.max(capabilityTypeOptions.length + 1, 2);
+    const industryLastRow = Math.max(industryOptions.length + 1, 2);
+    const scenarioLastRow = Math.max(scenarioOptions.length + 1, 2);
+
+    for (let rowIndex = 2; rowIndex <= maxDataRows; rowIndex += 1) {
+      worksheet.getCell(`C${rowIndex}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`'下拉选项'!$A$2:$A$${typeLastRow}`],
+        showErrorMessage: true,
+        errorTitle: '类型无效',
+        error: '请从下拉选项中选择类型。',
+      };
+      worksheet.getCell(`D${rowIndex}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`'下拉选项'!$B$2:$B$${industryLastRow}`],
+        showErrorMessage: true,
+        errorTitle: '适用行业无效',
+        error: '请从下拉选项中选择适用行业。',
+      };
+      worksheet.getCell(`E${rowIndex}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`'下拉选项'!$C$2:$C$${scenarioLastRow}`],
+        showErrorMessage: true,
+        errorTitle: '适用场景无效',
+        error: '请从下拉选项中选择适用场景。',
+      };
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
-    XLSX.writeFile(workbook, `product-capabilities-${stamp}.xlsx`);
+    anchor.href = url;
+    anchor.download = `product-capabilities-${stamp}.xlsx`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleImportClick = () => {
@@ -595,7 +656,6 @@ export const ProductCapabilities: React.FC = () => {
         const rawIndustries = getImportCellValue(row, IMPORT_FIELD_ALIASES.industries);
         const rawScenarios = getImportCellValue(row, IMPORT_FIELD_ALIASES.scenarios);
         const rawDescription = getImportCellValue(row, IMPORT_FIELD_ALIASES.description);
-        const rawCreateTime = getImportCellValue(row, IMPORT_FIELD_ALIASES.createTime);
 
         const name = normalizeLabel(String(rawName || '').trim());
         const type = normalizeImportedType(rawType);
@@ -631,7 +691,7 @@ export const ProductCapabilities: React.FC = () => {
           industries,
           scenarios,
           description,
-          createTime: parseImportedTime(rawCreateTime),
+          createTime: new Date().toISOString(),
         });
       });
 
@@ -907,4 +967,7 @@ export const ProductCapabilities: React.FC = () => {
     </div>
   );
 };
+
+
+
 

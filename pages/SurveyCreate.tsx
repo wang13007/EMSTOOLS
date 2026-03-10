@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ReportStatus, SurveyStatus } from '../types';
 import { INDUSTRIES, REGIONS } from '../constants';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
+import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
 import { roleService, surveyService, userService } from '../src/services/supabaseService';
-import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
+import { applyReportTemplateNameOverrides, applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 
 type UserOption = {
   id: string;
@@ -55,6 +56,11 @@ export const SurveyCreate: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
   const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(SURVEY_TEMPLATES), []);
+  const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(REPORT_TEMPLATES), []);
+  const reportTemplateNameMap = useMemo(
+    () => new Map(reportTemplates.map((item) => [item.id, item.name])),
+    [reportTemplates]
+  );
   const [selectedTemplateId, setSelectedTemplateId] = useState(surveyTemplates[0]?.id || '');
   const navigate = useNavigate();
 
@@ -335,7 +341,7 @@ export const SurveyCreate: React.FC = () => {
           >
             {surveyTemplates.map((template) => (
               <option key={template.id} value={template.id}>
-                {template.name}
+                {template.reportTemplateId ? reportTemplateNameMap.get(template.reportTemplateId) || template.name : template.name}
               </option>
             ))}
           </select>

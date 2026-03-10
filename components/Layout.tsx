@@ -295,7 +295,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
       )}
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0 shadow-sm relative z-0">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm relative z-0">
           <div className="flex items-center gap-4" />
           <div className="flex items-center gap-6">
             <div className="relative" ref={messagePanelRef}>
@@ -381,8 +381,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 scroll-smooth">
-          <div className="max-w-7xl mx-auto">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6 scroll-smooth">
+          <div className="w-full">{children}</div>
         </div>
       </main>
     </div>
