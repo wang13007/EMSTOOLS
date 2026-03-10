@@ -6,16 +6,7 @@ import { DictItem, DictType, ProductCapability, ProductType } from '../types';
 import { dictService } from '../src/services/supabaseService';
 import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
 import Portal from '../src/components/Portal';
-
-type ProductCapabilityRecord = {
-  id: string;
-  name: string;
-  type: ProductType;
-  industries: string[];
-  scenarios: string[];
-  description: string;
-  create_time: string;
-};
+import { getProductCapabilities, saveProductCapabilities } from '../src/services/productCapabilityStore';
 
 type DictionaryTypeLike = Partial<DictType> & {
   type_id?: string;
@@ -338,40 +329,6 @@ const MultiSelectDropdown: React.FC<{
   );
 };
 
-export const productService = {
-  async getProducts(): Promise<ProductCapabilityRecord[]> {
-    return [
-      {
-        id: '1',
-        name: '能效分析平台',
-        type: ProductType.SOFTWARE,
-        industries: ['制造业', '园区'],
-        scenarios: ['能耗分析', '能效诊断'],
-        description: '提供看板分析、异常告警与能效诊断的核心软件平台。',
-        create_time: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        name: '边缘采集网关',
-        type: ProductType.HARDWARE,
-        industries: ['制造业', '商业地产'],
-        scenarios: ['数据采集', '协议转换'],
-        description: '支持常见工业协议接入与边缘侧数据汇聚。',
-        create_time: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        name: '节能改造实施服务',
-        type: ProductType.RETROFIT,
-        industries: ['园区', '制造业'],
-        scenarios: ['系统升级', '节能改造'],
-        description: '面向现场的节能改造交付与实施服务包。',
-        create_time: new Date().toISOString(),
-      },
-    ];
-  },
-};
-
 export const ProductCapabilities: React.FC = () => {
   const [products, setProducts] = useState<ProductCapability[]>([]);
   const [editingIds, setEditingIds] = useState<string[]>([]);
@@ -379,25 +336,19 @@ export const ProductCapabilities: React.FC = () => {
   const [dictCapabilityTypeOptions, setDictCapabilityTypeOptions] = useState<string[]>([]);
   const [dictIndustryOptions, setDictIndustryOptions] = useState<string[]>([]);
   const [dictScenarioOptions, setDictScenarioOptions] = useState<string[]>([]);
+  const [initialized, setInitialized] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      const productList = await productService.getProducts();
-      const formattedProducts: ProductCapability[] = productList.map((product) => ({
-        id: product.id,
-        name: product.name,
-        type: product.type,
-        industries: product.industries,
-        scenarios: product.scenarios,
-        description: product.description,
-        createTime: product.create_time,
-      }));
-      setProducts(formattedProducts);
-    };
-
-    fetchProducts();
+    const storedProducts = getProductCapabilities();
+    setProducts(storedProducts);
+    setInitialized(true);
   }, []);
+
+  useEffect(() => {
+    if (!initialized) return;
+    saveProductCapabilities(products);
+  }, [products, initialized]);
 
   useEffect(() => {
     const loadDictionaryOptions = async () => {

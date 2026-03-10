@@ -108,6 +108,19 @@ const isCapabilityType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
     || name === 'product type';
 };
 
+const isRegionType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
+  const code = normalizeTypeCode(type.typeCode);
+  const name = normalizeTypeName(type.typeName);
+  return code === 'region'
+    || name === '区域信息'
+    || name === 'region'
+    || name === 'region info';
+};
+
+const isPresetProtectedType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
+  return isIndustryType(type) || isRegionType(type) || isCapabilityType(type) || isScenarioType(type);
+};
+
 const mergeDictTypes = (...groups: DictType[][]) => {
   const map = new Map<string, DictType>();
   groups.forEach((types) => {
@@ -434,6 +447,24 @@ export const Dictionaries: React.FC = () => {
     a.click();
   };
 
+  const handleDeleteType = (type: DictType) => {
+    if (isPresetProtectedType(type)) {
+      alert('预置字典类型不可删除。');
+      return;
+    }
+    const confirmed = window.confirm(`确认删除字典类型「${type.typeName}」吗？删除后其下数据项也会一并移除。`);
+    if (!confirmed) return;
+
+    const nextTypes = dictTypes.filter((item) => item.typeId !== type.typeId);
+    const nextItems = dictItems.filter((item) => item.typeId !== type.typeId);
+    setDictTypes(nextTypes);
+    setDictItems(nextItems);
+    setSelectedType((prev) => {
+      if (!prev || prev.typeId !== type.typeId) return prev;
+      return nextTypes[0] || null;
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn">
       <div className="flex justify-between items-end">
@@ -473,9 +504,16 @@ export const Dictionaries: React.FC = () => {
                   className={`p-4 cursor-pointer transition-all flex justify-between items-center group ${selectedType?.typeId === type.typeId ? 'bg-blue-50 border-l-4 border-blue-600' : 'hover:bg-slate-50'}`}
                 >
                   <div>
-                    <p className={`font-bold text-sm ${selectedType?.typeId === type.typeId ? 'text-blue-700' : 'text-slate-700'}`}>
-                      {type.typeName}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className={`font-bold text-sm ${selectedType?.typeId === type.typeId ? 'text-blue-700' : 'text-slate-700'}`}>
+                        {type.typeName}
+                      </p>
+                      {isPresetProtectedType(type) && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-bold uppercase">
+                          预置
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[10px] text-slate-400 font-mono uppercase">{type.typeCode}</p>
                   </div>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -485,6 +523,15 @@ export const Dictionaries: React.FC = () => {
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
+                    {!isPresetProtectedType(type) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteType(type); }}
+                        className="p-1 text-slate-400 hover:text-rose-600"
+                        title="删除字典类型"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

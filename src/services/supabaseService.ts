@@ -5,6 +5,44 @@ const isMissingColumn = (error: any, column: string) => {
   return error?.code === 'PGRST204' && String(error?.message || '').includes(`'${column}'`);
 };
 
+const getMissingColumnName = (error: any): string | null => {
+  if (error?.code !== 'PGRST204') return null;
+  const message = String(error?.message || '');
+  const match = message.match(/'([^']+)'/);
+  return match?.[1] || null;
+};
+
+const formatSupabaseWriteError = (error: any) => {
+  if (!error) return '未知错误';
+  const code = String(error.code || '');
+  const message = String(error.message || '');
+  const details = String(error.details || '');
+  const hint = String(error.hint || '');
+  const combined = `${message} ${details} ${hint}`.toLowerCase();
+
+  if (code === '23505' || combined.includes('duplicate key')) {
+    if (combined.includes('username')) return '用户名已存在，请更换后重试';
+    if (combined.includes('user_name')) return '账号已存在，请更换后重试';
+    if (combined.includes('phone')) return '手机号已存在，请更换后重试';
+    if (combined.includes('email')) return '邮箱已存在，请更换后重试';
+    return '存在重复数据，请检查用户名/账号/手机号/邮箱是否已被使用';
+  }
+
+  if (code === '22P02' || combined.includes('invalid input syntax for type uuid')) {
+    return '用户数据格式错误（UUID字段无效），请刷新页面后重试';
+  }
+
+  if (code === '23514') {
+    return '用户数据未通过约束校验，请检查用户类型、状态或角色配置';
+  }
+
+  if (code === '23502' || combined.includes('null value in column')) {
+    return '存在必填字段为空，请检查用户名、角色等必填信息';
+  }
+
+  return message || details || '创建用户失败，请稍后重试';
+};
+
 const MULTI_ROLE_CACHE_KEY = 'ems_user_role_ids_map';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -298,11 +336,11 @@ export const userService = {
 
   async createUser(user: any) {
     try {
-      console.log('寮€濮嬪垱寤虹敤鎴凤紝鐢ㄦ埛鏁版嵁:', user);
+      console.log('开始创建用户，输入数据:', user);
 
       const { data: roles, error: rolesError } = await supabase.from('roles').select('*');
       if (rolesError) {
-        console.error('鑾峰彇瑙掕壊鍒楄〃澶辫触:', rolesError);
+        console.error('获取角色列表失败:', rolesError);
       }
 
       const userType = normalizeUserType(user.user_type || user.type);
@@ -317,18 +355,18 @@ export const userService = {
       }
 
       if (!roleId) {
-        throw new Error('Unable to determine user role. Please create a role first.');
+        throw new Error('无法确定用户角色，请先在角色管理中配置可用角色');
       }
 
       const roleValidationPassed = await userService.validateUserRoles(null, userType, roleIds);
       if (!roleValidationPassed) {
-        throw new Error(userType === 'internal' ? '鍐呴儴鐢ㄦ埛鍙兘閫夋嫨鍐呴儴瑙掕壊' : '澶栭儴鐢ㄦ埛鍙兘閫夋嫨澶栭儴瑙掕壊');
+        throw new Error(userType === 'internal' ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色');
       }
 
       const baseUser: any = {
-        user_id: user.user_id,
-        user_name: user.user_name || user.username,
-        name: user.user_name || user.name || user.username,
+        user_name: user.username || user.user_name || user.name,
+        name: user.name || user.user_name || user.username,
+        username: user.username || user.user_name,
         password_hash: user.password_hash || user.password,
         role_id: roleId,
         status: user.status || 'enabled',
@@ -336,6 +374,9 @@ export const userService = {
         creator: user.creator || 'system',
         is_deleted: false,
       };
+      if (isUuid(user.user_id)) {
+        baseUser.user_id = user.user_id;
+      }
 
       if (user.phone) baseUser.phone = user.phone;
       if (user.email) baseUser.email = user.email;
@@ -343,38 +384,51 @@ export const userService = {
       const payloads = [
         { ...baseUser, user_type: userType },
         { ...baseUser, type: userType },
+        { ...baseUser },
       ];
 
       let lastError: any = null;
 
       for (const dbUser of payloads) {
-        console.log('澶勭悊鍚庣殑鏁版嵁搴撶敤鎴锋暟鎹?', dbUser);
+        let payload = { ...dbUser };
+        console.log('处理后的数据库用户数据:', payload);
 
-        const { data, error } = await supabase.from('users').insert(dbUser).select().single();
+        while (true) {
+          const { data, error } = await supabase.from('users').insert(payload).select().single();
 
-        if (!error) {
-          const createdUserId = data.user_id || data.id;
-          cacheRoleIdsForUser(createdUserId, roleIds);
-          console.log('鍒涘缓鐢ㄦ埛鎴愬姛:', data);
-          return normalizeUser({ ...data, role_ids: roleIds });
+          if (!error) {
+            const createdUserId = data.user_id || data.id;
+            cacheRoleIdsForUser(createdUserId, roleIds);
+            console.log('创建用户成功:', data);
+            return normalizeUser({ ...data, role_ids: roleIds });
+          }
+
+          lastError = error;
+          const missingColumn = getMissingColumnName(error);
+
+          if (missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+            const nextPayload = { ...payload };
+            delete nextPayload[missingColumn];
+            payload = nextPayload;
+            console.warn(`users表缺少字段 ${missingColumn}，已自动剔除后重试`);
+            continue;
+          }
+
+          if (isMissingColumn(error, 'type') || isMissingColumn(error, 'user_type')) {
+            console.warn('用户类型字段不匹配，自动尝试兼容字段:', error.message);
+          } else {
+            console.error('创建用户失败:', error);
+          }
+          break;
         }
-
-        lastError = error;
-
-        if (isMissingColumn(error, 'type') || isMissingColumn(error, 'user_type')) {
-          console.warn('鐢ㄦ埛绫诲瀷瀛楁涓嶅尮閰嶏紝鑷姩灏濊瘯鍏煎瀛楁:', error.message);
-          continue;
-        }
-
-        console.error('鍒涘缓鐢ㄦ埛澶辫触:', error);
-        return null;
       }
 
-      console.error('鍒涘缓鐢ㄦ埛澶辫触:', lastError);
-      return null;
+      const readableMessage = formatSupabaseWriteError(lastError);
+      console.error('创建用户失败:', lastError);
+      throw new Error(readableMessage);
     } catch (error) {
-      console.error('鍒涘缓鐢ㄦ埛杩囩▼涓彂鐢熷紓甯?', error);
-      return null;
+      console.error('创建用户过程中发生异常:', error);
+      throw error instanceof Error ? error : new Error('创建用户失败，请稍后重试');
     }
   },
 

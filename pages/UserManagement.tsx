@@ -56,13 +56,6 @@ const inferRoleType = (role: any): UserType => {
   return externalKeywords.some((keyword) => source.includes(keyword)) ? UserType.EXTERNAL : UserType.INTERNAL;
 };
 
-const generateUserId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-};
-
 export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [roles, setRoles] = useState<RoleLite[]>([]);
@@ -260,7 +253,6 @@ export const UserManagement: React.FC = () => {
       if (modalMode === 'create') {
         const created = await userService.createUser({
           ...payload,
-          user_id: generateUserId(),
           password_hash: RESET_PASSWORD_DEFAULT,
           status: UserStatus.ENABLED,
         });

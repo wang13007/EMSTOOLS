@@ -3,6 +3,7 @@ import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { SurveyForm } from '../types';
 import { getReportTemplateNameById, getSurveyTemplateNameById } from '../src/services/templateNameStore';
 import { ReportResult } from './geminiService';
+import { getProductCapabilities, matchProductCapabilities, ProductCapabilityMatch } from '../src/services/productCapabilityStore';
 
 export type PreSalesContactInfo = {
   id?: string;
@@ -51,6 +52,7 @@ export type ReportBundle = {
   generatedAt: string;
   aiReport: ReportResult;
   templateReport: TemplateReportResult;
+  capabilityMatches: ProductCapabilityMatch[];
   preSalesContact: PreSalesContactInfo;
 };
 
@@ -83,6 +85,33 @@ const buildValueMap = (surveyForm: SurveyForm) => {
   } as Record<string, unknown>;
 };
 
+const dedupeStrings = (values: string[]) => {
+  return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
+};
+
+const enrichAiReportWithCapabilities = (
+  aiReport: ReportResult,
+  capabilityMatches: ProductCapabilityMatch[],
+): ReportResult => {
+  const matched = capabilityMatches.filter((item) => item.matched);
+  const software = matched.filter((item) => item.type === '软件').map((item) => item.name);
+  const hardware = matched.filter((item) => item.type === '硬件').map((item) => item.name);
+  const consulting = matched.filter((item) => item.type === '咨询').map((item) => item.name);
+  const retrofit = matched.filter((item) => item.type === '改造施工').map((item) => item.name);
+
+  return {
+    ...aiReport,
+    recommendedModules: dedupeStrings([...aiReport.recommendedModules, ...matched.map((item) => item.name)]),
+    softwareRecommendations: dedupeStrings([...aiReport.softwareRecommendations, ...software]),
+    hardwareRecommendations: dedupeStrings([...aiReport.hardwareRecommendations, ...hardware]),
+    consultingRecommendations: dedupeStrings([
+      ...aiReport.consultingRecommendations,
+      ...consulting,
+      ...retrofit.map((name) => `改造施工：${name}`),
+    ]),
+  };
+};
+
 const renderTemplateContent = (content: string, valueMap: Record<string, unknown>) => {
   const placeholderKeys = new Set<string>();
   let matched: RegExpExecArray | null;
@@ -105,7 +134,11 @@ const renderTemplateContent = (content: string, valueMap: Record<string, unknown
   return { renderedContent, placeholders };
 };
 
-const buildTemplateSections = (surveyForm: SurveyForm, aiReport?: ReportResult): TemplateReportSection[] => {
+const buildTemplateSections = (
+  surveyForm: SurveyForm,
+  aiReport?: ReportResult,
+  capabilityMatches: ProductCapabilityMatch[] = [],
+): TemplateReportSection[] => {
   const summary = aiReport?.summary || '基于调研模板字段，系统已完成项目现状梳理。';
   const diagnosis = [
     aiReport?.energyStructureAnalysis,
@@ -122,6 +155,15 @@ const buildTemplateSections = (surveyForm: SurveyForm, aiReport?: ReportResult):
     `硬件建议：${aiReport?.hardwareRecommendations?.join('；') || '未提供'}`,
     `咨询建议：${aiReport?.consultingRecommendations?.join('；') || '未提供'}`,
   ].join('\n');
+  const capabilityMatchSummary = capabilityMatches.length
+    ? [
+        `匹配结果：${capabilityMatches.filter((item) => item.matched).length}/${capabilityMatches.length} 已匹配`,
+        ...capabilityMatches.map(
+          (item, idx) =>
+            `${idx + 1}. ${item.name}（${item.type}）- ${item.matched ? '已匹配' : '待匹配'}；${item.reasons.join('；')}`,
+        ),
+      ].join('\n')
+    : '暂无产品能力数据。';
 
   return [
     {
@@ -141,18 +183,28 @@ const buildTemplateSections = (surveyForm: SurveyForm, aiReport?: ReportResult):
       content: recommendations,
     },
     {
+      title: '产品能力匹配',
+      content: capabilityMatchSummary,
+    },
+    {
       title: '实施路径',
       content: actions,
     },
   ];
 };
 
-const buildTemplateCharts = (surveyForm: SurveyForm, aiReport?: ReportResult): TemplateChartBlock[] => {
+const buildTemplateCharts = (
+  surveyForm: SurveyForm,
+  aiReport?: ReportResult,
+  capabilityMatches: ProductCapabilityMatch[] = [],
+): TemplateChartBlock[] => {
   const rawData = surveyForm?.data && typeof surveyForm.data === 'object' ? surveyForm.data : {};
   const efficiencyScore = aiReport?.efficiencyScore ?? 0;
   const softwareCount = aiReport?.softwareRecommendations?.length ?? 0;
   const hardwareCount = aiReport?.hardwareRecommendations?.length ?? 0;
   const consultingCount = aiReport?.consultingRecommendations?.length ?? 0;
+  const matchedCount = capabilityMatches.filter((item) => item.matched).length;
+  const unmatchedCount = Math.max(0, capabilityMatches.length - matchedCount);
   const annualPower = toNumber((rawData as any).field_016_16 || (rawData as any).annual_power_kwh);
   const annualCost = toNumber((rawData as any).field_017_17 || (rawData as any).annual_cost_wanyuan);
 
@@ -188,6 +240,16 @@ const buildTemplateCharts = (surveyForm: SurveyForm, aiReport?: ReportResult): T
       ],
       summary: annualPower || annualCost ? '图表展示当前项目基线能耗与费用规模' : '模板字段未提供能耗与费用数据，图表值为0',
     },
+    {
+      id: 'capability-match',
+      title: '产品能力匹配统计',
+      type: 'bar',
+      data: [
+        { name: '已匹配', value: matchedCount },
+        { name: '待匹配', value: unmatchedCount },
+      ],
+      summary: capabilityMatches.length ? `已完成 ${matchedCount}/${capabilityMatches.length} 项能力匹配` : '暂无产品能力可匹配',
+    },
   ];
 };
 
@@ -218,7 +280,11 @@ const composeTemplateReportContent = (
   ].join('\n');
 };
 
-const buildFallbackTemplateReport = (surveyForm: SurveyForm, aiReport?: ReportResult): TemplateReportResult => {
+const buildFallbackTemplateReport = (
+  surveyForm: SurveyForm,
+  aiReport?: ReportResult,
+  capabilityMatches: ProductCapabilityMatch[] = [],
+): TemplateReportResult => {
   const surveyTemplate = SURVEY_TEMPLATES.find((item) => item.id === surveyForm.templateId) || SURVEY_TEMPLATES[0];
   const content = `# 模板输出报告（回退）
 
@@ -234,8 +300,8 @@ const buildFallbackTemplateReport = (surveyForm: SurveyForm, aiReport?: ReportRe
     survey_data: surveyForm.data,
   };
   const rendered = renderTemplateContent(content, valueMap);
-  const sections = buildTemplateSections(surveyForm, aiReport);
-  const charts = buildTemplateCharts(surveyForm, aiReport);
+  const sections = buildTemplateSections(surveyForm, aiReport, capabilityMatches);
+  const charts = buildTemplateCharts(surveyForm, aiReport, capabilityMatches);
 
   return {
     templateId: 'fallback-template',
@@ -249,19 +315,24 @@ const buildFallbackTemplateReport = (surveyForm: SurveyForm, aiReport?: ReportRe
   };
 };
 
-export const generateTemplateReport = (surveyForm: SurveyForm, aiReport?: ReportResult): TemplateReportResult => {
+export const generateTemplateReport = (
+  surveyForm: SurveyForm,
+  aiReport?: ReportResult,
+  capabilityMatchesInput?: ProductCapabilityMatch[],
+): TemplateReportResult => {
   const surveyTemplate = SURVEY_TEMPLATES.find((item) => item.id === surveyForm.templateId) || SURVEY_TEMPLATES[0];
   const reportTemplate = surveyTemplate?.reportTemplateId
     ? REPORT_TEMPLATES.find((item) => item.id === surveyTemplate.reportTemplateId)
     : REPORT_TEMPLATES.find((item) => item.surveyTemplateId === surveyTemplate?.id);
+  const capabilityMatches = capabilityMatchesInput || matchProductCapabilities(surveyForm, getProductCapabilities());
 
   if (!surveyTemplate || !reportTemplate) {
-    return buildFallbackTemplateReport(surveyForm, aiReport);
+    return buildFallbackTemplateReport(surveyForm, aiReport, capabilityMatches);
   }
 
   const rendered = renderTemplateContent(reportTemplate.content, buildValueMap(surveyForm));
-  const sections = buildTemplateSections(surveyForm, aiReport);
-  const charts = buildTemplateCharts(surveyForm, aiReport);
+  const sections = buildTemplateSections(surveyForm, aiReport, capabilityMatches);
+  const charts = buildTemplateCharts(surveyForm, aiReport, capabilityMatches);
 
   return {
     templateId: reportTemplate.id,
@@ -280,11 +351,14 @@ export const buildReportBundle = (
   aiReport: ReportResult,
   preSalesContact: PreSalesContactInfo,
 ): ReportBundle => {
+  const capabilityMatches = matchProductCapabilities(surveyForm, getProductCapabilities());
+  const enrichedAiReport = enrichAiReportWithCapabilities(aiReport, capabilityMatches);
   return {
     surveyId: surveyForm.id,
     generatedAt: new Date().toISOString(),
-    aiReport,
-    templateReport: generateTemplateReport(surveyForm, aiReport),
+    aiReport: enrichedAiReport,
+    templateReport: generateTemplateReport(surveyForm, enrichedAiReport, capabilityMatches),
+    capabilityMatches,
     preSalesContact,
   };
 };
