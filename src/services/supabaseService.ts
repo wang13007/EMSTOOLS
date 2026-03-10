@@ -172,7 +172,7 @@ const resolveSurveyUserRefToId = async (value: any): Promise<string | null | und
     .limit(1);
 
   if (error) {
-    console.warn('瑙ｆ瀽璋冪爺琛ㄥ崟鐢ㄦ埛澶栭敭澶辫触:', { candidate, error });
+    console.warn('解析调研表单用户外键失败:', { candidate, error });
     return null;
   }
 
@@ -322,7 +322,7 @@ export const userService = {
 
     const { data, error } = await supabase.from('roles').select('*').in('id', selectedRoleIds);
     if (error || !data) {
-      console.error('鏍￠獙鐢ㄦ埛瑙掕壊澶辫触:', error);
+      console.error('校验用户角色失败:', error);
       return false;
     }
 
@@ -463,7 +463,7 @@ export const userService = {
       if (userType && roleIds.length) {
         const roleValidationPassed = await userService.validateUserRoles(id, userType, roleIds);
         if (!roleValidationPassed) {
-          throw new Error(userType === 'internal' ? '鍐呴儴鐢ㄦ埛鍙兘閫夋嫨鍐呴儴瑙掕壊' : '澶栭儴鐢ㄦ埛鍙兘閫夋嫨澶栭儴瑙掕壊');
+          throw new Error(userType === 'internal' ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色');
         }
       }
       const payloads: any[] = userType
@@ -471,7 +471,7 @@ export const userService = {
         : [{ ...baseUser }];
 
       for (const dbUser of payloads) {
-        console.log('澶勭悊鍚庣殑鏁版嵁搴撶敤鎴锋暟鎹?', dbUser);
+        console.log('处理后的数据库用户数据:', dbUser);
 
         const primary = await supabase.from('users').update(dbUser).eq('user_id', id).select().single();
         if (!primary.error) {
@@ -493,18 +493,18 @@ export const userService = {
           isMissingColumn(fallback.error, 'type') ||
           isMissingColumn(fallback.error, 'user_type')
         ) {
-          console.warn('鏇存柊鐢ㄦ埛绫诲瀷瀛楁涓嶅尮閰嶏紝鑷姩灏濊瘯鍏煎瀛楁');
+          console.warn('更新用户类型字段不匹配，自动尝试兼容字段');
           continue;
         }
 
-        console.error('鏇存柊鐢ㄦ埛澶辫触:', fallback.error || primary.error);
+        console.error('更新用户失败:', fallback.error || primary.error);
         return null;
       }
 
-      console.error('鏇存柊鐢ㄦ埛澶辫触: 鏃犳硶鍖归厤 users 琛ㄧ殑绫诲瀷瀛楁(type/user_type)');
+      console.error('更新用户失败: 无法匹配 users 表的类型字段(type/user_type)');
       return null;
     } catch (error) {
-      console.error('鏇存柊鐢ㄦ埛杩囩▼涓彂鐢熷紓甯?', error);
+      console.error('更新用户过程中发生异常:', error);
       return null;
     }
   },
@@ -515,14 +515,14 @@ export const userService = {
       if (error) {
         const { error: fallbackError } = await supabase.from('users').delete().eq('id', id);
         if (fallbackError) {
-          console.error('鍒犻櫎鐢ㄦ埛澶辫触:', fallbackError);
+          console.error('删除用户失败:', fallbackError);
           return false;
         }
       }
       removeCachedRoleIdsForUser(id);
       return true;
     } catch (error) {
-      console.error('鍒犻櫎鐢ㄦ埛杩囩▼涓彂鐢熷紓甯?', error);
+      console.error('删除用户过程中发生异常:', error);
       return false;
     }
   },
@@ -548,7 +548,7 @@ export const surveyService = {
 
       const allSharedErrored = sharedResults.length > 0 && sharedResults.every((result) => result.error);
       if (directResult.error && allSharedErrored) {
-        console.error('鑾峰彇澶栭儴鐢ㄦ埛琛ㄥ崟鍒楄〃澶辫触:', directResult.error, ...sharedResults.map((r) => r.error));
+        console.error('获取外部用户表单列表失败:', directResult.error, ...sharedResults.map((r) => r.error));
         return [];
       }
 
@@ -564,7 +564,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').select('*');
     if (error) {
-      console.error('鑾峰彇琛ㄥ崟鍒楄〃澶辫触:', error);
+      console.error('获取表单列表失败:', error);
       return [];
     }
     return (data || []).map(normalizeSurveyRow);
@@ -573,7 +573,7 @@ export const surveyService = {
   async getSurveyById(id: string) {
     const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
     if (error) {
-      console.error('鑾峰彇琛ㄥ崟璇︽儏澶辫触:', error);
+      console.error('获取表单详情失败:', error);
       return null;
     }
     const externalUser = isExternalLocalUser();
@@ -581,7 +581,7 @@ export const surveyService = {
       ? dedupeStringArray([externalUser.id, ...(Array.isArray((externalUser as any).ids) ? (externalUser as any).ids : [])])
       : [];
     if (externalUserIds.length && !canExternalAccessSurvey(data, externalUserIds)) {
-      console.warn('澶栭儴鐢ㄦ埛鏃犳潈闄愯闂琛ㄥ崟:', { surveyId: id, userIds: externalUserIds });
+      console.warn('外部用户无权限访问该表单:', { surveyId: id, userIds: externalUserIds });
       return null;
     }
     return normalizeSurveyRow(data);
@@ -598,7 +598,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
     if (error || !data) {
-      console.error('鎺堟潈閾炬帴鑾峰彇琛ㄥ崟澶辫触:', error);
+      console.error('授权链接获取表单失败:', error);
       return null;
     }
 
@@ -607,7 +607,7 @@ export const surveyService = {
     }
 
     if (!isExternalLinkEnabled(data)) {
-      console.warn('琛ㄥ崟鏈紑鍚閮ㄦ巿鏉冮摼鎺ヨ闂?', { surveyId: id, userIds: externalUserIds });
+      console.warn('表单未开启外部授权链接访问:', { surveyId: id, userIds: externalUserIds });
       return null;
     }
 
@@ -629,7 +629,7 @@ export const surveyService = {
       .single();
 
     if (updateError) {
-      console.error('鎺堟潈閾炬帴缁戝畾澶栭儴鐢ㄦ埛澶辫触:', updateError);
+      console.error('授权链接绑定外部用户失败:', updateError);
       return null;
     }
 
@@ -655,7 +655,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').insert(dbSurvey).select().single();
     if (error) {
-      console.error('鍒涘缓琛ㄥ崟澶辫触:', error);
+      console.error('创建表单失败:', error);
       return null;
     }
     return normalizeSurveyRow(data);
@@ -666,7 +666,7 @@ export const surveyService = {
     if (externalUser?.id) {
       const target = await surveyService.getSurveyById(id);
       if (!target) {
-        console.warn('澶栭儴鐢ㄦ埛鏇存柊琛ㄥ崟琚嫤鎴?', { surveyId: id, userId: externalUser.id });
+        console.warn('外部用户更新表单被拦截:', { surveyId: id, userId: externalUser.id });
         return null;
       }
     }
@@ -697,7 +697,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').update(dbSurvey).eq('id', id).select().single();
     if (error) {
-      console.error('鏇存柊琛ㄥ崟澶辫触:', error);
+      console.error('更新表单失败:', error);
       return null;
     }
     return normalizeSurveyRow(data);
@@ -708,14 +708,14 @@ export const surveyService = {
     if (externalUser?.id) {
       const target = await surveyService.getSurveyById(id);
       if (!target) {
-        console.warn('澶栭儴鐢ㄦ埛鍒犻櫎琛ㄥ崟琚嫤鎴?', { surveyId: id, userId: externalUser.id });
+        console.warn('外部用户删除表单被拦截:', { surveyId: id, userId: externalUser.id });
         return false;
       }
     }
 
     const { error } = await supabase.from('survey_forms').delete().eq('id', id);
     if (error) {
-      console.error('鍒犻櫎琛ㄥ崟澶辫触:', error);
+      console.error('删除表单失败:', error);
       return false;
     }
     return true;
@@ -726,7 +726,7 @@ export const templateService = {
   async getTemplates() {
     const { data, error } = await supabase.from('survey_templates').select('*');
     if (error) {
-      console.error('鑾峰彇妯℃澘鍒楄〃澶辫触:', error);
+      console.error('获取模板列表失败:', error);
       return [];
     }
     return data;
@@ -735,7 +735,7 @@ export const templateService = {
   async createTemplate(template: Omit<SurveyTemplate, 'id' | 'create_time'>) {
     const { data, error } = await supabase.from('survey_templates').insert(template).select().single();
     if (error) {
-      console.error('鍒涘缓妯℃澘澶辫触:', error);
+      console.error('创建模板失败:', error);
       return null;
     }
     return data;
@@ -746,7 +746,7 @@ export const dictService = {
   async getDictTypes() {
     const { data, error } = await supabase.from('dict_types').select('*');
     if (error) {
-      console.error('鑾峰彇瀛楀吀绫诲瀷鍒楄〃澶辫触:', error);
+      console.error('获取字典类型列表失败:', error);
       return [];
     }
     return data;
@@ -755,7 +755,7 @@ export const dictService = {
   async getDictItems(typeId: string) {
     const { data, error } = await supabase.from('dict_items').select('*').eq('type_id', typeId);
     if (error) {
-      console.error('鑾峰彇瀛楀吀椤瑰垪琛ㄥけ璐?', error);
+      console.error('获取字典项列表失败:', error);
       return [];
     }
     return data;
@@ -766,7 +766,7 @@ export const logService = {
   async createLog(log: Omit<SystemLog, 'id' | 'create_time'>) {
     const { data, error } = await supabase.from('system_logs').insert(log).select().single();
     if (error) {
-      console.error('鍒涘缓鏃ュ織澶辫触:', error);
+      console.error('创建日志失败:', error);
       return null;
     }
     return data;
@@ -775,7 +775,7 @@ export const logService = {
   async getLogs() {
     const { data, error } = await supabase.from('system_logs').select('*').order('create_time', { ascending: false });
     if (error) {
-      console.error('鑾峰彇鏃ュ織鍒楄〃澶辫触:', error);
+      console.error('获取日志列表失败:', error);
       return [];
     }
     return data;
@@ -824,7 +824,7 @@ const queryMessagesByTargetUser = async (userId: string, limit?: number) => {
 
   const { data, error } = await query;
   if (error) {
-    console.error('鎸夌敤鎴锋煡璇㈡秷鎭け璐?', error);
+    console.error('按用户查询消息失败:', error);
     return [];
   }
   return data || [];
@@ -844,7 +844,7 @@ const queryMessagesByTargetRoles = async (roleIds: string[], limit?: number) => 
 
   const { data, error } = await query;
   if (error) {
-    console.error('鎸夎鑹叉煡璇㈡秷鎭け璐?', error);
+    console.error('按角色查询消息失败:', error);
     return [];
   }
   return data || [];
@@ -864,7 +864,7 @@ const queryBroadcastMessages = async (limit?: number) => {
 
   const { data, error } = await query;
   if (error) {
-    console.error('鏌ヨ骞挎挱娑堟伅澶辫触:', error);
+    console.error('查询广播消息失败:', error);
     return [];
   }
   return data || [];
@@ -908,7 +908,7 @@ export const messageService = {
   async markAsRead(id: string) {
     const { data, error } = await supabase.from('messages').update({ read: true }).eq('id', id).select().single();
     if (error) {
-      console.error('鏍囪娑堟伅宸茶澶辫触:', error);
+      console.error('标记消息已读失败:', error);
       return null;
     }
     return data;
@@ -919,7 +919,7 @@ export const roleService = {
   async getRoles() {
     const { data, error } = await supabase.from('roles').select('*');
     if (error) {
-      console.error('鑾峰彇瑙掕壊鍒楄〃澶辫触:', error);
+      console.error('获取角色列表失败:', error);
       return [];
     }
     return (data || []).map(normalizeRole);
@@ -928,7 +928,7 @@ export const roleService = {
   async createRole(role: any) {
     const { data, error } = await supabase.from('roles').insert(role).select().single();
     if (error) {
-      console.error('鍒涘缓瑙掕壊澶辫触:', error);
+      console.error('创建角色失败:', error);
       return null;
     }
     return data;
@@ -937,7 +937,7 @@ export const roleService = {
   async updateRole(id: string, role: any) {
     const { data, error } = await supabase.from('roles').update(role).eq('id', id).select().single();
     if (error) {
-      console.error('鏇存柊瑙掕壊澶辫触:', error);
+      console.error('更新角色失败:', error);
       return null;
     }
     return data;
@@ -952,7 +952,7 @@ export const roleService = {
     }
     const { error } = await supabase.from('roles').delete().eq('id', id);
     if (error) {
-      console.error('鍒犻櫎瑙掕壊澶辫触:', error);
+      console.error('删除角色失败:', error);
       return false;
     }
     return true;
