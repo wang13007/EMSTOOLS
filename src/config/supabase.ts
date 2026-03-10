@@ -14,26 +14,6 @@ if (!import.meta.env.VITE_SUPABASE_ANON_KEY && !import.meta.env.VITE_SUPABASE_SE
   console.warn('[supabase] Missing env key, using built-in service role fallback key.');
 }
 
-const detectSupabaseRole = (jwt: string) => {
-  try {
-    const payload = jwt.split('.')[1];
-    if (!payload) return 'unknown';
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const json = atob(normalized);
-    const parsed = JSON.parse(json);
-    return parsed?.role || 'unknown';
-  } catch {
-    return 'unknown';
-  }
-};
-
-if (import.meta.env.DEV) {
-  console.info('[supabase] client initialized:', {
-    url: supabaseUrl,
-    keyRole: detectSupabaseRole(supabaseKey),
-  });
-}
-
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default supabase;

@@ -102,7 +102,7 @@ export const UserManagement: React.FC = () => {
       const type = (u.user_type || u.type || UserType.EXTERNAL) as UserType;
       const roleIds = Array.isArray(u.role_ids) ? u.role_ids : u.role_id ? [u.role_id] : [];
       return {
-        id: u.user_id || u.id,
+        id: u.id || u.user_id,
         user_id: u.user_id,
         user_name: u.user_name || u.user_realname || u.username,
         username: u.username,

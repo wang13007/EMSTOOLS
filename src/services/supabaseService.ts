@@ -365,6 +365,7 @@ export const userService = {
         username: user.username || user.user_name,
         password_hash: user.password_hash || user.password,
         role_id: roleId,
+        role_ids: roleIds,
         status: user.status || 'enabled',
         create_time: new Date().toISOString(),
         creator: user.creator || 'system',
@@ -448,6 +449,7 @@ export const userService = {
       }
       if (roleIds.length) {
         baseUser.role_id = roleIds[0];
+        baseUser.role_ids = roleIds;
       }
       if (user.last_login_time) {
         baseUser.last_login_time = user.last_login_time;
@@ -465,32 +467,49 @@ export const userService = {
         : [{ ...baseUser }];
 
       for (const dbUser of payloads) {
-        const primary = await supabase.from('users').update(dbUser).eq('user_id', id).select().single();
-        if (!primary.error) {
-          const updatedUserId = primary.data?.user_id || primary.data?.id;
-          if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
-          return normalizeUser({ ...primary.data, role_ids: roleIds.length ? roleIds : undefined });
+        let payload = { ...dbUser };
+
+        while (true) {
+          const primary = await supabase.from('users').update(payload).eq('user_id', id).select().single();
+          if (!primary.error) {
+            const updatedUserId = primary.data?.user_id || primary.data?.id;
+            if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
+            return normalizeUser({ ...primary.data, role_ids: roleIds.length ? roleIds : undefined });
+          }
+
+          const fallback = await supabase.from('users').update(payload).eq('id', id).select().single();
+          if (!fallback.error) {
+            const updatedUserId = fallback.data?.user_id || fallback.data?.id;
+            if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
+            return normalizeUser({ ...fallback.data, role_ids: roleIds.length ? roleIds : undefined });
+          }
+
+          const missingColumn = getMissingColumnName(primary.error) || getMissingColumnName(fallback.error);
+          if (missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
+            const nextPayload = { ...payload };
+            delete nextPayload[missingColumn];
+            payload = nextPayload;
+            console.warn(`users表缺少字段 ${missingColumn}，已自动剔除后重试`);
+            continue;
+          }
+
+          if (
+            isMissingColumn(primary.error, 'type') ||
+            isMissingColumn(primary.error, 'user_type') ||
+            isMissingColumn(fallback.error, 'type') ||
+            isMissingColumn(fallback.error, 'user_type')
+          ) {
+            console.warn('更新用户类型字段不匹配，自动尝试兼容字段');
+            break;
+          }
+
+          console.error('更新用户失败:', fallback.error || primary.error);
+          return null;
         }
 
-        const fallback = await supabase.from('users').update(dbUser).eq('id', id).select().single();
-        if (!fallback.error) {
-          const updatedUserId = fallback.data?.user_id || fallback.data?.id;
-          if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
-          return normalizeUser({ ...fallback.data, role_ids: roleIds.length ? roleIds : undefined });
-        }
-
-        if (
-          isMissingColumn(primary.error, 'type') ||
-          isMissingColumn(primary.error, 'user_type') ||
-          isMissingColumn(fallback.error, 'type') ||
-          isMissingColumn(fallback.error, 'user_type')
-        ) {
-          console.warn('更新用户类型字段不匹配，自动尝试兼容字段');
+        if (!Object.prototype.hasOwnProperty.call(payload, 'type') && !Object.prototype.hasOwnProperty.call(payload, 'user_type')) {
           continue;
         }
-
-        console.error('更新用户失败:', fallback.error || primary.error);
-        return null;
       }
 
       console.error('更新用户失败: 无法匹配 users 表的类型字段(type/user_type)');
