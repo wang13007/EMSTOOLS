@@ -351,7 +351,7 @@ export const UserManagement: React.FC = () => {
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">手机号</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">邮箱</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">状态</th>
-              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">操作</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-left">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -380,7 +380,7 @@ export const UserManagement: React.FC = () => {
                         {u.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right space-x-3">
+                    <td className="px-6 py-4 text-left space-x-3">
                       <button onClick={() => openEditModal(u)} className="text-blue-600 font-bold text-sm hover:underline">编辑</button>
                       <button onClick={() => handleResetPassword(u)} className="text-amber-600 font-bold text-sm hover:underline">重置密码</button>
                       <button

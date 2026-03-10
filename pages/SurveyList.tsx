@@ -140,6 +140,20 @@ export const SurveyList: React.FC = () => {
     }
   };
 
+  const toggleSort = (nextSortBy: SortBy) => {
+    if (sortBy === nextSortBy) {
+      setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+      return;
+    }
+    setSortBy(nextSortBy);
+    setSortOrder('desc');
+  };
+
+  const getSortIndicator = (target: SortBy) => {
+    if (sortBy !== target) return '↕';
+    return sortOrder === 'desc' ? '↓' : '↑';
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn">
       <div className="flex justify-between items-end gap-4">
@@ -175,24 +189,6 @@ export const SurveyList: React.FC = () => {
             <option value={SurveyStatus.COMPLETED}>{SurveyStatus.COMPLETED}</option>
           </select>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="createTime">按创建时间</option>
-            <option value="submitTime">按提交时间</option>
-          </select>
-
-          <select
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="desc">从近到远</option>
-            <option value="asc">从远到近</option>
-          </select>
-
           <Link
             to="/surveys/new"
             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95"
@@ -216,8 +212,26 @@ export const SurveyList: React.FC = () => {
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">提交人</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">状态</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">报告</th>
-              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">创建时间</th>
-              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">提交时间</th>
+              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => toggleSort('createTime')}
+                  className="inline-flex items-center gap-1 hover:text-blue-600"
+                >
+                  创建时间
+                  <span className="text-xs">{getSortIndicator('createTime')}</span>
+                </button>
+              </th>
+              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => toggleSort('submitTime')}
+                  className="inline-flex items-center gap-1 hover:text-blue-600"
+                >
+                  提交时间
+                  <span className="text-xs">{getSortIndicator('submitTime')}</span>
+                </button>
+              </th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">操作</th>
             </tr>
           </thead>

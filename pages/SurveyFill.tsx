@@ -329,6 +329,37 @@ export const SurveyFill: React.FC = () => {
     navigate('/customer-survey/list');
   };
 
+  const handleCopyExternalLink = async () => {
+    if (!form) return;
+    try {
+      const nextData = {
+        ...(form.data || {}),
+        external_link_enabled: true,
+      };
+
+      if (!form.data?.external_link_enabled) {
+        const updated = await surveyService.updateSurvey(form.id, {
+          data: nextData,
+          status: form.status,
+          report_status: form.reportStatus,
+        });
+
+        if (updated) {
+          const mapped = toSurveyForm(updated);
+          setForm(mapped);
+          syncLocalSurvey(mapped);
+        }
+      }
+
+      const link = `${window.location.origin}${window.location.pathname}#/authorized/surveys/fill/${form.id}`;
+      await navigator.clipboard.writeText(link);
+      alert('外链填写地址已复制，外部客户可通过该链接继续填写。');
+    } catch (error) {
+      console.error('复制外链失败:', error);
+      alert('复制失败，请稍后重试');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!form) return;
     setSubmitting(true);
@@ -416,6 +447,13 @@ export const SurveyFill: React.FC = () => {
                 className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
               >
                 返回列表
+              </button>
+              <button
+                onClick={handleCopyExternalLink}
+                disabled={submitting}
+                className="px-6 py-2 border border-blue-200 rounded-xl font-bold text-blue-600 hover:bg-blue-50 transition-all bg-white"
+              >
+                复制外链填写地址
               </button>
               {!isCompleted && (
                 <>

@@ -4,6 +4,7 @@ import { ReportStatus, SurveyStatus } from '../types';
 import { INDUSTRIES, REGIONS } from '../constants';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { roleService, surveyService, userService } from '../src/services/supabaseService';
+import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 
 type UserOption = {
   id: string;
@@ -53,12 +54,13 @@ export const SurveyCreate: React.FC = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
-  const [selectedTemplateId, setSelectedTemplateId] = useState(SURVEY_TEMPLATES[0]?.id || '');
+  const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(SURVEY_TEMPLATES), []);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(surveyTemplates[0]?.id || '');
   const navigate = useNavigate();
 
   const selectedTemplate = useMemo(
-    () => SURVEY_TEMPLATES.find((template) => template.id === selectedTemplateId) || SURVEY_TEMPLATES[0],
-    [selectedTemplateId]
+    () => surveyTemplates.find((template) => template.id === selectedTemplateId) || surveyTemplates[0],
+    [selectedTemplateId, surveyTemplates]
   );
 
   const canSubmit = useMemo(() => {
@@ -331,7 +333,7 @@ export const SurveyCreate: React.FC = () => {
             onChange={(e) => setSelectedTemplateId(e.target.value)}
             className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            {SURVEY_TEMPLATES.map((template) => (
+            {surveyTemplates.map((template) => (
               <option key={template.id} value={template.id}>
                 {template.name}
               </option>

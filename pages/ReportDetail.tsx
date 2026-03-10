@@ -1,6 +1,19 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { SurveyForm } from '../types';
 import { ReportResult } from '../services/geminiService';
 import { buildReportBundle, ReportBundle } from '../services/reportService';
@@ -24,16 +37,6 @@ const getContactDisplay = (bundle: ReportBundle) => {
   };
 };
 
-const downloadTextFile = (filename: string, content: string) => {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-};
-
 const formatDate = (iso?: string) => {
   if (!iso) return '-';
   try {
@@ -49,6 +52,8 @@ export const ReportDetail: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<{ survey: SurveyForm; report: ReportBundle } | null>(null);
   const [activeType, setActiveType] = useState<ActiveReportType>(() => getInitialReportType(location.search));
+  const [exporting, setExporting] = useState(false);
+  const exportRootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setActiveType(getInitialReportType(location.search));
@@ -73,16 +78,42 @@ export const ReportDetail: React.FC = () => {
         return;
       }
 
-      const reportBundle: ReportBundle = rawStored.aiReport && rawStored.templateReport
-        ? (rawStored as ReportBundle)
-        : buildReportBundle(survey, rawStored as ReportResult, {
-            id: survey.preSalesResponsible,
-            name: '售前负责人',
-          });
+      let reportBundle: ReportBundle;
+      let shouldPersist = false;
+
+      if (rawStored.aiReport && rawStored.templateReport) {
+        const stored = rawStored as ReportBundle;
+        const hasCompleteTemplate = Array.isArray((stored as any)?.templateReport?.sections) && Array.isArray((stored as any)?.templateReport?.charts);
+
+        if (hasCompleteTemplate) {
+          reportBundle = stored;
+        } else {
+          const rebuilt = buildReportBundle(
+            survey,
+            stored.aiReport,
+            stored.preSalesContact || {
+              id: survey.preSalesResponsible,
+              name: '售前负责人',
+            },
+          );
+          reportBundle = {
+            ...rebuilt,
+            generatedAt: stored.generatedAt || rebuilt.generatedAt,
+            preSalesContact: stored.preSalesContact || rebuilt.preSalesContact,
+          };
+          shouldPersist = true;
+        }
+      } else {
+        reportBundle = buildReportBundle(survey, rawStored as ReportResult, {
+          id: survey.preSalesResponsible,
+          name: '售前负责人',
+        });
+        shouldPersist = true;
+      }
 
       setData({ survey, report: reportBundle });
 
-      if (!(rawStored.aiReport && rawStored.templateReport)) {
+      if (shouldPersist) {
         reports[id || ''] = reportBundle;
         localStorage.setItem('ems_reports', JSON.stringify(reports));
       }
@@ -138,77 +169,64 @@ export const ReportDetail: React.FC = () => {
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}${window.location.pathname}#/reports/${id}?type=${activeType}`;
-    const title = `${data.survey.projectName} - ${reportTypeLabel}`;
-    const text = `${title}\n售前专家：${contact.name} / ${contact.phone}`;
-
     try {
-      if (navigator.share) {
-        await navigator.share({ title, text, url: shareUrl });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        alert('分享链接已复制到剪贴板');
-      }
+      await navigator.clipboard.writeText(shareUrl);
+      alert('报告链接已复制到剪贴板');
     } catch {
-      // user cancelled share
+      window.prompt('复制失败，请手动复制以下链接', shareUrl);
     }
   };
 
-  const handleExport = () => {
-    const safeProjectName = (data.survey.projectName || 'report').replace(/[\\/:*?"<>|]/g, '_');
-    const safeTemplateLabel = templateReportLabel.replace(/[\\/:*?"<>|]/g, '_');
-    const filename = `${safeProjectName}-${activeType === 'ai' ? 'AI诊断' : safeTemplateLabel}报告.txt`;
-
-    const header = [
-      `项目名称: ${data.survey.projectName}`,
-      `客户名称: ${data.survey.customerName}`,
-      `报告类型: ${reportTypeLabel}`,
-      `生成时间: ${formatDate(data.report.generatedAt)}`,
-      `售前专家: ${contact.name}`,
-      `联系电话: ${contact.phone}`,
-      `邮箱: ${contact.email}`,
-      '',
-    ].join('\n');
-
-    if (activeType === 'ai') {
-      const ai = data.report.aiReport;
-      const body = [
-        '=== AI诊断报告 ===',
-        `能效成熟度: ${ai.efficiencyScore}%`,
-        `执行摘要: ${ai.summary}`,
-        `能源结构分析: ${ai.energyStructureAnalysis}`,
-        `节能潜力: ${ai.savingPotential}`,
-        `关键差距: ${ai.keyGaps.join('；')}`,
-        `软件建议: ${ai.softwareRecommendations.join('；')}`,
-        `硬件建议: ${ai.hardwareRecommendations.join('；')}`,
-        `咨询建议: ${ai.consultingRecommendations.join('；')}`,
-        `预计投入: ${ai.estimatedCostRange}`,
-        `ROI分析: ${ai.roiAnalysis}`,
-        `后续建议: ${ai.nextSteps.join('；')}`,
-      ].join('\n');
-      downloadTextFile(filename, `${header}${body}`);
+  const handleExport = async () => {
+    const target = exportRootRef.current;
+    if (!target) {
+      alert('导出失败：未找到报告内容');
       return;
     }
 
-    const template = data.report.templateReport;
-    const placeholders = template.placeholders
-      .map((item) => `{{${item.key}}}: ${item.value}`)
-      .join('\n');
+    setExporting(true);
+    try {
+      const safeProjectName = (data.survey.projectName || 'report').replace(/[\\/:*?"<>|]/g, '_');
+      const safeTemplateLabel = templateReportLabel.replace(/[\\/:*?"<>|]/g, '_');
+      const fileBaseName = `${safeProjectName}-${activeType === 'ai' ? 'AI诊断' : safeTemplateLabel}报告`;
 
-    const body = [
-      `=== 模板输出报告 (${template.templateName}) ===`,
-      `关联调研模板: ${template.surveyTemplateName}`,
-      '',
-      template.renderedContent,
-      '',
-      '=== 占位符映射 ===',
-      placeholders,
-    ].join('\n');
+      const canvas = await html2canvas(target, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
 
-    downloadTextFile(filename, `${header}${body}`);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`${fileBaseName}.pdf`);
+    } catch (error) {
+      console.error('导出PDF失败:', error);
+      alert('导出PDF失败，请重试');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
-    <div className="space-y-8 animate-fadeIn pb-20">
+    <div ref={exportRootRef} className="space-y-8 animate-fadeIn pb-20">
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -228,16 +246,17 @@ export const ReportDetail: React.FC = () => {
             onClick={handleShare}
             className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all active:scale-95"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
-            分享{reportTypeLabel}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 12h16M12 4l8 8-8 8"/></svg>
+            复制链接
           </button>
           <button
             type="button"
             onClick={handleExport}
-            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+            disabled={exporting}
+            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold shadow-xl hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-70"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            导出{reportTypeLabel}
+            {exporting ? '导出中...' : `导出${reportTypeLabel}PDF`}
           </button>
         </div>
       </div>
@@ -370,8 +389,50 @@ export const ReportDetail: React.FC = () => {
             <h3 className="text-lg font-bold text-slate-900">模板信息</h3>
             <div className="mt-3 text-sm text-slate-700 space-y-1">
               <p>报告模板：{data.report.templateReport.templateName}</p>
+              <p>报告模板ID：{data.report.templateReport.templateId}</p>
               <p>调研模板：{data.report.templateReport.surveyTemplateName}</p>
+              <p>调研模板ID：{data.report.templateReport.surveyTemplateId}</p>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {(data.report.templateReport.sections || []).map((section) => (
+              <section key={section.title} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-3">{section.title}</h3>
+                <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-6">{section.content}</pre>
+              </section>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {(data.report.templateReport.charts || []).map((chart) => (
+              <section key={chart.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-lg font-bold text-slate-900 mb-1">{chart.title}</h3>
+                <p className="text-sm text-slate-500 mb-3">{chart.summary}</p>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {chart.type === 'pie' ? (
+                      <PieChart>
+                        <Pie data={chart.data} dataKey="value" nameKey="name" outerRadius={80}>
+                          {chart.data.map((entry, idx) => (
+                            <Cell key={`${entry.name}-${idx}`} fill={idx % 2 === 0 ? '#2563eb' : '#93c5fd'} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    ) : (
+                      <BarChart data={chart.data}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
+                        <Tooltip />
+                        <Bar dataKey="value" fill="#2563eb" radius={[8, 8, 0, 0]} />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            ))}
           </div>
 
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">

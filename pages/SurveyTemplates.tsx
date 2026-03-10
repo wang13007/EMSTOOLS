@@ -4,6 +4,11 @@ import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { SurveyField, SurveyTemplate } from '../types';
 import Portal from '../src/components/Portal';
+import {
+  applyReportTemplateNameOverrides,
+  applySurveyTemplateNameOverrides,
+  setSurveyTemplateNameById,
+} from '../src/services/templateNameStore';
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: '文本',
@@ -11,10 +16,6 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   select: '单选',
   multiselect: '多选',
   textarea: '长文本',
-};
-
-const getReportTemplateMap = () => {
-  return new Map(REPORT_TEMPLATES.map((item) => [item.id, item]));
 };
 
 const buildAllCheckedPreviewData = (template: SurveyTemplate) => {
@@ -61,14 +62,34 @@ const getVisibleSectionsWithAllOptionsChecked = (template: SurveyTemplate) => {
 };
 
 export const SurveyTemplates: React.FC = () => {
-  const [selectedTemplate, setSelectedTemplate] = useState<SurveyTemplate | null>(null);
-  const templates = SURVEY_TEMPLATES;
-  const reportTemplateMap = useMemo(getReportTemplateMap, []);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const templates = useMemo(() => applySurveyTemplateNameOverrides(SURVEY_TEMPLATES), [refreshKey]);
+  const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(REPORT_TEMPLATES), [refreshKey]);
+  const reportTemplateMap = useMemo(() => new Map(reportTemplates.map((item) => [item.id, item])), [reportTemplates]);
+
+  const selectedTemplate = useMemo(
+    () => templates.find((item) => item.id === selectedTemplateId) || null,
+    [templates, selectedTemplateId]
+  );
 
   const expandedSections = useMemo(() => {
     if (!selectedTemplate) return [];
     return getVisibleSectionsWithAllOptionsChecked(selectedTemplate);
   }, [selectedTemplate]);
+
+  const handleRenameTemplate = (template: SurveyTemplate) => {
+    const nextName = window.prompt('请输入新的调研模板名称', template.name);
+    if (!nextName) return;
+    const normalized = nextName.trim();
+    if (!normalized) {
+      alert('模板名称不能为空');
+      return;
+    }
+    setSurveyTemplateNameById(template.id, normalized);
+    setRefreshKey((prev) => prev + 1);
+  };
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -91,7 +112,7 @@ export const SurveyTemplates: React.FC = () => {
             <button
               key={tpl.id}
               type="button"
-              onClick={() => setSelectedTemplate(tpl)}
+              onClick={() => setSelectedTemplateId(tpl.id)}
               className="text-left bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group overflow-hidden"
             >
               <div className="p-6">
@@ -104,7 +125,8 @@ export const SurveyTemplates: React.FC = () => {
                   </span>
                 </div>
 
-                <h3 className="text-lg font-bold text-slate-900 mb-2">{tpl.name}</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">{tpl.name}</h3>
+                <p className="text-xs text-slate-400 mb-2">模板ID：{tpl.id}</p>
                 <p className="text-sm text-slate-500 mb-3">
                   包含 {tpl.sections.length} 个章节，共 {fieldCount} 个字段。
                 </p>
@@ -130,19 +152,29 @@ export const SurveyTemplates: React.FC = () => {
               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">{selectedTemplate.name}</h3>
+                  <p className="text-xs text-slate-500 mt-1">模板ID：{selectedTemplate.id}</p>
                   <p className="text-xs text-slate-500 mt-1">
                     已按“所有选项勾选”展开显示，共 {expandedSections.length} 个章节，
                     {expandedSections.reduce((acc, section) => acc + section.fields.length, 0)} 个字段；关联报告模板：
                     {selectedTemplate.reportTemplateId ? reportTemplateMap.get(selectedTemplate.reportTemplateId)?.name || '未关联' : '未关联'}
                   </p>
                 </div>
-                <button
-                  onClick={() => setSelectedTemplate(null)}
-                  className="p-2 hover:bg-slate-200 rounded-full transition-colors"
-                  aria-label="关闭模板详情"
-                >
-                  <ICONS.Plus className="w-6 h-6 rotate-45 text-slate-400" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRenameTemplate(selectedTemplate)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100"
+                  >
+                    修改名称
+                  </button>
+                  <button
+                    onClick={() => setSelectedTemplateId(null)}
+                    className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                    aria-label="关闭模板详情"
+                  >
+                    <ICONS.Plus className="w-6 h-6 rotate-45 text-slate-400" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
