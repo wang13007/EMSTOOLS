@@ -65,15 +65,6 @@ export const SurveyTemplates: React.FC = () => {
   const templates = SURVEY_TEMPLATES;
   const reportTemplateMap = useMemo(getReportTemplateMap, []);
 
-  const summary = useMemo(() => {
-    const totalSections = templates.reduce((acc, tpl) => acc + tpl.sections.length, 0);
-    const totalFields = templates.reduce(
-      (acc, tpl) => acc + tpl.sections.reduce((sectionAcc, section) => sectionAcc + section.fields.length, 0),
-      0
-    );
-    return { totalSections, totalFields };
-  }, [templates]);
-
   const expandedSections = useMemo(() => {
     if (!selectedTemplate) return [];
     return getVisibleSectionsWithAllOptionsChecked(selectedTemplate);
@@ -130,10 +121,6 @@ export const SurveyTemplates: React.FC = () => {
             </button>
           );
         })}
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 text-sm text-slate-600">
-        当前模板总计 {summary.totalSections} 个章节，{summary.totalFields} 个字段。
       </div>
 
       {selectedTemplate && (

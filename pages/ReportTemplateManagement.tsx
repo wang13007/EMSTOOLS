@@ -13,11 +13,6 @@ export const ReportTemplateManagement: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const surveyTemplateMap = useMemo(getSurveyTemplateMap, []);
 
-  const summary = useMemo(() => {
-    const totalSections = REPORT_TEMPLATES.reduce((acc, item) => acc + item.sections.length, 0);
-    return { totalSections };
-  }, []);
-
   const placeholderList = useMemo(() => {
     if (!selectedTemplate) return [] as Array<{ sectionTitle: string; fieldLabel: string; fieldId: string }>;
     const linkedSurveyTemplate = surveyTemplateMap.get(selectedTemplate.surveyTemplateId);
@@ -79,10 +74,6 @@ export const ReportTemplateManagement: React.FC = () => {
             </button>
           );
         })}
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 text-sm text-slate-600">
-        当前模板总计 {summary.totalSections} 个章节。
       </div>
 
       {selectedTemplate && (
