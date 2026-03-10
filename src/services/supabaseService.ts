@@ -6,10 +6,13 @@ const isMissingColumn = (error: any, column: string) => {
 };
 
 const MULTI_ROLE_CACHE_KEY = 'ems_user_role_ids_map';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const dedupeStringArray = (values: Array<string | undefined | null>) => {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 };
+
+const isUuid = (value: string | null | undefined) => Boolean(value && UUID_REGEX.test(value));
 
 const normalizeUserType = (value: any): 'internal' | 'external' => {
   return value === 'internal' ? 'internal' : 'external';
@@ -96,6 +99,27 @@ const normalizeSurveyRow = (survey: any) => {
   };
 };
 
+const resolveSurveyUserRefToId = async (value: any): Promise<string | null | undefined> => {
+  if (typeof value === 'undefined') return undefined;
+  if (value === null || value === '') return null;
+
+  const candidate = String(value).trim();
+  if (!isUuid(candidate)) return null;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id,user_id')
+    .or(`id.eq.${candidate},user_id.eq.${candidate}`)
+    .limit(1);
+
+  if (error) {
+    console.warn('解析调研表单用户外键失败:', { candidate, error });
+    return null;
+  }
+
+  return data?.[0]?.id || null;
+};
+
 const getLocalUserContext = () => {
   if (!canUseLocalStorage()) return null;
   try {
@@ -174,7 +198,7 @@ const removeCachedRoleIdsForUser = (userId: string | undefined) => {
 };
 
 const resolveRoleIds = (user: any) => {
-  const userId = user.user_id || user.id;
+  const userId = user.id || user.user_id;
   const roleIdsFromRow = Array.isArray(user.role_ids)
     ? dedupeStringArray(user.role_ids)
     : dedupeStringArray([user.role_id]);
@@ -191,7 +215,7 @@ const normalizeUser = (user: any) => {
   const userType = normalizeUserType(user.user_type || user.type);
   const roleIds = resolveRoleIds(user);
   return {
-    id: user.user_id || user.id,
+    id: user.id || user.user_id,
     user_id: user.user_id,
     user_name: user.user_realname || user.user_name || user.username,
     name: user.user_realname || user.user_name || user.username,
@@ -530,6 +554,15 @@ export const surveyService = {
     };
     delete dbSurvey.reportStatus;
 
+    const [creatorId, submitterId, preSalesResponsibleId] = await Promise.all([
+      resolveSurveyUserRefToId(dbSurvey.creator_id),
+      resolveSurveyUserRefToId(dbSurvey.submitter_id),
+      resolveSurveyUserRefToId(dbSurvey.pre_sales_responsible_id),
+    ]);
+    dbSurvey.creator_id = creatorId ?? null;
+    dbSurvey.submitter_id = submitterId ?? null;
+    dbSurvey.pre_sales_responsible_id = preSalesResponsibleId ?? null;
+
     const { data, error } = await supabase.from('survey_forms').insert(dbSurvey).select().single();
     if (error) {
       console.error('创建表单失败:', error);
@@ -562,6 +595,15 @@ export const surveyService = {
     delete dbSurvey.customerName;
     delete dbSurvey.projectName;
     delete dbSurvey.preSalesResponsibleId;
+
+    const [creatorId, submitterId, preSalesResponsibleId] = await Promise.all([
+      resolveSurveyUserRefToId(dbSurvey.creator_id),
+      resolveSurveyUserRefToId(dbSurvey.submitter_id),
+      resolveSurveyUserRefToId(dbSurvey.pre_sales_responsible_id),
+    ]);
+    if (typeof creatorId !== 'undefined') dbSurvey.creator_id = creatorId;
+    if (typeof submitterId !== 'undefined') dbSurvey.submitter_id = submitterId;
+    if (typeof preSalesResponsibleId !== 'undefined') dbSurvey.pre_sales_responsible_id = preSalesResponsibleId;
 
     const { data, error } = await supabase.from('survey_forms').update(dbSurvey).eq('id', id).select().single();
     if (error) {
