@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
+import { ICONS } from '../constants';
+import Portal from '../src/components/Portal';
 
 type ReportTemplate = {
   id: string;
@@ -15,7 +17,7 @@ const REPORT_TEMPLATES: ReportTemplate[] = [
     id: 'report-template-standard',
     name: '标准能效评估模板',
     version: 'v1.0',
-    description: '用于常规制造/园区项目，覆盖现状分析、节能潜力、改造建议。',
+    description: '用于常规制造业与园区项目，覆盖现状分析、节能潜力、改造建议与投资回报评估。',
     sections: ['项目概况', '能耗结构分析', '关键问题识别', '实施建议', '投资回报评估'],
     content: `# 标准能效评估模板
 
@@ -81,63 +83,109 @@ const REPORT_TEMPLATES: ReportTemplate[] = [
 ];
 
 export const ReportTemplateManagement: React.FC = () => {
-  const [activeTemplateId, setActiveTemplateId] = useState(REPORT_TEMPLATES[0].id);
+  const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
 
-  const activeTemplate = useMemo(
-    () => REPORT_TEMPLATES.find((item) => item.id === activeTemplateId) || REPORT_TEMPLATES[0],
-    [activeTemplateId]
-  );
+  const summary = useMemo(() => {
+    const totalSections = REPORT_TEMPLATES.reduce((acc, item) => acc + item.sections.length, 0);
+    return { totalSections };
+  }, []);
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="rounded-2xl bg-gradient-to-r from-slate-50 via-white to-blue-50 p-5 border border-slate-200/80">
-        <h2 className="text-2xl font-bold text-slate-900">报告模板管理</h2>
-        <p className="text-slate-500 mt-1">当前页面为只读模式，仅支持查看模板内容。</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
-          {REPORT_TEMPLATES.map((template) => {
-            const active = template.id === activeTemplate.id;
-            return (
-              <button
-                key={template.id}
-                type="button"
-                onClick={() => setActiveTemplateId(template.id)}
-                className={`w-full text-left p-4 rounded-xl border transition-colors ${
-                  active ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <p className={`text-sm font-bold ${active ? 'text-blue-700' : 'text-slate-800'}`}>{template.name}</p>
-                <p className="text-xs text-slate-500 mt-1">{template.version}</p>
-              </button>
-            );
-          })}
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">报告模板管理</h2>
+          <p className="text-slate-500">模板内容为只读展示，可用于报告生成时选择。</p>
         </div>
-
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">{activeTemplate.name}</h3>
-            <p className="text-sm text-slate-500 mt-1">{activeTemplate.description}</p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {activeTemplate.sections.map((section) => (
-              <span key={section} className="px-2 py-1 text-xs rounded bg-slate-100 text-slate-600">
-                {section}
-              </span>
-            ))}
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs text-slate-500 mb-2">模板正文（只读）</p>
-            <pre className="text-sm text-slate-700 whitespace-pre-wrap leading-6">{activeTemplate.content}</pre>
-          </div>
-
-          <p className="text-xs text-slate-400">最近更新：{activeTemplate.updatedAt}</p>
+        <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-semibold">
+          预置模板: {REPORT_TEMPLATES.length} 个
         </div>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {REPORT_TEMPLATES.map((tpl) => (
+          <button
+            key={tpl.id}
+            type="button"
+            onClick={() => setSelectedTemplate(tpl)}
+            className="text-left bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-200 transition-all group overflow-hidden"
+          >
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                  <ICONS.Report className="w-6 h-6" />
+                </div>
+                <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded text-[10px] font-bold uppercase tracking-wider">
+                  只读
+                </span>
+              </div>
+
+              <h3 className="text-lg font-bold text-slate-900 mb-1">{tpl.name}</h3>
+              <p className="text-xs text-slate-400 mb-2">版本 {tpl.version}</p>
+              <p className="text-sm text-slate-500 mb-4">{tpl.description}</p>
+
+              <div className="flex items-center justify-between pt-4 border-t border-slate-50">
+                <span className="text-[10px] text-slate-400 font-medium">更新于 {tpl.updatedAt}</span>
+                <span className="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold">查看模板</span>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 text-sm text-slate-600">
+        当前模板总计 {summary.totalSections} 个章节。
+      </div>
+
+      {selectedTemplate && (
+        <Portal>
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-slideUp">
+              <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">{selectedTemplate.name}</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    版本 {selectedTemplate.version}，共 {selectedTemplate.sections.length} 个章节
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedTemplate(null)}
+                  className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+                  aria-label="关闭模板详情"
+                >
+                  <ICONS.Plus className="w-6 h-6 rotate-45 text-slate-400" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <h4 className="font-bold text-slate-900 mb-3">模板说明</h4>
+                  <p className="text-sm text-slate-600 leading-6">{selectedTemplate.description}</p>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                  <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <h4 className="font-bold text-slate-900">章节结构</h4>
+                    <span className="text-xs text-slate-500">章节数: {selectedTemplate.sections.length}</span>
+                  </div>
+                  <div className="px-6 py-4 flex flex-wrap gap-2">
+                    {selectedTemplate.sections.map((section) => (
+                      <span key={section} className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs">
+                        {section}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <h4 className="font-bold text-slate-900 mb-3">模板正文（只读）</h4>
+                  <pre className="text-xs leading-6 text-slate-700 whitespace-pre-wrap">{selectedTemplate.content}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      )}
     </div>
   );
 };
-

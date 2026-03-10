@@ -21,9 +21,7 @@ const SidebarItem = ({ to, icon: Icon, label, isActive, isExpanded, onClick }: {
     <div
       onClick={onClick}
       className={`flex items-center justify-between px-4 py-2.5 rounded-lg cursor-pointer transition-all duration-200 group ${
-        isActive
-          ? 'bg-blue-600 text-white shadow-md'
-          : 'text-slate-600 hover:bg-slate-100'
+        isActive ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'
       }`}
     >
       <div className="flex items-center gap-3">
@@ -76,10 +74,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
   const [openMenus, setOpenMenus] = useState<string[]>(['survey', 'product', 'settings']);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [messagePanelOpen, setMessagePanelOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [recentMessages, setRecentMessages] = useState<HeaderMessagePreview[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [messageLoading, setMessageLoading] = useState(false);
   const messagePanelRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const formatRelativeTime = (time?: string) => {
     if (!time) return '刚刚';
@@ -185,23 +185,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
   }, [refreshMessageSummary, currentUser?.role_id, currentUser?.role]);
 
   useEffect(() => {
-    if (!messagePanelOpen) return;
+    if (!messagePanelOpen && !userMenuOpen) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (!messagePanelRef.current) return;
-      if (!messagePanelRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (messagePanelRef.current && !messagePanelRef.current.contains(target)) {
         setMessagePanelOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setUserMenuOpen(false);
       }
     };
 
     window.addEventListener('mousedown', handleClickOutside);
     return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [messagePanelOpen]);
+  }, [messagePanelOpen, userMenuOpen]);
 
   const handleMessageIconClick = () => {
     setMessagePanelOpen((prev) => {
       const next = !prev;
       if (next) {
+        setUserMenuOpen(false);
         void refreshMessageSummary();
       }
       return next;
@@ -218,15 +222,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
     localStorage.removeItem('ems_token');
     setCurrentUser(null);
     setMessagePanelOpen(false);
+    setUserMenuOpen(false);
     setRecentMessages([]);
     setUnreadCount(0);
     navigate('/login');
   };
 
   const toggleMenu = (menu: string) => {
-    setOpenMenus((prev) =>
-      prev.includes(menu) ? prev.filter((m) => m !== menu) : [...prev, menu]
-    );
+    setOpenMenus((prev) => (prev.includes(menu) ? prev.filter((m) => m !== menu) : [...prev, menu]));
   };
 
   const isMenuOpen = (menu: string) => openMenus.includes(menu);
@@ -252,20 +255,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
           </div>
 
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-hide">
-            <SidebarItem
-              to="/"
-              icon={ICONS.Dashboard}
-              label="售前综合看板"
-              isActive={location.pathname === '/'}
-            />
+            <SidebarItem to="/" icon={ICONS.Dashboard} label="售前综合看板" isActive={location.pathname === '/'} />
 
             <div className="pt-2">
-              <SidebarItem
-                label="客户调研管理"
-                icon={ICONS.Form}
-                isExpanded={isMenuOpen('survey')}
-                onClick={() => toggleMenu('survey')}
-              />
+              <SidebarItem label="客户调研管理" icon={ICONS.Form} isExpanded={isMenuOpen('survey')} onClick={() => toggleMenu('survey')} />
               {isMenuOpen('survey') && (
                 <div className="mt-1 space-y-1 animate-fadeIn">
                   <SubItem to="/customer-survey/list" label="调研表单列表" />
@@ -275,12 +268,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
             </div>
 
             <div className="pt-2">
-              <SidebarItem
-                label="产品方案管理"
-                icon={ICONS.Report}
-                isExpanded={isMenuOpen('product')}
-                onClick={() => toggleMenu('product')}
-              />
+              <SidebarItem label="产品方案管理" icon={ICONS.Report} isExpanded={isMenuOpen('product')} onClick={() => toggleMenu('product')} />
               {isMenuOpen('product') && (
                 <div className="mt-1 space-y-1 animate-fadeIn">
                   <SubItem to="/product-solution/capabilities" label="产品能力维护" />
@@ -290,12 +278,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
             </div>
 
             <div className="pt-2">
-              <SidebarItem
-                label="系统设置"
-                icon={ICONS.Settings}
-                isExpanded={isMenuOpen('settings')}
-                onClick={() => toggleMenu('settings')}
-              />
+              <SidebarItem label="系统设置" icon={ICONS.Settings} isExpanded={isMenuOpen('settings')} onClick={() => toggleMenu('settings')} />
               {isMenuOpen('settings') && (
                 <div className="mt-1 space-y-1 animate-fadeIn">
                   <SubItem to="/settings/users" label="用户管理" />
@@ -308,18 +291,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
               )}
             </div>
           </nav>
-
-          <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-2 py-2 text-xs text-red-600 font-medium hover:bg-red-50 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              退出登录
-            </button>
-          </div>
         </aside>
       )}
 
@@ -349,11 +320,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
                       <p className="text-sm font-bold text-slate-900">{getDisplayName(currentUser)}</p>
                       <p className="text-xs text-slate-500">未读消息 {unreadCount} 条</p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleGoToMessageCenter}
-                      className="text-xs font-semibold text-blue-600 hover:underline"
-                    >
+                    <button type="button" onClick={handleGoToMessageCenter} className="text-xs font-semibold text-blue-600 hover:underline">
                       查看全部
                     </button>
                   </div>
@@ -363,16 +330,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
                       <p className="text-xs text-slate-400 py-4 text-center">消息加载中...</p>
                     ) : recentMessages.length > 0 ? (
                       recentMessages.map((message) => (
-                        <button
-                          key={message.id}
-                          type="button"
-                          onClick={handleGoToMessageCenter}
-                          className="w-full text-left p-2 rounded-lg hover:bg-slate-50"
-                        >
+                        <button key={message.id} type="button" onClick={handleGoToMessageCenter} className="w-full text-left p-2 rounded-lg hover:bg-slate-50">
                           <div className="flex items-start justify-between gap-3">
-                            <p className={`text-sm truncate ${message.read ? 'text-slate-600' : 'text-slate-900 font-semibold'}`}>
-                              {message.title}
-                            </p>
+                            <p className={`text-sm truncate ${message.read ? 'text-slate-600' : 'text-slate-900 font-semibold'}`}>{message.title}</p>
                             <span className="text-[10px] text-slate-400 shrink-0">{message.time}</span>
                           </div>
                         </button>
@@ -387,29 +347,42 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
 
             <div className="h-8 w-px bg-slate-200" />
 
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-slate-900">{getDisplayName(currentUser)}</p>
-                <p className="text-[10px] text-slate-400">{roleText}</p>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-blue-600 shadow-inner">
-                {avatarText}
-              </div>
+            <div className="relative" ref={userMenuRef}>
               <button
                 type="button"
-                onClick={handleLogout}
-                className="hidden sm:inline text-xs font-semibold text-rose-600 hover:text-rose-700"
+                onClick={() => {
+                  setUserMenuOpen((prev) => !prev);
+                  setMessagePanelOpen(false);
+                }}
+                className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-slate-50 transition-colors"
+                aria-label="用户菜单"
               >
-                退出
+                <div className="text-right hidden sm:block">
+                  <p className="text-xs font-bold text-slate-900">{getDisplayName(currentUser)}</p>
+                  <p className="text-[10px] text-slate-400">{roleText}</p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-blue-600 shadow-inner">
+                  {avatarText}
+                </div>
               </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 mt-2 w-40 rounded-xl border border-slate-200 bg-white shadow-xl p-2 z-20">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                  >
+                    退出登录
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-8 scroll-smooth">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
+          <div className="max-w-7xl mx-auto">{children}</div>
         </div>
       </main>
     </div>
