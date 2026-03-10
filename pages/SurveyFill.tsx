@@ -3,7 +3,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { generateEnergyReport } from '../services/geminiService';
-import { surveyService } from '../src/services/supabaseService';
+import { buildReportBundle, PreSalesContactInfo } from '../services/reportService';
+import { surveyService, userService } from '../src/services/supabaseService';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -15,6 +16,33 @@ const getCurrentUserId = () => {
     return parsed?.id || '';
   } catch {
     return '';
+  }
+};
+
+const resolvePreSalesContact = async (preSalesResponsibleId?: string): Promise<PreSalesContactInfo> => {
+  if (!preSalesResponsibleId) {
+    return { name: '未配置售前负责人' };
+  }
+
+  try {
+    const users = await userService.getUsers();
+    const target = (users || []).find(
+      (user: any) => user.id === preSalesResponsibleId || user.user_id === preSalesResponsibleId
+    );
+
+    if (!target) {
+      return { id: preSalesResponsibleId, name: '未匹配售前负责人' };
+    }
+
+    return {
+      id: target.id || target.user_id,
+      name: target.user_name || target.name || target.username || '售前负责人',
+      username: target.username,
+      phone: target.phone,
+      email: target.email,
+    };
+  } catch {
+    return { id: preSalesResponsibleId, name: '售前负责人' };
   }
 };
 
@@ -312,7 +340,7 @@ export const SurveyFill: React.FC = () => {
         }
       }
 
-      const report = await generateEnergyReport(form);
+      const aiReport = await generateEnergyReport(form);
       const currentUserId = getCurrentUserId();
 
       const updated = await surveyService.updateSurvey(form.id, {
@@ -333,8 +361,11 @@ export const SurveyFill: React.FC = () => {
       setLastSavedAt(new Date().toISOString());
       setAutoSaveState('saved');
 
+      const preSalesContact = await resolvePreSalesContact(form.preSalesResponsible);
+      const reportBundle = buildReportBundle(mapped, aiReport, preSalesContact);
+
       const reports = JSON.parse(localStorage.getItem('ems_reports') || '{}');
-      reports[form.id] = report;
+      reports[form.id] = reportBundle;
       localStorage.setItem('ems_reports', JSON.stringify(reports));
 
       navigate(`/reports/${form.id}`);

@@ -1,16 +1,16 @@
-import { ReportTemplate } from '../types';
+﻿import { ReportTemplate } from '../types';
 
 export const REPORT_TEMPLATES: ReportTemplate[] = [
   {
     id: 'report-template-standard',
-    name: '标准能效评估模板',
+    name: '千丁EMS能源诊断标准报告模板',
     version: 'v1.0',
     description: '用于常规制造业与园区项目，覆盖现状分析、节能潜力、改造建议与投资回报评估。',
     sections: ['项目概况', '能耗结构分析', '关键问题识别', '实施建议', '投资回报评估'],
-    content: `# 标准能效评估模板
+    content: `# 千丁EMS能源诊断标准报告模板
 
 ## 1. 项目概况
-- 项目名称：{{field_002_2}}
+- 项目名称：{{project_name}}
 - 客户名称：{{client_name}}
 - 项目区域：{{field_003_3}}
 - 详细地址：{{field_004_4}}
@@ -41,11 +41,11 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
   },
   {
     id: 'report-template-advanced',
-    name: '高级诊断模板',
+    name: 'SGS节能诊断报告模板',
     version: 'v1.0',
     description: '用于重点客户深度诊断，增加分阶段落地路径与风险控制。',
     sections: ['诊断范围', '深度分析', '阶段性改造路线', '风险与保障', '实施计划'],
-    content: `# 高级诊断模板
+    content: `# SGS节能诊断报告模板
 
 ## 1. 诊断范围
 - 报告编号：{{report_no}}
@@ -74,7 +74,7 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
 ## 5. 实施计划
 - 诊断开始日期：{{diagnosis_start_date}}
 - 诊断结束日期：{{diagnosis_end_date}}
-- AI 结论：{{ai_generated_final_conclusion}}`,
+- AI结论：{{ai_generated_final_conclusion}}`,
     updatedAt: '2026-03-10',
     surveyTemplateId: 'tpl-sgs-diagnosis-001',
   },
