@@ -1,5 +1,5 @@
 import supabase from '../config/supabase';
-import { SurveyForm, SurveyTemplate, SystemLog } from '../../types';
+import { ReportStatus, SurveyForm, SurveyStatus, SurveyTemplate, SystemLog } from '../../types';
 
 const isMissingColumn = (error: any, column: string) => {
   return error?.code === 'PGRST204' && String(error?.message || '').includes(`'${column}'`);
@@ -28,6 +28,72 @@ const inferRoleType = (role: any): 'internal' | 'external' => {
 
 const canUseLocalStorage = () => {
   return typeof window !== 'undefined' && !!window.localStorage;
+};
+
+const CJK_SURVEY_STATUS = {
+  draft: '\u8349\u7A3F',
+  filling: '\u586B\u5199\u4E2D',
+  completed: '\u5DF2\u5B8C\u6210',
+} as const;
+
+const CJK_REPORT_STATUS = {
+  pending: '\u672A\u751F\u6210',
+  generated: '\u5DF2\u751F\u6210',
+} as const;
+
+const toDbSurveyStatus = (value: any): 'draft' | 'in_progress' | 'completed' => {
+  const raw = String(value ?? '').trim();
+  const lower = raw.toLowerCase();
+
+  if (lower === 'in_progress' || raw === CJK_SURVEY_STATUS.filling || raw === SurveyStatus.FILLING) {
+    return 'in_progress';
+  }
+  if (lower === 'completed' || raw === CJK_SURVEY_STATUS.completed || raw === SurveyStatus.COMPLETED) {
+    return 'completed';
+  }
+  return 'draft';
+};
+
+const toDbReportStatus = (value: any): 'pending' | 'generated' => {
+  const raw = String(value ?? '').trim();
+  const lower = raw.toLowerCase();
+
+  if (lower === 'generated' || raw === CJK_REPORT_STATUS.generated || raw === ReportStatus.GENERATED) {
+    return 'generated';
+  }
+  return 'pending';
+};
+
+const toClientSurveyStatus = (value: any): SurveyStatus => {
+  const raw = String(value ?? '').trim();
+  const lower = raw.toLowerCase();
+
+  if (lower === 'in_progress' || raw === CJK_SURVEY_STATUS.filling) {
+    return SurveyStatus.FILLING;
+  }
+  if (lower === 'completed' || raw === CJK_SURVEY_STATUS.completed) {
+    return SurveyStatus.COMPLETED;
+  }
+  return SurveyStatus.DRAFT;
+};
+
+const toClientReportStatus = (value: any): ReportStatus => {
+  const raw = String(value ?? '').trim();
+  const lower = raw.toLowerCase();
+
+  if (lower === 'generated' || raw === CJK_REPORT_STATUS.generated) {
+    return ReportStatus.GENERATED;
+  }
+  return ReportStatus.NOT_GENERATED;
+};
+
+const normalizeSurveyRow = (survey: any) => {
+  if (!survey || typeof survey !== 'object') return survey;
+  return {
+    ...survey,
+    status: toClientSurveyStatus(survey.status),
+    report_status: toClientReportStatus(survey.report_status),
+  };
 };
 
 const getLocalUserContext = () => {
@@ -385,7 +451,7 @@ export const surveyService = {
         if (!canExternalAccessSurvey(survey, externalUser.id)) return;
         merged.set(survey.id, survey);
       });
-      return Array.from(merged.values());
+      return Array.from(merged.values()).map(normalizeSurveyRow);
     }
 
     const { data, error } = await supabase.from('survey_forms').select('*');
@@ -393,7 +459,7 @@ export const surveyService = {
       console.error('获取表单列表失败:', error);
       return [];
     }
-    return data;
+    return (data || []).map(normalizeSurveyRow);
   },
 
   async getSurveyById(id: string) {
@@ -407,7 +473,7 @@ export const surveyService = {
       console.warn('外部用户无权限访问该表单:', { surveyId: id, userId: externalUser.id });
       return null;
     }
-    return data;
+    return normalizeSurveyRow(data);
   },
 
   async grantExternalAccessByAuthorizedLink(id: string) {
@@ -423,7 +489,7 @@ export const surveyService = {
     }
 
     if (canExternalAccessSurvey(data, externalUser.id)) {
-      return data;
+      return normalizeSurveyRow(data);
     }
 
     if (!isExternalLinkEnabled(data)) {
@@ -453,16 +519,23 @@ export const surveyService = {
       return null;
     }
 
-    return updated;
+    return normalizeSurveyRow(updated);
   },
 
   async createSurvey(survey: Omit<SurveyForm, 'id' | 'create_time'>) {
-    const { data, error } = await supabase.from('survey_forms').insert(survey).select().single();
+    const dbSurvey: any = {
+      ...survey,
+      status: toDbSurveyStatus((survey as any).status),
+      report_status: toDbReportStatus((survey as any).reportStatus || (survey as any).report_status),
+    };
+    delete dbSurvey.reportStatus;
+
+    const { data, error } = await supabase.from('survey_forms').insert(dbSurvey).select().single();
     if (error) {
       console.error('创建表单失败:', error);
       return null;
     }
-    return data;
+    return normalizeSurveyRow(data);
   },
 
   async updateSurvey(id: string, survey: any) {
@@ -477,11 +550,13 @@ export const surveyService = {
 
     const dbSurvey = {
       ...survey,
+      status: toDbSurveyStatus(survey.status),
       report_status: survey.reportStatus || survey.report_status,
       customer_name: survey.customerName || survey.customer_name,
       project_name: survey.projectName || survey.project_name,
       pre_sales_responsible_id: survey.preSalesResponsibleId || survey.pre_sales_responsible_id,
     };
+    dbSurvey.report_status = toDbReportStatus(dbSurvey.report_status);
 
     delete dbSurvey.reportStatus;
     delete dbSurvey.customerName;
@@ -493,7 +568,7 @@ export const surveyService = {
       console.error('更新表单失败:', error);
       return null;
     }
-    return data;
+    return normalizeSurveyRow(data);
   },
 
   async deleteSurvey(id: string) {
