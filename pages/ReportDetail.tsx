@@ -20,7 +20,6 @@ const getContactDisplay = (bundle: ReportBundle) => {
     name: contact.name || '未配置售前负责人',
     phone: contact.phone || '未提供',
     email: contact.email || '未提供',
-    username: contact.username || '-',
     id: contact.id || '-',
   };
 };
@@ -134,12 +133,13 @@ export const ReportDetail: React.FC = () => {
   }
 
   const contact = getContactDisplay(data.report);
-  const reportTypeLabel = activeType === 'ai' ? 'AI诊断报告' : '模板输出报告';
+  const templateReportLabel = data.report.templateReport.templateName || '模板输出报告';
+  const reportTypeLabel = activeType === 'ai' ? 'AI诊断报告' : templateReportLabel;
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}${window.location.pathname}#/reports/${id}?type=${activeType}`;
     const title = `${data.survey.projectName} - ${reportTypeLabel}`;
-    const text = `${title}\n售前对接：${contact.name} / ${contact.phone}`;
+    const text = `${title}\n售前专家：${contact.name} / ${contact.phone}`;
 
     try {
       if (navigator.share) {
@@ -155,14 +155,15 @@ export const ReportDetail: React.FC = () => {
 
   const handleExport = () => {
     const safeProjectName = (data.survey.projectName || 'report').replace(/[\\/:*?"<>|]/g, '_');
-    const filename = `${safeProjectName}-${activeType === 'ai' ? 'AI诊断' : '模板输出'}报告.txt`;
+    const safeTemplateLabel = templateReportLabel.replace(/[\\/:*?"<>|]/g, '_');
+    const filename = `${safeProjectName}-${activeType === 'ai' ? 'AI诊断' : safeTemplateLabel}报告.txt`;
 
     const header = [
       `项目名称: ${data.survey.projectName}`,
       `客户名称: ${data.survey.customerName}`,
       `报告类型: ${reportTypeLabel}`,
       `生成时间: ${formatDate(data.report.generatedAt)}`,
-      `售前对接: ${contact.name}`,
+      `售前专家: ${contact.name}`,
       `联系电话: ${contact.phone}`,
       `邮箱: ${contact.email}`,
       '',
@@ -242,8 +243,8 @@ export const ReportDetail: React.FC = () => {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">售前对接信息</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+        <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">您的售前专家</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div>
             <p className="text-slate-400">姓名</p>
             <p className="font-semibold text-slate-800">{contact.name}</p>
@@ -255,10 +256,6 @@ export const ReportDetail: React.FC = () => {
           <div>
             <p className="text-slate-400">邮箱</p>
             <p className="font-semibold text-slate-800">{contact.email}</p>
-          </div>
-          <div>
-            <p className="text-slate-400">账号</p>
-            <p className="font-semibold text-slate-800">{contact.username}</p>
           </div>
         </div>
       </div>
@@ -280,7 +277,7 @@ export const ReportDetail: React.FC = () => {
             activeType === 'template' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          模板输出报告
+          {templateReportLabel}
         </button>
       </div>
 

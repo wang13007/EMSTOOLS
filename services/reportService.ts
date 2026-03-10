@@ -1,4 +1,4 @@
-import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
+﻿import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { SurveyForm } from '../types';
 import { ReportResult } from './geminiService';
@@ -80,7 +80,15 @@ const renderTemplateContent = (content: string, valueMap: Record<string, unknown
 
 const buildFallbackTemplateReport = (surveyForm: SurveyForm): TemplateReportResult => {
   const surveyTemplate = SURVEY_TEMPLATES.find((item) => item.id === surveyForm.templateId) || SURVEY_TEMPLATES[0];
-  const content = `# 模板输出报告（回退）\n\n项目名称：{{project_name}}\n客户名称：{{client_name}}\n行业：{{industry}}\n区域：{{region}}\n\n调研原始数据：\n{{survey_data}}`;
+  const content = `# 模板输出报告（回退）
+
+项目名称：{{project_name}}
+客户名称：{{client_name}}
+行业：{{industry}}
+区域：{{region}}
+
+调研原始数据：
+{{survey_data}}`;
   const valueMap = {
     ...buildValueMap(surveyForm),
     survey_data: surveyForm.data,

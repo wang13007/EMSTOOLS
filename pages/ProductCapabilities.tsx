@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ICONS } from '../constants';
+import * as XLSX from 'xlsx';
 import { DictItem, DictType, ProductCapability, ProductType } from '../types';
 import { dictService } from '../src/services/supabaseService';
 import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
@@ -56,9 +57,9 @@ const dedupeStrings = (values: string[]) => {
 
 const parseMultiValues = (value: unknown): string[] => {
   if (Array.isArray(value)) {
-    return dedupeStrings(value.map((item) => String(item || '')));
+    return dedupeStrings(value.map((item) => normalizeLabel(String(item || ''))));
   }
-  return dedupeStrings(String(value || '').split(/[,，;；]/));
+  return dedupeStrings(String(value || '').split(/[,，;；]/).map((item) => normalizeLabel(item)));
 };
 
 const getTypeId = (type: DictionaryTypeLike) => String(type.typeId ?? type.type_id ?? '');
@@ -122,7 +123,7 @@ const summaryText = (values: string[], placeholder: string) => {
   return `${values.slice(0, 2).join('、')} +${values.length - 2}`;
 };
 
-const normalizeImportedType = (rawType: unknown): ProductType => {
+const normalizeImportedType = (rawType: unknown): ProductType | null => {
   const value = String(rawType || '').trim();
   if (Object.values(ProductType).includes(value as ProductType)) {
     return value as ProductType;
@@ -145,15 +146,52 @@ const normalizeImportedType = (rawType: unknown): ProductType => {
   if (['hardware', 'hard'].includes(normalized)) return ProductType.HARDWARE;
   if (['consulting', 'consult', 'advisory'].includes(normalized)) return ProductType.CONSULTING;
   if (['retrofit', 'renovation', 'construction'].includes(normalized)) return ProductType.RETROFIT;
-  if (value) return value as ProductType;
-  return ProductType.SOFTWARE;
+  return null;
 };
 
-const toExportPayload = (products: ProductCapability[]) => ({
-  exportedAt: new Date().toISOString(),
-  count: products.length,
-  products,
-});
+const IMPORT_FIELD_ALIASES = {
+  id: ['ID', 'id', 'Id', '能力ID', 'productId'],
+  name: ['能力名称', 'name', 'Name', 'capabilityName'],
+  type: ['类型', '能力类型', '产品类型', 'type', 'Type'],
+  industries: ['适用行业', 'industries', 'industry', '行业'],
+  scenarios: ['适用场景', 'scenarios', 'scenario', '场景'],
+  description: ['详细描述', 'description', 'detailDescription', '描述'],
+  createTime: ['创建时间', 'createTime', 'create_time'],
+};
+
+const EXCEL_EXPORT_HEADERS = ['ID', '能力名称', '类型', '适用行业', '适用场景', '详细描述', '创建时间'];
+
+const getImportCellValue = (row: Record<string, unknown>, aliases: string[]) => {
+  for (const alias of aliases) {
+    if (Object.prototype.hasOwnProperty.call(row, alias)) return row[alias];
+  }
+
+  const lowerCaseKeyMap = Object.keys(row).reduce<Record<string, string>>((acc, key) => {
+    acc[key.trim().toLowerCase()] = key;
+    return acc;
+  }, {});
+
+  for (const alias of aliases) {
+    const mappedKey = lowerCaseKeyMap[alias.trim().toLowerCase()];
+    if (mappedKey) return row[mappedKey];
+  }
+
+  return '';
+};
+
+const parseImportedTime = (value: unknown) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const unixMs = Math.round((value - 25569) * 86400 * 1000);
+    return new Date(unixMs).toISOString();
+  }
+
+  const text = String(value || '').trim();
+  return text || new Date().toISOString();
+};
 
 const IconEdit = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -507,15 +545,20 @@ export const ProductCapabilities: React.FC = () => {
   };
 
   const handleExport = () => {
-    const payload = toExportPayload(products);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
+    const sheetRows = products.map((item) => [
+      item.id,
+      item.name,
+      item.type,
+      item.industries.join('，'),
+      item.scenarios.join('，'),
+      item.description,
+      item.createTime,
+    ]);
+    const worksheet = XLSX.utils.aoa_to_sheet([EXCEL_EXPORT_HEADERS, ...sheetRows]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '产品能力');
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, '');
-    anchor.href = url;
-    anchor.download = `product-capabilities-${stamp}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    XLSX.writeFile(workbook, `product-capabilities-${stamp}.xlsx`);
   };
 
   const handleImportClick = () => {
@@ -527,36 +570,104 @@ export const ProductCapabilities: React.FC = () => {
     if (!file) return;
 
     try {
-      const text = await file.text();
-      const parsed = JSON.parse(text);
-      const sourceRows: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.products) ? parsed.products : [];
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        alert('导入失败：Excel 文件中未找到工作表。');
+        return;
+      }
+      const sourceRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheetName], { defval: '' });
 
       if (!sourceRows.length) {
         alert('导入文件中未找到可用数据。');
         return;
       }
 
-      const importedProducts: ProductCapability[] = sourceRows.map((row, index) => ({
-        id: String(row.id || row.productId || Math.random().toString(36).slice(2, 11) + index),
-        type: normalizeImportedType(row.type),
-        name: String(row.name ?? row.capabilityName ?? row['能力名称'] ?? '').trim(),
-        industries: parseMultiValues(row.industries ?? row.industry ?? row['适用行业']),
-        scenarios: parseMultiValues(row.scenarios ?? row.scenario ?? row['适用场景']),
-        description: String(row.description ?? row.detailDescription ?? row['详细描述'] ?? '').trim(),
-        createTime: String(row.createTime ?? row.create_time ?? new Date().toISOString()),
-      }));
+      const errors: string[] = [];
+      const importedProducts: ProductCapability[] = [];
 
-      const validRows = importedProducts.filter((item) => item.name || item.description || item.industries.length || item.scenarios.length);
-      if (!validRows.length) {
+      sourceRows.forEach((row, index) => {
+        const rowNo = index + 2;
+        const rawId = getImportCellValue(row, IMPORT_FIELD_ALIASES.id);
+        const rawName = getImportCellValue(row, IMPORT_FIELD_ALIASES.name);
+        const rawType = getImportCellValue(row, IMPORT_FIELD_ALIASES.type);
+        const rawIndustries = getImportCellValue(row, IMPORT_FIELD_ALIASES.industries);
+        const rawScenarios = getImportCellValue(row, IMPORT_FIELD_ALIASES.scenarios);
+        const rawDescription = getImportCellValue(row, IMPORT_FIELD_ALIASES.description);
+        const rawCreateTime = getImportCellValue(row, IMPORT_FIELD_ALIASES.createTime);
+
+        const name = normalizeLabel(String(rawName || '').trim());
+        const type = normalizeImportedType(rawType);
+        const industries = parseMultiValues(rawIndustries);
+        const scenarios = parseMultiValues(rawScenarios);
+        const description = String(rawDescription || '').trim();
+
+        const rowHasContent = Boolean(
+          name
+          || String(rawType || '').trim()
+          || industries.length
+          || scenarios.length
+          || description,
+        );
+        if (!rowHasContent) return;
+
+        const rowErrors: string[] = [];
+        if (!name) {
+          rowErrors.push(`第 ${rowNo} 行：能力名称不能为空。`);
+        }
+        if (!type) {
+          rowErrors.push(`第 ${rowNo} 行：类型无效，请填写“软件/硬件/咨询/改造施工”。`);
+        }
+        if (rowErrors.length) {
+          errors.push(...rowErrors);
+          return;
+        }
+
+        importedProducts.push({
+          id: String(rawId || '').trim() || `pc-${Date.now()}-${index}`,
+          type,
+          name,
+          industries,
+          scenarios,
+          description,
+          createTime: parseImportedTime(rawCreateTime),
+        });
+      });
+
+      if (errors.length) {
+        const preview = errors.slice(0, 8).join('\n');
+        const remain = errors.length > 8 ? `\n...其余 ${errors.length - 8} 条错误请检查 Excel。` : '';
+        alert(`导入校验失败，请修正后重试：\n${preview}${remain}`);
+        return;
+      }
+
+      if (!importedProducts.length) {
         alert('未识别到有效产品能力记录。');
         return;
       }
 
-      setProducts((prev) => [...prev, ...validRows]);
-      setEditingIds((prev) => dedupeStrings([...prev, ...validRows.map((item) => item.id)]));
-      alert(`成功导入 ${validRows.length} 条产品能力记录。`);
+      const duplicateIds = dedupeStrings(
+        importedProducts
+          .map((item) => item.id)
+          .filter((id, index, arr) => id && arr.indexOf(id) !== index),
+      );
+      if (duplicateIds.length) {
+        const preview = duplicateIds.slice(0, 5).join('、');
+        const remain = duplicateIds.length > 5 ? ` 等 ${duplicateIds.length} 个` : '';
+        alert(`导入校验失败：Excel 中存在重复 ID（${preview}${remain}）。`);
+        return;
+      }
+
+      const confirmed = window.confirm(`将使用 Excel 内容全量覆盖当前 ${products.length} 条数据，并更新为 ${importedProducts.length} 条，是否继续？`);
+      if (!confirmed) return;
+
+      setProducts(importedProducts);
+      setSelectedIds([]);
+      setEditingIds([]);
+      alert(`Excel 导入成功，已全量更新 ${importedProducts.length} 条产品能力记录。`);
     } catch {
-      alert('导入失败，请检查 JSON 格式是否正确。');
+      alert('导入失败，请检查 Excel 格式和内容是否正确。');
     } finally {
       event.target.value = '';
     }
@@ -564,7 +675,7 @@ export const ProductCapabilities: React.FC = () => {
 
   return (
     <div className="space-y-5 animate-fadeIn">
-      <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImportFile} />
+      <input ref={importInputRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" className="hidden" onChange={handleImportFile} />
 
       <div className="rounded-2xl bg-gradient-to-r from-slate-50 via-white to-blue-50 p-5 border border-slate-200/80">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -573,7 +684,7 @@ export const ProductCapabilities: React.FC = () => {
               <span className="w-1.5 h-6 rounded-full bg-blue-600" />
               产品能力维护
             </h2>
-            <p className="text-slate-500 mt-1">支持行内编辑、字典多选、批量删除及导入导出。</p>
+            <p className="text-slate-500 mt-1">支持行内编辑、字典多选、批量删除及 Excel 导入导出（导入为全量覆盖）。</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

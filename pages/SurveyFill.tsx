@@ -236,7 +236,7 @@ export const SurveyFill: React.FC = () => {
   );
 
   useEffect(() => {
-    if (!form || initializing || submitting) return;
+    if (!form || initializing || submitting || form.status === SurveyStatus.COMPLETED) return;
     if (!dirty) return;
 
     if (autoSaveTimerRef.current) {
@@ -299,7 +299,7 @@ export const SurveyFill: React.FC = () => {
   };
 
   const handleFieldChange = (fieldId: string, value: any) => {
-    if (!form) return;
+    if (!form || form.status === SurveyStatus.COMPLETED) return;
     setForm({
       ...form,
       data: { ...form.data, [fieldId]: value },
@@ -342,9 +342,14 @@ export const SurveyFill: React.FC = () => {
 
       const aiReport = await generateEnergyReport(form);
       const currentUserId = getCurrentUserId();
+      const submitTime = new Date().toISOString();
+      const submittedData = {
+        ...(form.data || {}),
+        submit_time: submitTime,
+      };
 
       const updated = await surveyService.updateSurvey(form.id, {
-        data: form.data,
+        data: submittedData,
         status: SurveyStatus.COMPLETED,
         report_status: ReportStatus.GENERATED,
         submitter_id: currentUserId || undefined,
@@ -378,6 +383,7 @@ export const SurveyFill: React.FC = () => {
   };
 
   const autoSaveMessage = useMemo(() => {
+    if (form?.status === SurveyStatus.COMPLETED) return '该表单已提交完成，当前为只读模式';
     if (autoSaveState === 'saving') return '正在自动保存...';
     if (autoSaveState === 'saved') return `已自动保存 ${formatTime(lastSavedAt)}`;
     if (autoSaveState === 'error') return '自动保存失败，请点击“保存草稿”重试';
@@ -389,6 +395,8 @@ export const SurveyFill: React.FC = () => {
   if (initializing || !form || !template) {
     return <div className="p-20 text-center">加载中...</div>;
   }
+
+  const isCompleted = form.status === SurveyStatus.COMPLETED;
 
   return (
     <div className="animate-fadeIn">
@@ -409,34 +417,38 @@ export const SurveyFill: React.FC = () => {
               >
                 返回列表
               </button>
-              <button
-                onClick={saveDraft}
-                disabled={saving || submitting}
-                className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
-              >
-                {saving ? '正在保存...' : '保存草稿'}
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || autoSaveState === 'saving'}
-                className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70"
-              >
-                {submitting ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    AI 分析中...
-                  </>
-                ) : (
-                  '提交并生成报告'
-                )}
-              </button>
+              {!isCompleted && (
+                <>
+                  <button
+                    onClick={saveDraft}
+                    disabled={saving || submitting}
+                    className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
+                  >
+                    {saving ? '正在保存...' : '保存草稿'}
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting || autoSaveState === 'saving'}
+                    className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70"
+                  >
+                    {submitting ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        AI 分析中...
+                      </>
+                    ) : (
+                      '提交并生成报告'
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -468,6 +480,7 @@ export const SurveyFill: React.FC = () => {
                   if (!shouldShowField(field)) return null;
 
                   const readOnly = isFieldReadOnly(field.id);
+                  const disabled = readOnly || isCompleted;
 
                   return (
                     <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
@@ -479,10 +492,10 @@ export const SurveyFill: React.FC = () => {
 
                       {field.type === 'text' && (
                         <input
-                          readOnly={readOnly}
+                          readOnly={disabled}
                           placeholder={field.placeholder}
                           className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            readOnly
+                            disabled
                               ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
                               : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
                           }`}
@@ -494,10 +507,10 @@ export const SurveyFill: React.FC = () => {
                       {field.type === 'number' && (
                         <input
                           type="number"
-                          readOnly={readOnly}
+                          readOnly={disabled}
                           placeholder={field.placeholder}
                           className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            readOnly
+                            disabled
                               ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
                               : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
                           }`}
@@ -508,9 +521,9 @@ export const SurveyFill: React.FC = () => {
 
                       {field.type === 'select' && (
                         <select
-                          disabled={readOnly}
+                          disabled={disabled}
                           className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            readOnly
+                            disabled
                               ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
                               : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
                           }`}
@@ -535,9 +548,9 @@ export const SurveyFill: React.FC = () => {
                               <button
                                 type="button"
                                 key={opt}
-                                disabled={readOnly}
+                                disabled={disabled}
                                 onClick={() => {
-                                  if (readOnly) return;
+                                  if (disabled) return;
                                   const next = isSelected ? current.filter((item: string) => item !== opt) : [...current, opt];
                                   handleFieldChange(field.id, next);
                                 }}
@@ -545,7 +558,7 @@ export const SurveyFill: React.FC = () => {
                                   isSelected
                                     ? 'bg-blue-600 border-blue-600 text-white'
                                     : 'bg-white border-slate-200 text-slate-600'
-                                } ${readOnly ? 'cursor-not-allowed opacity-70' : 'hover:border-blue-300'}`}
+                                } ${disabled ? 'cursor-not-allowed opacity-70' : 'hover:border-blue-300'}`}
                               >
                                 {opt}
                               </button>
@@ -556,11 +569,11 @@ export const SurveyFill: React.FC = () => {
 
                       {field.type === 'textarea' && (
                         <textarea
-                          readOnly={readOnly}
+                          readOnly={disabled}
                           rows={4}
                           placeholder={field.placeholder}
                           className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            readOnly
+                            disabled
                               ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
                               : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
                           }`}

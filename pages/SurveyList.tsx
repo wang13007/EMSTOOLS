@@ -4,10 +4,38 @@ import { ICONS } from '../constants';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { surveyService, userService } from '../src/services/supabaseService';
 
+type SurveyListItem = SurveyForm & {
+  creatorId?: string;
+  submitterId?: string;
+  preSalesResponsibleId?: string;
+  updateTime?: string;
+  submitTime?: string;
+};
+
+type SortBy = 'createTime' | 'submitTime';
+type SortOrder = 'desc' | 'asc';
+
+const toTimestamp = (value?: string) => {
+  if (!value) return 0;
+  const ts = new Date(value).getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  const pad = (num: number) => String(num).padStart(2, '0');
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
 export const SurveyList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [surveys, setSurveys] = useState<SurveyForm[]>([]);
+  const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
   const [isExternalView, setIsExternalView] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | SurveyStatus>('all');
+  const [sortBy, setSortBy] = useState<SortBy>('createTime');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
   useEffect(() => {
     try {
@@ -32,7 +60,7 @@ export const SurveyList: React.FC = () => {
         if (user.user_id) userNameMap[user.user_id] = displayName;
       });
 
-      const formattedSurveys = (surveyList || []).map((survey: any) => ({
+      const formattedSurveys: SurveyListItem[] = (surveyList || []).map((survey: any) => ({
         id: survey.id,
         name: survey.name,
         projectName: survey.project_name,
@@ -48,6 +76,11 @@ export const SurveyList: React.FC = () => {
         data: survey.data,
         createTime: survey.create_time,
         updateTime: survey.update_time,
+        submitTime:
+          survey.submit_time
+          || survey.submitTime
+          || survey.data?.submit_time
+          || (survey.status === SurveyStatus.COMPLETED ? survey.update_time : ''),
         creator: userNameMap[survey.creator_id] || '-',
         submitter: userNameMap[survey.submitter_id] || '-',
         preSalesResponsible: userNameMap[survey.pre_sales_responsible_id] || '-',
@@ -61,15 +94,28 @@ export const SurveyList: React.FC = () => {
 
   const filteredSurveys = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-    if (!keyword) return surveys;
     return surveys.filter((item) => {
-      return (
-        (item.name || '').toLowerCase().includes(keyword) ||
-        (item.projectName || '').toLowerCase().includes(keyword) ||
-        (item.customerName || '').toLowerCase().includes(keyword)
-      );
+      const statusMatched = statusFilter === 'all' ? true : item.status === statusFilter;
+      const keywordMatched = !keyword
+        ? true
+        : (
+            (item.name || '').toLowerCase().includes(keyword)
+            || (item.projectName || '').toLowerCase().includes(keyword)
+            || (item.customerName || '').toLowerCase().includes(keyword)
+          );
+      return statusMatched && keywordMatched;
     });
-  }, [searchTerm, surveys]);
+  }, [searchTerm, statusFilter, surveys]);
+
+  const sortedSurveys = useMemo(() => {
+    const cloned = [...filteredSurveys];
+    cloned.sort((a, b) => {
+      const left = sortBy === 'submitTime' ? toTimestamp(a.submitTime) : toTimestamp(a.createTime);
+      const right = sortBy === 'submitTime' ? toTimestamp(b.submitTime) : toTimestamp(b.createTime);
+      return sortOrder === 'desc' ? right - left : left - right;
+    });
+    return cloned;
+  }, [filteredSurveys, sortBy, sortOrder]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('确定要删除该表单吗？')) return;
@@ -88,7 +134,7 @@ export const SurveyList: React.FC = () => {
     if (success) {
       setSurveys((prev) =>
         prev.map((item) =>
-          item.id === id ? { ...item, status: SurveyStatus.DRAFT, reportStatus: ReportStatus.NOT_GENERATED } : item
+          item.id === id ? { ...item, status: SurveyStatus.DRAFT, reportStatus: ReportStatus.NOT_GENERATED, submitTime: '' } : item
         )
       );
     }
@@ -102,7 +148,7 @@ export const SurveyList: React.FC = () => {
           <p className="text-slate-500">查看并管理调研项目表单。</p>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           <div className="relative">
             <input
               type="text"
@@ -118,6 +164,35 @@ export const SurveyList: React.FC = () => {
             </div>
           </div>
 
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | SurveyStatus)}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="all">全部状态</option>
+            <option value={SurveyStatus.DRAFT}>{SurveyStatus.DRAFT}</option>
+            <option value={SurveyStatus.FILLING}>{SurveyStatus.FILLING}</option>
+            <option value={SurveyStatus.COMPLETED}>{SurveyStatus.COMPLETED}</option>
+          </select>
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="createTime">按创建时间</option>
+            <option value="submitTime">按提交时间</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            <option value="desc">从近到远</option>
+            <option value="asc">从远到近</option>
+          </select>
+
           <Link
             to="/surveys/new"
             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95"
@@ -129,7 +204,7 @@ export const SurveyList: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
-        <table className={`w-full text-left ${isExternalView ? 'min-w-[1240px]' : 'min-w-[1120px]'}`}>
+        <table className={`w-full text-left ${isExternalView ? 'min-w-[1320px]' : 'min-w-[1420px]'}`}>
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">表单名称</th>
@@ -137,22 +212,19 @@ export const SurveyList: React.FC = () => {
               {!isExternalView && (
                 <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">客户名称</th>
               )}
-              {isExternalView && (
-                <>
-                  <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">创建人</th>
-                  <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">提交人</th>
-                </>
-              )}
+              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">创建人</th>
+              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">提交人</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">状态</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">报告</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">创建时间</th>
+              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">提交时间</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">操作</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-slate-100">
-            {filteredSurveys.length > 0 ? (
-              filteredSurveys.map((item) => (
+            {sortedSurveys.length > 0 ? (
+              sortedSurveys.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-4 font-bold text-slate-900 text-sm">
                     <Link to={`/surveys/fill/${item.id}`} className="hover:text-blue-600 transition-colors">
@@ -161,12 +233,8 @@ export const SurveyList: React.FC = () => {
                   </td>
                   <td className="px-4 py-4 text-sm text-slate-700">{item.projectName || '-'}</td>
                   {!isExternalView && <td className="px-4 py-4 text-sm text-slate-700">{item.customerName || '-'}</td>}
-                  {isExternalView && (
-                    <>
-                      <td className="px-4 py-4 text-sm text-slate-700">{item.creator || '-'}</td>
-                      <td className="px-4 py-4 text-sm text-slate-700">{item.submitter || '-'}</td>
-                    </>
-                  )}
+                  <td className="px-4 py-4 text-sm text-slate-700">{item.creator || '-'}</td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{item.submitter || '-'}</td>
                   <td className="px-4 py-4">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -189,7 +257,8 @@ export const SurveyList: React.FC = () => {
                       <span className="text-slate-300 text-xs italic">未生成</span>
                     )}
                   </td>
-                  <td className="px-4 py-4 text-xs text-slate-500">{new Date(item.createTime).toLocaleDateString()}</td>
+                  <td className="px-4 py-4 text-xs text-slate-500">{formatDateTime(item.createTime)}</td>
+                  <td className="px-4 py-4 text-xs text-slate-500">{formatDateTime(item.submitTime)}</td>
                   <td className="px-4 py-4 text-right">
                     <div className="flex justify-end gap-3">
                       {item.status === SurveyStatus.COMPLETED && (
@@ -206,7 +275,7 @@ export const SurveyList: React.FC = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={isExternalView ? 8 : 7} className="px-6 py-20 text-center text-slate-400">
+                <td colSpan={isExternalView ? 9 : 10} className="px-6 py-20 text-center text-slate-400">
                   <div className="flex flex-col items-center">
                     <ICONS.Form className="w-12 h-12 mb-4 opacity-20" />
                     <p className="mt-2 font-medium">未找到符合条件的调研记录</p>
