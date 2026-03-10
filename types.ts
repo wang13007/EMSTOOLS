@@ -148,9 +148,21 @@ export interface SurveyTemplate {
   id: string;
   name: string;
   industry: string;
+  reportTemplateId?: string;
   sections: SurveySection[];
   createTime: string;
   readonlyContent?: string;
+}
+
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  sections: string[];
+  content: string;
+  updatedAt: string;
+  surveyTemplateId: string;
 }
 
 export interface SurveySection {

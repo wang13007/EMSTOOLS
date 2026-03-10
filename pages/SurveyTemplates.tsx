@@ -1,7 +1,8 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { ICONS } from '../constants';
-import { SurveyTemplate } from '../types';
+import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
+import { SurveyField, SurveyTemplate } from '../types';
 import Portal from '../src/components/Portal';
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
@@ -12,9 +13,57 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   textarea: '长文本',
 };
 
+const getReportTemplateMap = () => {
+  return new Map(REPORT_TEMPLATES.map((item) => [item.id, item]));
+};
+
+const buildAllCheckedPreviewData = (template: SurveyTemplate) => {
+  const previewData: Record<string, any> = {};
+
+  template.sections.forEach((section) => {
+    section.fields.forEach((field) => {
+      if (field.type === 'multiselect') {
+        previewData[field.id] = [...(field.options || [])];
+        return;
+      }
+      if (field.type === 'select') {
+        previewData[field.id] = field.options && field.options.length ? [...field.options] : ['__selected__'];
+        return;
+      }
+      previewData[field.id] = '__filled__';
+    });
+  });
+
+  return previewData;
+};
+
+const shouldShowByVisibleWhen = (
+  visibleWhen: { fieldId: string; values: string[] } | undefined,
+  previewData: Record<string, any>
+) => {
+  if (!visibleWhen) return true;
+  const value = previewData[visibleWhen.fieldId];
+  if (!value) return false;
+
+  const values = Array.isArray(value) ? value : [value];
+  return values.some((item) => visibleWhen.values.includes(item));
+};
+
+const getVisibleSectionsWithAllOptionsChecked = (template: SurveyTemplate) => {
+  const previewData = buildAllCheckedPreviewData(template);
+
+  return template.sections
+    .filter((section) => shouldShowByVisibleWhen(section.visibleWhen, previewData))
+    .map((section) => ({
+      ...section,
+      fields: section.fields.filter((field: SurveyField) => shouldShowByVisibleWhen(field.visibleWhen, previewData)),
+    }));
+};
+
 export const SurveyTemplates: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<SurveyTemplate | null>(null);
   const templates = SURVEY_TEMPLATES;
+  const reportTemplateMap = useMemo(getReportTemplateMap, []);
 
   const summary = useMemo(() => {
     const totalSections = templates.reduce((acc, tpl) => acc + tpl.sections.length, 0);
@@ -24,6 +73,11 @@ export const SurveyTemplates: React.FC = () => {
     );
     return { totalSections, totalFields };
   }, [templates]);
+
+  const expandedSections = useMemo(() => {
+    if (!selectedTemplate) return [];
+    return getVisibleSectionsWithAllOptionsChecked(selectedTemplate);
+  }, [selectedTemplate]);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -40,6 +94,8 @@ export const SurveyTemplates: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {templates.map((tpl) => {
           const fieldCount = tpl.sections.reduce((acc, section) => acc + section.fields.length, 0);
+          const relatedReportTemplate = tpl.reportTemplateId ? reportTemplateMap.get(tpl.reportTemplateId) : undefined;
+
           return (
             <button
               key={tpl.id}
@@ -58,8 +114,12 @@ export const SurveyTemplates: React.FC = () => {
                 </div>
 
                 <h3 className="text-lg font-bold text-slate-900 mb-2">{tpl.name}</h3>
-                <p className="text-sm text-slate-500 mb-4">
+                <p className="text-sm text-slate-500 mb-3">
                   包含 {tpl.sections.length} 个章节，共 {fieldCount} 个字段。
+                </p>
+
+                <p className="text-xs text-blue-700 bg-blue-50 rounded-lg px-2 py-1 inline-block mb-4">
+                  关联报告模板：{relatedReportTemplate?.name || '未关联'}
                 </p>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -79,13 +139,14 @@ export const SurveyTemplates: React.FC = () => {
       {selectedTemplate && (
         <Portal>
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-slideUp">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden animate-slideUp">
               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">{selectedTemplate.name}</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    共 {selectedTemplate.sections.length} 个章节，
-                    {selectedTemplate.sections.reduce((acc, s) => acc + s.fields.length, 0)} 个字段
+                    已按“所有选项勾选”展开显示，共 {expandedSections.length} 个章节，
+                    {expandedSections.reduce((acc, section) => acc + section.fields.length, 0)} 个字段；关联报告模板：
+                    {selectedTemplate.reportTemplateId ? reportTemplateMap.get(selectedTemplate.reportTemplateId)?.name || '未关联' : '未关联'}
                   </p>
                 </div>
                 <button
@@ -105,7 +166,7 @@ export const SurveyTemplates: React.FC = () => {
                   </div>
                 )}
 
-                {selectedTemplate.sections.map((section) => (
+                {expandedSections.map((section) => (
                   <div key={section.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                     <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                       <h4 className="font-bold text-slate-900">{section.title}</h4>
@@ -120,16 +181,28 @@ export const SurveyTemplates: React.FC = () => {
                             <span className="px-2 py-0.5 text-[11px] font-semibold rounded bg-slate-100 text-slate-600">
                               {FIELD_TYPE_LABELS[field.type] || field.type}
                             </span>
+                            <span className="px-2 py-0.5 text-[11px] font-mono rounded bg-blue-50 text-blue-700">{`{{${field.id}}}`}</span>
                           </div>
+
                           {field.options && field.options.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {field.options.map((option) => (
-                                <span key={`${field.id}-${option}`} className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs">
-                                  {option}
-                                </span>
-                              ))}
+                            <div className="space-y-1">
+                              <p className="text-xs text-slate-400">可选项（预览视为全选展开）</p>
+                              <div className="flex flex-wrap gap-2">
+                                {field.options.map((option) => (
+                                  <span key={`${field.id}-${option}`} className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs">
+                                    {option}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
+
+                          {field.visibleWhen && (
+                            <p className="text-xs text-amber-600">
+                              显示条件：{field.visibleWhen.fieldId} ∈ [{field.visibleWhen.values.join('、')}]
+                            </p>
+                          )}
+
                           {field.placeholder && <p className="text-xs text-slate-400">示例: {field.placeholder}</p>}
                         </div>
                       ))}

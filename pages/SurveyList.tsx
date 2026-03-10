@@ -154,12 +154,12 @@ export const SurveyList: React.FC = () => {
             {filteredSurveys.length > 0 ? (
               filteredSurveys.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-4 text-sm text-slate-700">{item.name || '-'}</td>
                   <td className="px-4 py-4 font-bold text-slate-900 text-sm">
                     <Link to={`/surveys/fill/${item.id}`} className="hover:text-blue-600 transition-colors">
-                      {item.projectName}
+                      {item.name || '-'}
                     </Link>
                   </td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{item.projectName || '-'}</td>
                   {!isExternalView && <td className="px-4 py-4 text-sm text-slate-700">{item.customerName || '-'}</td>}
                   {isExternalView && (
                     <>

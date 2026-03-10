@@ -6,6 +6,7 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
   id: 'tpl-ems-presales-001',
   name: '千丁EMS能源诊断标准模板',
   industry: '通用',
+  reportTemplateId: 'report-template-standard',
   createTime: '2026-02-26',
   readonlyContent: `用于常规售前调研的标准模板，覆盖企业基础、用能现状、系统能力、管理痛点与碳管理诉求。`,
   sections: [
@@ -168,6 +169,7 @@ export const SGS_PRESET_TEMPLATE: SurveyTemplate = {
   id: 'tpl-sgs-diagnosis-001',
   name: 'SGS节能诊断模板',
   industry: '通用',
+  reportTemplateId: 'report-template-advanced',
   createTime: '2026-03-10',
   readonlyContent: `# SGS节能诊断模板（只读）
 
