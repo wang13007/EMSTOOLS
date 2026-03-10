@@ -44,7 +44,6 @@ const CAPABILITY_TYPE_CODES = ['capability_type', 'product_type', 'capability', 
 const INDUSTRY_TYPE_NAMES = ['行业类型', '行业分类', 'industry type', 'industry category'];
 const SCENARIO_TYPE_NAMES = ['场景分类', '场景类型', 'scenario category', 'scenario type'];
 const CAPABILITY_TYPE_NAMES = ['能力类型', '产品类型', 'capability type', 'product type'];
-const MULTI_SELECT_EXPORT_LIMIT = 10;
 
 const BUTTON_BASE = 'h-10 px-4 rounded-xl inline-flex items-center gap-2 text-sm font-semibold transition-all';
 
@@ -155,37 +154,18 @@ const IMPORT_FIELD_ALIASES = {
   id: ['ID', 'id', 'Id', '能力ID', 'productId'],
   name: ['能力名称', 'name', 'Name', 'capabilityName'],
   type: ['类型', '能力类型', '产品类型', 'type', 'Type'],
+  industries: ['适用行业', '适用行业（多选请用英文逗号,分隔）', 'industries', 'industry', '行业'],
+  scenarios: ['适用场景', '适用场景（多选请用英文逗号,分隔）', 'scenarios', 'scenario', '场景'],
   description: ['详细描述', 'description', 'detailDescription', '描述'],
   createTime: ['创建时间', '创建时间（导入时无需填写，系统自动生成）', 'createTime', 'create_time'],
 };
-
-const INDUSTRY_MULTI_COLUMN_HEADERS = Array.from(
-  { length: MULTI_SELECT_EXPORT_LIMIT },
-  (_, idx) => `适用行业(下拉选项${idx + 1})`,
-);
-const SCENARIO_MULTI_COLUMN_HEADERS = Array.from(
-  { length: MULTI_SELECT_EXPORT_LIMIT },
-  (_, idx) => `适用场景(下拉选项${idx + 1})`,
-);
-
-const INDUSTRY_MULTI_COLUMN_ALIASES = INDUSTRY_MULTI_COLUMN_HEADERS.map((header, idx) =>
-  idx === 0
-    ? [header, '适用行业', 'industries', 'industry', '行业', 'industries_1', 'industry_1']
-    : [header, `industries_${idx + 1}`, `industry_${idx + 1}`]
-);
-
-const SCENARIO_MULTI_COLUMN_ALIASES = SCENARIO_MULTI_COLUMN_HEADERS.map((header, idx) =>
-  idx === 0
-    ? [header, '适用场景', 'scenarios', 'scenario', '场景', 'scenarios_1', 'scenario_1']
-    : [header, `scenarios_${idx + 1}`, `scenario_${idx + 1}`]
-);
 
 const EXCEL_EXPORT_HEADERS = [
   'ID',
   '能力名称',
   '类型',
-  ...INDUSTRY_MULTI_COLUMN_HEADERS,
-  ...SCENARIO_MULTI_COLUMN_HEADERS,
+  '适用行业（多选请用英文逗号,分隔）',
+  '适用场景（多选请用英文逗号,分隔）',
   '详细描述',
   '创建时间（导入时无需填写，系统自动生成）',
 ];
@@ -363,29 +343,29 @@ export const productService = {
     return [
       {
         id: '1',
-        name: 'EMS Analytics Platform',
+        name: '能效分析平台',
         type: ProductType.SOFTWARE,
-        industries: ['Manufacturing', 'Campus'],
-        scenarios: ['Energy analysis', 'Diagnosis'],
-        description: 'Core EMS software with dashboards and insights.',
+        industries: ['制造业', '园区'],
+        scenarios: ['能耗分析', '能效诊断'],
+        description: '提供看板分析、异常告警与能效诊断的核心软件平台。',
         create_time: new Date().toISOString(),
       },
       {
         id: '2',
-        name: 'Edge Gateway EC-100',
+        name: '边缘采集网关',
         type: ProductType.HARDWARE,
-        industries: ['General'],
-        scenarios: ['Data collection', 'Protocol conversion'],
-        description: 'Supports Modbus and BACnet integration.',
+        industries: ['制造业', '商业地产'],
+        scenarios: ['数据采集', '协议转换'],
+        description: '支持常见工业协议接入与边缘侧数据汇聚。',
         create_time: new Date().toISOString(),
       },
       {
         id: '3',
-        name: 'Retrofit Delivery Package',
+        name: '节能改造实施服务',
         type: ProductType.RETROFIT,
-        industries: ['Industrial Park', 'Manufacturing'],
-        scenarios: ['Upgrade', 'Retrofit'],
-        description: 'Delivery package for on-site retrofit implementation.',
+        industries: ['园区', '制造业'],
+        scenarios: ['系统升级', '节能改造'],
+        description: '面向现场的节能改造交付与实施服务包。',
         create_time: new Date().toISOString(),
       },
     ];
@@ -564,21 +544,17 @@ export const ProductCapabilities: React.FC = () => {
     const worksheet = workbook.addWorksheet('产品能力');
     const optionsSheet = workbook.addWorksheet('下拉选项');
     const typeColIndex = 3;
-    const industryColStart = 4;
-    const industryColEnd = industryColStart + MULTI_SELECT_EXPORT_LIMIT - 1;
-    const scenarioColStart = industryColEnd + 1;
-    const scenarioColEnd = scenarioColStart + MULTI_SELECT_EXPORT_LIMIT - 1;
+    const industryColIndex = 4;
+    const scenarioColIndex = 5;
 
     worksheet.addRow(EXCEL_EXPORT_HEADERS);
     products.forEach((item) => {
-      const industryValues = Array.from({ length: MULTI_SELECT_EXPORT_LIMIT }, (_, idx) => item.industries[idx] || '');
-      const scenarioValues = Array.from({ length: MULTI_SELECT_EXPORT_LIMIT }, (_, idx) => item.scenarios[idx] || '');
       worksheet.addRow([
         item.id,
         item.name,
         item.type,
-        ...industryValues,
-        ...scenarioValues,
+        item.industries.join(','),
+        item.scenarios.join(','),
         item.description,
         item.createTime,
       ]);
@@ -588,8 +564,8 @@ export const ProductCapabilities: React.FC = () => {
       { width: 18 },
       { width: 24 },
       { width: 16 },
-      ...INDUSTRY_MULTI_COLUMN_HEADERS.map(() => ({ width: 24 })),
-      ...SCENARIO_MULTI_COLUMN_HEADERS.map(() => ({ width: 24 })),
+      { width: 40 },
+      { width: 40 },
       { width: 36 },
       { width: 34 },
     ];
@@ -628,26 +604,24 @@ export const ProductCapabilities: React.FC = () => {
         errorTitle: '类型无效',
         error: '请从下拉选项中选择类型。',
       };
-      for (let colIndex = industryColStart; colIndex <= industryColEnd; colIndex += 1) {
-        worksheet.getCell(rowIndex, colIndex).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: [`'下拉选项'!$B$2:$B$${industryLastRow}`],
-          showErrorMessage: true,
-          errorTitle: '适用行业无效',
-          error: '请从下拉选项中选择适用行业。',
-        };
-      }
-      for (let colIndex = scenarioColStart; colIndex <= scenarioColEnd; colIndex += 1) {
-        worksheet.getCell(rowIndex, colIndex).dataValidation = {
-          type: 'list',
-          allowBlank: true,
-          formulae: [`'下拉选项'!$C$2:$C$${scenarioLastRow}`],
-          showErrorMessage: true,
-          errorTitle: '适用场景无效',
-          error: '请从下拉选项中选择适用场景。',
-        };
-      }
+      worksheet.getCell(rowIndex, industryColIndex).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`'下拉选项'!$B$2:$B$${industryLastRow}`],
+        showErrorMessage: false,
+        showInputMessage: true,
+        promptTitle: '填写提示',
+        prompt: '支持多选：多个适用行业请用英文逗号,分隔',
+      };
+      worksheet.getCell(rowIndex, scenarioColIndex).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`'下拉选项'!$C$2:$C$${scenarioLastRow}`],
+        showErrorMessage: false,
+        showInputMessage: true,
+        promptTitle: '填写提示',
+        prompt: '支持多选：多个适用场景请用英文逗号,分隔',
+      };
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -692,18 +666,14 @@ export const ProductCapabilities: React.FC = () => {
         const rawId = getImportCellValue(row, IMPORT_FIELD_ALIASES.id);
         const rawName = getImportCellValue(row, IMPORT_FIELD_ALIASES.name);
         const rawType = getImportCellValue(row, IMPORT_FIELD_ALIASES.type);
-        const rawIndustryValues = INDUSTRY_MULTI_COLUMN_ALIASES.map((aliases) => getImportCellValue(row, aliases));
-        const rawScenarioValues = SCENARIO_MULTI_COLUMN_ALIASES.map((aliases) => getImportCellValue(row, aliases));
+        const rawIndustries = getImportCellValue(row, IMPORT_FIELD_ALIASES.industries);
+        const rawScenarios = getImportCellValue(row, IMPORT_FIELD_ALIASES.scenarios);
         const rawDescription = getImportCellValue(row, IMPORT_FIELD_ALIASES.description);
 
         const name = normalizeLabel(String(rawName || '').trim());
         const type = normalizeImportedType(rawType);
-        const industries = dedupeStrings(
-          rawIndustryValues.flatMap((value) => parseMultiValues(value)),
-        );
-        const scenarios = dedupeStrings(
-          rawScenarioValues.flatMap((value) => parseMultiValues(value)),
-        );
+        const industries = parseMultiValues(rawIndustries);
+        const scenarios = parseMultiValues(rawScenarios);
         const description = String(rawDescription || '').trim();
 
         const rowHasContent = Boolean(
