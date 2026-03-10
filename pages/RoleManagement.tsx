@@ -260,6 +260,8 @@ const INITIAL_ROLES: Role[] = [
   },
 ];
 
+const PRESET_ROLE_IDS = new Set(['role-1', 'role-2', 'role-3']);
+
 export const RoleManagement: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -418,13 +420,19 @@ export const RoleManagement: React.FC = () => {
                   </button>
                   <button
                     onClick={() => {
+                      if (PRESET_ROLE_IDS.has(role.id)) {
+                        setSaveSuccessMessage('预置角色不可删除');
+                        window.setTimeout(() => setSaveSuccessMessage(''), 3000);
+                        return;
+                      }
                       if (window.confirm('确定要删除该角色吗？')) {
                         saveRoles(roles.filter((r) => r.id !== role.id));
                       }
                     }}
-                    className="text-rose-600 font-bold text-xs hover:underline"
+                    disabled={PRESET_ROLE_IDS.has(role.id)}
+                    className={`font-bold text-xs ${PRESET_ROLE_IDS.has(role.id) ? 'text-slate-300 cursor-not-allowed' : 'text-rose-600 hover:underline'}`}
                   >
-                    删除
+                    {PRESET_ROLE_IDS.has(role.id) ? '预置角色' : '删除'}
                   </button>
                 </div>
               </div>

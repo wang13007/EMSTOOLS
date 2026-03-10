@@ -3,7 +3,8 @@ import { ICONS } from '../constants';
 import { User, UserStatus, UserType } from '../types';
 import { roleService, userService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
-import { getRoleManagementRoles, normalizeRoleOptions } from '../src/services/roleLocalStore';
+import { getRoleManagementRoles } from '../src/services/roleLocalStore';
+import ActionDialog from '../src/components/ActionDialog';
 
 type RoleLite = {
   id: string;
@@ -68,6 +69,33 @@ export const UserManagement: React.FC = () => {
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
+  const [pendingResetUser, setPendingResetUser] = useState<UserRow | null>(null);
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<UserRow | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [infoDialog, setInfoDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant?: 'default' | 'danger' | 'success';
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    variant: 'default',
+  });
+
+  const showInfoDialog = (
+    title: string,
+    message: string,
+    variant: 'default' | 'danger' | 'success' = 'default',
+  ) => {
+    setInfoDialog({
+      open: true,
+      title,
+      message,
+      variant,
+    });
+  };
 
   const normalizeUsers = (list: any[]): UserRow[] => {
     return (list || []).map((u: any) => {
@@ -100,13 +128,36 @@ export const UserManagement: React.FC = () => {
     try {
       const [userList, roleList] = await Promise.all([userService.getUsers(), roleService.getRoles()]);
       const managedRoles = getRoleManagementRoles();
-      const fallbackRoles = normalizeRoleOptions(roleList || []);
+      const databaseRoles = (roleList || [])
+        .map((role: any) => {
+          const id = String(role?.id || '').trim();
+          const name = String(role?.name || '').trim();
+          if (!id || !name) return null;
+          return {
+            id,
+            name,
+            type: inferRoleType(role),
+          } as RoleLite;
+        })
+        .filter((role: RoleLite | null): role is RoleLite => Boolean(role));
       const roleMergedMap = new Map<string, any>();
 
-      [...fallbackRoles, ...managedRoles].forEach((role) => {
+      databaseRoles.forEach((role) => {
         if (!role?.id || !role?.name) return;
         roleMergedMap.set(role.id, role);
       });
+
+      if (!databaseRoles.length) {
+        managedRoles.forEach((role) => {
+          if (!role?.id || !role?.name) return;
+          roleMergedMap.set(role.id, role);
+        });
+      } else {
+        managedRoles.forEach((role) => {
+          if (!role?.id || !role?.name || roleMergedMap.has(role.id)) return;
+          roleMergedMap.set(role.id, role);
+        });
+      }
 
       const roleSource = Array.from(roleMergedMap.values());
 
@@ -257,7 +308,7 @@ export const UserManagement: React.FC = () => {
           status: UserStatus.ENABLED,
         });
         if (!created) throw new Error('用户创建失败');
-        alert(`新用户已创建成功，初始密码：${RESET_PASSWORD_DEFAULT}`);
+        showInfoDialog('创建成功', `新用户已创建成功，初始密码：${RESET_PASSWORD_DEFAULT}`, 'success');
       } else {
         if (!editingUserId) throw new Error('编辑用户ID不存在');
         const updated = await userService.updateUser(editingUserId, {
@@ -288,24 +339,47 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const handleResetPassword = async (u: UserRow) => {
-    if (!window.confirm(`确认将用户 ${u.username} 的密码重置为 ${RESET_PASSWORD_DEFAULT} 吗？`)) return;
-    const updated = await userService.updateUser(u.id, {
-      status: u.status,
-      password_hash: RESET_PASSWORD_DEFAULT,
-    });
-    if (updated) {
-      alert(`用户 ${u.username} 的密码已重置为 ${RESET_PASSWORD_DEFAULT}`);
-      return;
-    }
-    alert('重置密码失败，请稍后重试');
+  const handleResetPassword = (u: UserRow) => {
+    setPendingResetUser(u);
   };
 
-  const handleDelete = async (u: UserRow) => {
-    if (!window.confirm(`确定删除用户 ${u.username} 吗？`)) return;
-    const ok = await userService.deleteUser(u.id);
-    if (ok) {
-      setUsers((prev) => prev.filter((item) => item.id !== u.id));
+  const handleDelete = (u: UserRow) => {
+    setPendingDeleteUser(u);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!pendingResetUser || actionLoading) return;
+    setActionLoading(true);
+    try {
+      const updated = await userService.updateUser(pendingResetUser.id, {
+        status: pendingResetUser.status,
+        password_hash: RESET_PASSWORD_DEFAULT,
+      });
+      if (updated) {
+        showInfoDialog('重置成功', `用户 ${pendingResetUser.username} 的密码已重置为 ${RESET_PASSWORD_DEFAULT}`, 'success');
+      } else {
+        showInfoDialog('重置失败', '重置密码失败，请稍后重试', 'danger');
+      }
+    } finally {
+      setActionLoading(false);
+      setPendingResetUser(null);
+    }
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!pendingDeleteUser || actionLoading) return;
+    setActionLoading(true);
+    try {
+      const ok = await userService.deleteUser(pendingDeleteUser.id);
+      if (ok) {
+        setUsers((prev) => prev.filter((item) => item.id !== pendingDeleteUser.id));
+        showInfoDialog('删除成功', `用户 ${pendingDeleteUser.username} 已删除。`, 'success');
+      } else {
+        showInfoDialog('删除失败', '删除用户失败，请稍后重试。', 'danger');
+      }
+    } finally {
+      setActionLoading(false);
+      setPendingDeleteUser(null);
     }
   };
 
@@ -514,6 +588,39 @@ export const UserManagement: React.FC = () => {
           </div>
         </Portal>
       )}
+
+      <ActionDialog
+        open={Boolean(pendingResetUser)}
+        title="重置密码确认"
+        message={pendingResetUser ? `确认将用户 ${pendingResetUser.username} 的密码重置为 ${RESET_PASSWORD_DEFAULT} 吗？` : ''}
+        confirmText="确认重置"
+        cancelText="取消"
+        variant="danger"
+        onConfirm={confirmResetPassword}
+        onCancel={() => setPendingResetUser(null)}
+      />
+
+      <ActionDialog
+        open={Boolean(pendingDeleteUser)}
+        title="删除用户确认"
+        message={pendingDeleteUser ? `确定删除用户 ${pendingDeleteUser.username} 吗？` : ''}
+        confirmText="删除"
+        cancelText="取消"
+        variant="danger"
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setPendingDeleteUser(null)}
+      />
+
+      <ActionDialog
+        open={infoDialog.open}
+        title={infoDialog.title}
+        message={infoDialog.message}
+        confirmText="我知道了"
+        showCancel={false}
+        variant={infoDialog.variant || 'default'}
+        onConfirm={() => setInfoDialog((prev) => ({ ...prev, open: false }))}
+        onCancel={() => setInfoDialog((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 };

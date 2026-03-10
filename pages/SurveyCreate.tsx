@@ -17,9 +17,9 @@ type CreateMode = 'direct' | 'link';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isUuid = (value: string | undefined | null) => Boolean(value && UUID_REGEX.test(value));
 
-const isPreSalesRole = (role: any) => {
+const isPreSalesEngineerRole = (role: any) => {
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
-  const keywords = ['售前', 'presales', 'pre-sales', 'pre sales'];
+  const keywords = ['售前工程师', 'presales engineer', 'pre-sales engineer', 'pre sales engineer', '售前'];
   return keywords.some((keyword) => source.includes(keyword));
 };
 
@@ -82,13 +82,16 @@ export const SurveyCreate: React.FC = () => {
       setLoadingUsers(true);
       try {
         const [roles, users] = await Promise.all([roleService.getRoles(), userService.getUsers()]);
-        const preSalesRoleIds = new Set((roles || []).filter(isPreSalesRole).map((role: any) => role.id));
+        const preSalesRoleIds = new Set((roles || []).filter(isPreSalesEngineerRole).map((role: any) => role.id));
 
         const preSales = (users || [])
           .filter((user: any) => (user.status || 'enabled') === 'enabled')
           .filter((user: any) => {
             const roleIds = Array.isArray(user.role_ids) && user.role_ids.length ? user.role_ids : [user.role_id];
-            return roleIds.some((roleId: string) => preSalesRoleIds.has(roleId));
+            const byRoleId = roleIds.some((roleId: string) => preSalesRoleIds.has(roleId));
+            if (byRoleId) return true;
+            const roleText = `${user.role || ''}`.toLowerCase();
+            return roleText.includes('售前工程师') || roleText.includes('presales');
           })
           .map((user: any) => ({
             id: user.id || user.user_id,
@@ -388,7 +391,7 @@ export const SurveyCreate: React.FC = () => {
             disabled={!canSubmit}
             className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {loading ? '正在创建...' : createMode === 'direct' ? '创建并填写' : '创建并生成链接'}
+            {loading ? '正在创建...' : createMode === 'direct' ? '创建并提交' : '创建并提交并生成链接'}
           </button>
         </div>
       </form>

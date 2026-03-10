@@ -7,6 +7,7 @@ import { dictService } from '../src/services/supabaseService';
 import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
 import Portal from '../src/components/Portal';
 import { getProductCapabilities, saveProductCapabilities } from '../src/services/productCapabilityStore';
+import ActionDialog from '../src/components/ActionDialog';
 
 type DictionaryTypeLike = Partial<DictType> & {
   type_id?: string;
@@ -211,6 +212,7 @@ const MultiSelectDropdown: React.FC<{
   disabled?: boolean;
 }> = ({ options, value, onChange, placeholder, disabled }) => {
   const [open, setOpen] = useState(false);
+  const [draftValue, setDraftValue] = useState<string[]>([]);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -247,6 +249,7 @@ const MultiSelectDropdown: React.FC<{
 
   useEffect(() => {
     if (!open) return;
+    setDraftValue([...value]);
     updatePosition();
 
     const handleViewportChange = () => updatePosition();
@@ -260,14 +263,19 @@ const MultiSelectDropdown: React.FC<{
   }, [open, updatePosition]);
 
   const toggleValue = (option: string) => {
-    if (value.includes(option)) {
-      onChange(value.filter((item) => item !== option));
+    if (draftValue.includes(option)) {
+      setDraftValue(draftValue.filter((item) => item !== option));
       return;
     }
-    onChange([...value, option]);
+    setDraftValue([...draftValue, option]);
   };
 
-  const clearAll = () => onChange([]);
+  const clearAll = () => setDraftValue([]);
+  const selectAll = () => setDraftValue(dedupeStrings(options));
+  const confirmSelection = () => {
+    onChange(dedupeStrings(draftValue));
+    setOpen(false);
+  };
 
   return (
     <>
@@ -297,10 +305,15 @@ const MultiSelectDropdown: React.FC<{
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between px-2 py-1.5 border-b border-slate-100 mb-1">
-              <span className="text-xs font-semibold text-slate-500">已选 {value.length}</span>
-              <button type="button" onClick={clearAll} className="text-xs text-blue-600 hover:underline">
-                清空
-              </button>
+              <span className="text-xs font-semibold text-slate-500">已选 {draftValue.length}</span>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={selectAll} className="text-xs text-blue-600 hover:underline">
+                  全选
+                </button>
+                <button type="button" onClick={clearAll} className="text-xs text-blue-600 hover:underline">
+                  清空
+                </button>
+              </div>
             </div>
 
             <div className="overflow-y-auto" style={{ maxHeight: panelStyle.maxHeight ? Number(panelStyle.maxHeight) - 44 : 200 }}>
@@ -310,7 +323,7 @@ const MultiSelectDropdown: React.FC<{
                     <label key={option} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-50 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={value.includes(option)}
+                        checked={draftValue.includes(option)}
                         onChange={() => toggleValue(option)}
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
@@ -321,6 +334,23 @@ const MultiSelectDropdown: React.FC<{
               ) : (
                 <div className="px-2 py-3 text-xs text-slate-400">暂无可选项</div>
               )}
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={confirmSelection}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
+              >
+                确定
+              </button>
             </div>
           </div>
         </Portal>
@@ -338,6 +368,33 @@ export const ProductCapabilities: React.FC = () => {
   const [dictScenarioOptions, setDictScenarioOptions] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+  const [pendingImportProducts, setPendingImportProducts] = useState<ProductCapability[] | null>(null);
+  const [infoDialog, setInfoDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant?: 'default' | 'danger' | 'success';
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    variant: 'default',
+  });
+
+  const showInfoDialog = (
+    title: string,
+    message: string,
+    variant: 'default' | 'danger' | 'success' = 'default',
+  ) => {
+    setInfoDialog({
+      open: true,
+      title,
+      message,
+      variant,
+    });
+  };
 
   useEffect(() => {
     const storedProducts = getProductCapabilities();
@@ -438,7 +495,7 @@ export const ProductCapabilities: React.FC = () => {
     if (isEditing) {
       const target = products.find((item) => item.id === id);
       if (target && !target.name.trim()) {
-        alert('请先填写能力名称');
+        showInfoDialog('无法保存', '请先填写能力名称', 'danger');
         return;
       }
       setEditingIds((prev) => prev.filter((itemId) => itemId !== id));
@@ -448,19 +505,26 @@ export const ProductCapabilities: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    if (!window.confirm('确认删除该产品能力吗？')) return;
-    setProducts((prev) => prev.filter((item) => item.id !== id));
-    setSelectedIds((prev) => prev.filter((itemId) => itemId !== id));
-    setEditingIds((prev) => prev.filter((itemId) => itemId !== id));
+    setPendingDeleteId(id);
   };
 
   const handleBatchDelete = () => {
     if (!selectedIds.length) return;
-    if (!window.confirm(`确认批量删除已选的 ${selectedIds.length} 条记录吗？`)) return;
+    setConfirmBatchDelete(true);
+  };
 
+  const applyDelete = (id: string) => {
+    setProducts((prev) => prev.filter((item) => item.id !== id));
+    setSelectedIds((prev) => prev.filter((itemId) => itemId !== id));
+    setEditingIds((prev) => prev.filter((itemId) => itemId !== id));
+    setPendingDeleteId(null);
+  };
+
+  const applyBatchDelete = () => {
     setProducts((prev) => prev.filter((item) => !selectedIdSet.has(item.id)));
     setEditingIds((prev) => prev.filter((itemId) => !selectedIdSet.has(itemId)));
     setSelectedIds([]);
+    setConfirmBatchDelete(false);
   };
 
   const handleAdd = () => {
@@ -599,13 +663,13 @@ export const ProductCapabilities: React.FC = () => {
       const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
       const firstSheetName = workbook.SheetNames[0];
       if (!firstSheetName) {
-        alert('导入失败：Excel 文件中未找到工作表。');
+        showInfoDialog('导入失败', 'Excel 文件中未找到工作表。', 'danger');
         return;
       }
       const sourceRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheetName], { defval: '' });
 
       if (!sourceRows.length) {
-        alert('导入文件中未找到可用数据。');
+        showInfoDialog('导入失败', '导入文件中未找到可用数据。', 'danger');
         return;
       }
 
@@ -674,12 +738,12 @@ export const ProductCapabilities: React.FC = () => {
       if (errors.length) {
         const preview = errors.slice(0, 8).join('\n');
         const remain = errors.length > 8 ? `\n...其余 ${errors.length - 8} 条错误请检查 Excel。` : '';
-        alert(`导入校验失败，请修正后重试：\n${preview}${remain}`);
+        showInfoDialog('导入校验失败', `请修正后重试：\n${preview}${remain}`, 'danger');
         return;
       }
 
       if (!importedProducts.length) {
-        alert('未识别到有效产品能力记录。');
+        showInfoDialog('导入失败', '未识别到有效产品能力记录。', 'danger');
         return;
       }
 
@@ -691,22 +755,26 @@ export const ProductCapabilities: React.FC = () => {
       if (duplicateIds.length) {
         const preview = duplicateIds.slice(0, 5).join('、');
         const remain = duplicateIds.length > 5 ? ` 等 ${duplicateIds.length} 个` : '';
-        alert(`导入校验失败：Excel 中存在重复 ID（${preview}${remain}）。`);
+        showInfoDialog('导入校验失败', `Excel 中存在重复 ID（${preview}${remain}）。`, 'danger');
         return;
       }
 
-      const confirmed = window.confirm(`将使用 Excel 内容全量覆盖当前 ${products.length} 条数据，并更新为 ${importedProducts.length} 条，是否继续？`);
-      if (!confirmed) return;
-
-      setProducts(importedProducts);
-      setSelectedIds([]);
-      setEditingIds([]);
-      alert(`Excel 导入成功，已全量更新 ${importedProducts.length} 条产品能力记录。`);
+      setPendingImportProducts(importedProducts);
     } catch {
-      alert('导入失败，请检查 Excel 格式和内容是否正确。');
+      showInfoDialog('导入失败', '请检查 Excel 格式和内容是否正确。', 'danger');
     } finally {
       event.target.value = '';
     }
+  };
+
+  const applyImportReplace = () => {
+    if (!pendingImportProducts) return;
+    const nextCount = pendingImportProducts.length;
+    setProducts(pendingImportProducts);
+    setSelectedIds([]);
+    setEditingIds([]);
+    setPendingImportProducts(null);
+    showInfoDialog('导入成功', `Excel 导入成功，已全量更新 ${nextCount} 条产品能力记录。`, 'success');
   };
 
   return (
@@ -940,6 +1008,52 @@ export const ProductCapabilities: React.FC = () => {
           </table>
         </div>
       </div>
+
+      <ActionDialog
+        open={Boolean(pendingDeleteId)}
+        title="删除确认"
+        message="确认删除该产品能力吗？"
+        confirmText="删除"
+        cancelText="取消"
+        variant="danger"
+        onConfirm={() => {
+          if (pendingDeleteId) applyDelete(pendingDeleteId);
+        }}
+        onCancel={() => setPendingDeleteId(null)}
+      />
+
+      <ActionDialog
+        open={confirmBatchDelete}
+        title="批量删除确认"
+        message={`确认批量删除已选的 ${selectedIds.length} 条记录吗？`}
+        confirmText="批量删除"
+        cancelText="取消"
+        variant="danger"
+        onConfirm={applyBatchDelete}
+        onCancel={() => setConfirmBatchDelete(false)}
+      />
+
+      <ActionDialog
+        open={Boolean(pendingImportProducts)}
+        title="导入覆盖确认"
+        message={`将使用 Excel 内容全量覆盖当前 ${products.length} 条数据，并更新为 ${pendingImportProducts?.length || 0} 条，是否继续？`}
+        confirmText="确认覆盖"
+        cancelText="取消"
+        variant="danger"
+        onConfirm={applyImportReplace}
+        onCancel={() => setPendingImportProducts(null)}
+      />
+
+      <ActionDialog
+        open={infoDialog.open}
+        title={infoDialog.title}
+        message={infoDialog.message}
+        confirmText="我知道了"
+        showCancel={false}
+        variant={infoDialog.variant || 'default'}
+        onConfirm={() => setInfoDialog((prev) => ({ ...prev, open: false }))}
+        onCancel={() => setInfoDialog((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 };

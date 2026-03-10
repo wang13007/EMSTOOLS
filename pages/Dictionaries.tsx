@@ -6,6 +6,7 @@ import {
 import { ICONS } from '../constants';
 import { dictService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
+import ActionDialog from '../src/components/ActionDialog';
 import { INITIAL_REGIONS } from '../constants/regions';
 import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
 
@@ -78,6 +79,7 @@ const normalizeTypeCode = (typeCode?: string) => (typeCode || '').trim().toLower
 const normalizeTypeName = (typeName?: string) => (typeName || '').trim().toLowerCase();
 const normalizeLabel = (label?: string) => (label || '').trim().toLowerCase();
 const isRemovedTypeCode = (typeCode?: string) => REMOVED_TYPE_CODES.has(normalizeTypeCode(typeCode));
+const isUuid = (value?: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
 
 const isIndustryType = (type: Pick<DictType, 'typeCode' | 'typeName'>) => {
   const code = normalizeTypeCode(type.typeCode);
@@ -252,6 +254,31 @@ export const Dictionaries: React.FC = () => {
   const [editingType, setEditingType] = useState<Partial<DictType> | null>(null);
   const [editingItem, setEditingItem] = useState<Partial<DictItem> | null>(null);
   const [editingRegion, setEditingRegion] = useState<Partial<RegionDict> | null>(null);
+  const [pendingDeleteType, setPendingDeleteType] = useState<DictType | null>(null);
+  const [infoDialog, setInfoDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    variant?: 'default' | 'danger' | 'success';
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    variant: 'default',
+  });
+
+  const showInfoDialog = (
+    title: string,
+    message: string,
+    variant: 'default' | 'danger' | 'success' = 'default',
+  ) => {
+    setInfoDialog({
+      open: true,
+      title,
+      message,
+      variant,
+    });
+  };
 
   // Load data
   useEffect(() => {
@@ -304,6 +331,7 @@ export const Dictionaries: React.FC = () => {
     if (!selectedType || selectedType.typeCode === 'region' || isRemovedTypeCode(selectedType.typeCode)) return;
 
     const fetchDictItems = async () => {
+      if (!isUuid(selectedType.typeId)) return;
       try {
         const itemList = await dictService.getDictItems(selectedType.typeId);
         // 转换数据格式以匹配前端类型
@@ -374,7 +402,7 @@ export const Dictionaries: React.FC = () => {
     e.preventDefault();
     if (!editingType?.typeName || !editingType?.typeCode) return;
     if (isRemovedTypeCode(editingType.typeCode)) {
-      alert('表单状态和用户状态字典已下线，不可创建。');
+      showInfoDialog('无法创建', '表单状态和用户状态字典已下线，不可创建。', 'danger');
       return;
     }
 
@@ -449,20 +477,23 @@ export const Dictionaries: React.FC = () => {
 
   const handleDeleteType = (type: DictType) => {
     if (isPresetProtectedType(type)) {
-      alert('预置字典类型不可删除。');
+      showInfoDialog('删除受限', '预置字典类型不可删除。', 'danger');
       return;
     }
-    const confirmed = window.confirm(`确认删除字典类型「${type.typeName}」吗？删除后其下数据项也会一并移除。`);
-    if (!confirmed) return;
+    setPendingDeleteType(type);
+  };
 
-    const nextTypes = dictTypes.filter((item) => item.typeId !== type.typeId);
-    const nextItems = dictItems.filter((item) => item.typeId !== type.typeId);
+  const confirmDeleteType = () => {
+    if (!pendingDeleteType) return;
+    const nextTypes = dictTypes.filter((item) => item.typeId !== pendingDeleteType.typeId);
+    const nextItems = dictItems.filter((item) => item.typeId !== pendingDeleteType.typeId);
     setDictTypes(nextTypes);
     setDictItems(nextItems);
     setSelectedType((prev) => {
-      if (!prev || prev.typeId !== type.typeId) return prev;
+      if (!prev || prev.typeId !== pendingDeleteType.typeId) return prev;
       return nextTypes[0] || null;
     });
+    setPendingDeleteType(null);
   };
 
   return (
@@ -830,6 +861,28 @@ export const Dictionaries: React.FC = () => {
           </div>
         </Portal>
       )}
+
+      <ActionDialog
+        open={Boolean(pendingDeleteType)}
+        title="删除字典类型确认"
+        message={pendingDeleteType ? `确认删除字典类型「${pendingDeleteType.typeName}」吗？删除后其下数据项也会一并移除。` : ''}
+        confirmText="删除"
+        cancelText="取消"
+        variant="danger"
+        onConfirm={confirmDeleteType}
+        onCancel={() => setPendingDeleteType(null)}
+      />
+
+      <ActionDialog
+        open={infoDialog.open}
+        title={infoDialog.title}
+        message={infoDialog.message}
+        confirmText="我知道了"
+        showCancel={false}
+        variant={infoDialog.variant || 'default'}
+        onConfirm={() => setInfoDialog((prev) => ({ ...prev, open: false }))}
+        onCancel={() => setInfoDialog((prev) => ({ ...prev, open: false }))}
+      />
     </div>
   );
 };

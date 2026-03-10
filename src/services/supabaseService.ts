@@ -944,6 +944,12 @@ export const roleService = {
   },
 
   async deleteRole(id: string) {
+    const protectedRoleNames = ['\u8d85\u7ea7\u7ba1\u7406\u5458', '\u552e\u524d\u5de5\u7a0b\u5e08', '\u5916\u90e8\u5ba2\u6237'];
+    const { data: roleInfo } = await supabase.from('roles').select('name').eq('id', id).maybeSingle();
+    if (roleInfo?.name && protectedRoleNames.includes(String(roleInfo.name))) {
+      console.warn('预置角色不可删除:', roleInfo.name);
+      return false;
+    }
     const { error } = await supabase.from('roles').delete().eq('id', id);
     if (error) {
       console.error('鍒犻櫎瑙掕壊澶辫触:', error);
