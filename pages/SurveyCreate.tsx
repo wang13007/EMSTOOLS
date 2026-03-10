@@ -37,7 +37,6 @@ const buildShareUrl = (surveyId: string) => {
 };
 
 export const SurveyCreate: React.FC = () => {
-  const presetTemplate = SURVEY_TEMPLATES[0];
   const hasLoadedUsersRef = useRef(false);
 
   const [formData, setFormData] = useState({
@@ -54,7 +53,13 @@ export const SurveyCreate: React.FC = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState(SURVEY_TEMPLATES[0]?.id || '');
   const navigate = useNavigate();
+
+  const selectedTemplate = useMemo(
+    () => SURVEY_TEMPLATES.find((template) => template.id === selectedTemplateId) || SURVEY_TEMPLATES[0],
+    [selectedTemplateId]
+  );
 
   const canSubmit = useMemo(() => {
     if (loading || loadingUsers || !isUuid(formData.preSalesResponsibleId)) return false;
@@ -124,12 +129,20 @@ export const SurveyCreate: React.FC = () => {
       }
 
       const dataPayload: Record<string, any> = {
-        template_key: presetTemplate.id,
-        field_001_1: formData.customerName,
-        field_002_2: formData.projectName,
-        field_003_3: formData.region,
-        field_005_5: formData.industry,
+        template_key: selectedTemplate.id,
       };
+
+      if (selectedTemplate.id === 'tpl-sgs-diagnosis-001') {
+        dataPayload.client_name = formData.customerName;
+        dataPayload.project_name = formData.projectName;
+        dataPayload.audit_site = formData.region;
+        dataPayload.company_type = formData.industry;
+      } else {
+        dataPayload.field_001_1 = formData.customerName;
+        dataPayload.field_002_2 = formData.projectName;
+        dataPayload.field_003_3 = formData.region;
+        dataPayload.field_005_5 = formData.industry;
+      }
       if (createMode === 'link') {
         dataPayload.external_link_enabled = true;
       }
@@ -140,7 +153,7 @@ export const SurveyCreate: React.FC = () => {
         project_name: formData.projectName,
         industry: formData.industry,
         region: formData.region,
-        template_id: isUuid(presetTemplate.id) ? presetTemplate.id : null,
+        template_id: isUuid(selectedTemplate.id) ? selectedTemplate.id : null,
         status: SurveyStatus.DRAFT,
         report_status: ReportStatus.NOT_GENERATED,
         creator_id: currentUserId,
@@ -314,13 +327,17 @@ export const SurveyCreate: React.FC = () => {
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-700">调研模板</label>
           <select
-            disabled
-            className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-600 cursor-not-allowed"
-            value={presetTemplate.id}
+            value={selectedTemplateId}
+            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            <option value={presetTemplate.id}>{presetTemplate.name}</option>
+            {SURVEY_TEMPLATES.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
           </select>
-          <p className="text-xs text-slate-500">系统使用预置模板发起调研，不支持手动更改。</p>
+          <p className="text-xs text-slate-500">选择模板后，填写页将按该模板字段渲染。</p>
         </div>
 
         {generatedLink && (

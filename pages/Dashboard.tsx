@@ -1,11 +1,22 @@
-
-import React, { useMemo, useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { ICONS, INDUSTRIES, REGIONS } from '../constants';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  Cell, PieChart, Pie, Legend, ScatterChart, Scatter, ZAxis, ReferenceLine, LabelList
+﻿import React, { useMemo, useState, useEffect } from 'react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
+  Legend,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  LabelList,
 } from 'recharts';
+import { ICONS } from '../constants';
 import { SurveyForm, SurveyStatus, ReportStatus } from '../types';
 import { surveyService } from '../src/services/supabaseService';
 
@@ -17,11 +28,9 @@ export const Dashboard: React.FC = () => {
   const [surveys, setSurveys] = useState<SurveyForm[]>([]);
 
   useEffect(() => {
-    // 从数据库获取调研表单列表
     const fetchSurveys = async () => {
       const surveyList = await surveyService.getSurveys();
-      // 转换数据格式以匹配前端类型
-      const formattedSurveys = surveyList.map(survey => ({
+      const formattedSurveys = (surveyList || []).map((survey: any) => ({
         id: survey.id,
         name: survey.name,
         projectName: survey.project_name,
@@ -37,28 +46,25 @@ export const Dashboard: React.FC = () => {
         data: survey.data,
         createTime: survey.create_time,
         updateTime: survey.update_time,
-        // 前端需要的其他字段
         creator: '系统用户',
         submitter: '系统用户',
-        preSalesResponsible: '系统用户'
+        preSalesResponsible: '系统用户',
       }));
       setSurveys(formattedSurveys);
     };
 
-    fetchSurveys();
+    void fetchSurveys();
   }, []);
 
-  const rawData: SurveyForm[] = useMemo(() => {
-    return surveys;
-  }, [surveys]);
+  const rawData: SurveyForm[] = useMemo(() => surveys, [surveys]);
 
   const filteredData = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-    return rawData.filter(f => {
-      const createDate = new Date(f.createTime);
+    return rawData.filter((item) => {
+      const createDate = new Date(item.createTime);
       if (timeRange === 'month') return createDate >= startOfMonth;
       if (timeRange === 'year') return createDate >= startOfYear;
       return true;
@@ -66,11 +72,10 @@ export const Dashboard: React.FC = () => {
   }, [rawData, timeRange]);
 
   const stats = useMemo(() => {
-    const totalForms = filteredData.length;
-    const customerCount = new Set(filteredData.map(f => f.customerName)).size;
-    const projectCount = new Set(filteredData.map(f => f.projectName)).size;
-    const reportCount = filteredData.filter(f => f.reportStatus === ReportStatus.GENERATED).length;
-    
+    const customerCount = new Set(filteredData.map((item) => item.customerName)).size;
+    const projectCount = new Set(filteredData.map((item) => item.projectName)).size;
+    const reportCount = filteredData.filter((item) => item.reportStatus === ReportStatus.GENERATED).length;
+
     return [
       { label: '调研客户数量', value: customerCount.toString(), icon: ICONS.Users, color: 'blue' },
       { label: '调研项目数量', value: projectCount.toString(), icon: ICONS.Form, color: 'indigo' },
@@ -80,23 +85,25 @@ export const Dashboard: React.FC = () => {
 
   const industryData = useMemo(() => {
     const counts: Record<string, number> = {};
-    filteredData.forEach(f => {
-      counts[f.industry] = (counts[f.industry] || 0) + 1;
+    filteredData.forEach((item) => {
+      counts[item.industry] = (counts[item.industry] || 0) + 1;
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value })).filter(d => d.value > 0);
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .filter((item) => item.value > 0);
   }, [filteredData]);
 
   const regionData = useMemo(() => {
     const counts: Record<string, number> = {};
-    filteredData.forEach(f => {
-      counts[f.region] = (counts[f.region] || 0) + 1;
+    filteredData.forEach((item) => {
+      counts[item.region] = (counts[item.region] || 0) + 1;
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value })).filter(d => d.value > 0);
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .filter((item) => item.value > 0);
   }, [filteredData]);
 
-  // Mock demand ranking based on filtered data
   const demandRanking = useMemo(() => {
-    // In a real app, this would be derived from survey field analysis
     const baseDemands = [
       { name: '能效分析需求', base: 12 },
       { name: '数据报表需求', base: 10 },
@@ -104,26 +111,34 @@ export const Dashboard: React.FC = () => {
       { name: '碳管理需求', base: 6 },
       { name: '可视化需求', base: 5 },
     ];
+
     const factor = filteredData.length / (rawData.length || 1);
-    return baseDemands.map(d => ({
-      name: d.name,
-      count: Math.max(1, Math.round(d.base * factor + (Math.random() * 2)))
-    })).sort((a, b) => b.count - a.count);
+    return baseDemands
+      .map((item) => ({
+        name: item.name,
+        count: Math.max(1, Math.round(item.base * factor + Math.random() * 2)),
+      }))
+      .sort((a, b) => b.count - a.count);
   }, [filteredData, rawData]);
 
-  // Mock customer value data (Scatter plot)
   const customerValueData = useMemo(() => {
-    const customers = Array.from(new Set(filteredData.map(f => f.customerName)));
-    return customers.map(name => ({
-      name,
-      x: 40 + Math.random() * 50, // Potential Value (0-100)
-      y: 30 + Math.random() * 60, // Current Engagement (0-100)
-      score: Math.round(70 + Math.random() * 25)
-    })).sort((a, b) => b.score - a.score);
+    const customers = Array.from(new Set(filteredData.map((item) => item.customerName))).filter(Boolean);
+    return customers
+      .map((name) => {
+        const potentialValue = 40 + Math.random() * 50;
+        const engagement = 30 + Math.random() * 60;
+        const score = Math.round(potentialValue * 0.5 + engagement * 0.5);
+        return {
+          name,
+          x: potentialValue,
+          y: engagement,
+          score,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
   }, [filteredData]);
 
   const top5Value = customerValueData.slice(0, 5);
-
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
   return (
@@ -139,9 +154,7 @@ export const Dashboard: React.FC = () => {
               key={range}
               onClick={() => setTimeRange(range)}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                timeRange === range 
-                  ? 'bg-blue-600 text-white shadow-md' 
-                  : 'text-slate-500 hover:bg-slate-50'
+                timeRange === range ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
               {range === 'month' ? '本月' : range === 'year' ? '本年' : '累计'}
@@ -150,10 +163,9 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, i) => (
-          <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-6">
+        {stats.map((stat, idx) => (
+          <div key={idx} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-6">
             <div className={`p-4 rounded-2xl bg-${stat.color}-50 text-${stat.color}-600`}>
               <stat.icon className="w-8 h-8" />
             </div>
@@ -166,7 +178,6 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Industry Distribution */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
             <span className="w-1.5 h-6 bg-blue-600 rounded-full" />
@@ -188,16 +199,13 @@ export const Dashboard: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
-                <Legend verticalAlign="bottom" height={36}/>
+                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                <Legend verticalAlign="bottom" height={36} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Region Distribution */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
           <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
             <span className="w-1.5 h-6 bg-emerald-500 rounded-full" />
@@ -218,38 +226,32 @@ export const Dashboard: React.FC = () => {
                     <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                />
+                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Demand Ranking */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
           <span className="w-1.5 h-6 bg-amber-500 rounded-full" />
-          客户需求排行榜
+          客户需求排行
         </h3>
         <div className="h-80 min-h-[320px] min-w-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart layout="vertical" data={demandRanking} margin={{ left: 40, right: 40 }}>
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
               <XAxis type="number" hide />
-              <YAxis 
-                dataKey="name" 
-                type="category" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{fill: '#64748b', fontSize: 12, fontWeight: 600}} 
+              <YAxis
+                dataKey="name"
+                type="category"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
                 width={100}
               />
-              <Tooltip 
-                cursor={{fill: '#f8fafc'}}
-                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-              />
+              <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
               <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24}>
                 <LabelList dataKey="count" position="right" style={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
               </Bar>
@@ -258,14 +260,19 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Customer Value Map (4 Quadrants) */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex justify-between items-center mb-8">
-          <h3 className="text-lg font-bold flex items-center gap-2">
-            <span className="w-1.5 h-6 bg-rose-500 rounded-full" />
-            客户价值图 (Top 5)
-          </h3>
-          <button 
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <span className="w-1.5 h-6 bg-rose-500 rounded-full" />
+              客户价值图 (Top 5)
+            </h3>
+            <span className="text-xs text-slate-500 bg-slate-100 rounded-full px-3 py-1">
+              计算依据：客户价值分 = 潜在价值(50%) + 当前参与度(50%)
+            </span>
+          </div>
+
+          <button
             onClick={() => setShowAllValueList(!showAllValueList)}
             className="text-blue-600 text-sm font-bold hover:underline flex items-center gap-1"
           >
@@ -291,7 +298,7 @@ export const Dashboard: React.FC = () => {
                 <XAxis type="number" dataKey="x" name="潜在价值" hide domain={[0, 100]} />
                 <YAxis type="number" dataKey="y" name="当前参与度" hide domain={[0, 100]} />
                 <ZAxis type="number" dataKey="score" range={[100, 500]} />
-                <Tooltip 
+                <Tooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   content={({ active, payload }) => {
                     if (active && payload && payload.length) {
@@ -299,7 +306,9 @@ export const Dashboard: React.FC = () => {
                       return (
                         <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100">
                           <p className="text-sm font-bold text-slate-900">{data.name}</p>
-                          <p className="text-xs text-slate-500 mt-1">综合评分: <span className="text-blue-600 font-bold">{data.score}</span></p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            客户价值分: <span className="text-blue-600 font-bold">{data.score}</span>
+                          </p>
                         </div>
                       );
                     }
@@ -317,14 +326,14 @@ export const Dashboard: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">价值排行榜</h4>
-            {top5Value.map((c, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+            <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">价值排行</h4>
+            {top5Value.map((item, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-black text-slate-300 w-4">0{i+1}</span>
-                  <p className="text-sm font-bold text-slate-700">{c.name}</p>
+                  <span className="text-xs font-black text-slate-300 w-4">{String(index + 1).padStart(2, '0')}</span>
+                  <p className="text-sm font-bold text-slate-700">{item.name}</p>
                 </div>
-                <span className="text-sm font-black text-blue-600">{c.score}</span>
+                <span className="text-sm font-black text-blue-600">{item.score}</span>
               </div>
             ))}
           </div>
@@ -340,25 +349,25 @@ export const Dashboard: React.FC = () => {
                     <th className="px-4 py-2">客户名称</th>
                     <th className="px-4 py-2">潜在价值</th>
                     <th className="px-4 py-2">当前参与度</th>
-                    <th className="px-4 py-2 text-right">综合评分</th>
+                    <th className="px-4 py-2 text-right">客户价值分</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {customerValueData.map((c, i) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-xs font-bold text-slate-400">{i + 1}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-slate-700">{c.name}</td>
+                  {customerValueData.map((item, index) => (
+                    <tr key={index} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-xs font-bold text-slate-400">{index + 1}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-slate-700">{item.name}</td>
                       <td className="px-4 py-3">
                         <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-blue-400 h-full" style={{ width: `${c.x}%` }} />
+                          <div className="bg-blue-400 h-full" style={{ width: `${item.x}%` }} />
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="w-24 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-emerald-400 h-full" style={{ width: `${c.y}%` }} />
+                          <div className="bg-emerald-400 h-full" style={{ width: `${item.y}%` }} />
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-black text-blue-600">{c.score}</td>
+                      <td className="px-4 py-3 text-right font-black text-blue-600">{item.score}</td>
                     </tr>
                   ))}
                 </tbody>

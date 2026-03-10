@@ -1,4 +1,4 @@
-
+﻿
 import React from 'react';
 
 export const ICONS = {
@@ -54,7 +54,7 @@ export const INDUSTRIES = [
   '学校',
   '政府办公',
   '酒店',
-  '交通枢纽'
+  '交通枢纽',
 ];
 
 export const REGIONS = [
@@ -64,7 +64,8 @@ export const REGIONS = [
   '华中地区',
   '西南地区',
   '西北地区',
-  '东北地区'
+  '东北地区',
 ];
 
 export { SURVEY_TEMPLATES } from './constants/surveyTemplatePreset';
+

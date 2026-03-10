@@ -39,7 +39,8 @@ const inferRoleType = (role: any): UserType => {
   const directType = role?.type || role?.user_type;
   if (directType === UserType.INTERNAL || directType === UserType.EXTERNAL) return directType;
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
-  return source.includes('客户') || source.includes('外部') ? UserType.EXTERNAL : UserType.INTERNAL;
+  const externalKeywords = ['客户', '外部', 'customer', 'client', 'external'];
+  return externalKeywords.some((keyword) => source.includes(keyword)) ? UserType.EXTERNAL : UserType.INTERNAL;
 };
 
 const generateUserId = () => {
@@ -94,7 +95,14 @@ export const UserManagement: React.FC = () => {
       const [userList, roleList] = await Promise.all([userService.getUsers(), roleService.getRoles()]);
       const managedRoles = getRoleManagementRoles();
       const fallbackRoles = normalizeRoleOptions(roleList || []);
-      const roleSource = managedRoles.length ? managedRoles : fallbackRoles;
+      const roleMergedMap = new Map<string, any>();
+
+      [...fallbackRoles, ...managedRoles].forEach((role) => {
+        if (!role?.id || !role?.name) return;
+        roleMergedMap.set(role.id, role);
+      });
+
+      const roleSource = Array.from(roleMergedMap.values());
 
       setRoles(
         roleSource.map((r: any) => ({
@@ -459,7 +467,7 @@ export const UserManagement: React.FC = () => {
                         ))
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400">仅显示中文角色名，来源于角色管理。</p>
+                    <p className="text-[11px] text-slate-400">角色列表来自角色管理和系统角色配置。</p>
                     {selectedRoleNames && <p className="text-xs text-slate-500">已选：{selectedRoleNames}</p>}
                   </div>
                 </div>

@@ -84,7 +84,7 @@ export const SurveyFill: React.FC = () => {
 
       if (!resolvedId) {
         setInitializing(false);
-        alert('鏈壘鍒拌琛ㄥ崟');
+        alert('未找到该表单');
         navigate('/customer-survey/list');
         return;
       }
@@ -110,7 +110,7 @@ export const SurveyFill: React.FC = () => {
       }
       if (!survey) {
         setInitializing(false);
-        alert('鏈壘鍒拌琛ㄥ崟');
+        alert('未找到该表单');
         navigate('/customer-survey/list');
         return;
       }
@@ -142,7 +142,7 @@ export const SurveyFill: React.FC = () => {
     const handler = (event: BeforeUnloadEvent) => {
       if (!dirty && autoSaveState !== 'saving') return;
       event.preventDefault();
-      event.returnValue = '褰撳墠鏈夋湭淇濆瓨淇敼锛岀‘璁ょ寮€鍚楋紵';
+      event.returnValue = '当前有未保存修改，确认离开吗？';
       return event.returnValue;
     };
     window.addEventListener('beforeunload', handler);
@@ -173,7 +173,7 @@ export const SurveyFill: React.FC = () => {
         });
 
         if (!updated) {
-          throw new Error('淇濆瓨鑽夌澶辫触');
+          throw new Error('保存草稿失败');
         }
 
         const mapped = toSurveyForm(updated);
@@ -191,10 +191,10 @@ export const SurveyFill: React.FC = () => {
         }, 1800);
         return true;
       } catch (error) {
-        console.error('淇濆瓨鑽夌澶辫触:', error);
+        console.error('保存草稿失败:', error);
         setAutoSaveState('error');
         if (alertOnError) {
-          alert('淇濆瓨鑽夌澶辫触锛岃閲嶈瘯');
+          alert('保存草稿失败，请重试');
         }
         return false;
       } finally {
@@ -256,7 +256,17 @@ export const SurveyFill: React.FC = () => {
   };
 
   const isFieldReadOnly = (fieldId: string): boolean => {
-    const readonlyFields = ['field_001_1', 'field_002_2', 'field_003_3', 'field_004_4', 'field_005_5', 'field_006_6'];
+    const readonlyFields = [
+      'field_001_1',
+      'field_002_2',
+      'field_003_3',
+      'field_004_4',
+      'field_005_5',
+      'field_006_6',
+      'computed_summary_readonly',
+      'ai_generated_final_conclusion',
+      'report_template_placeholder',
+    ];
     return readonlyFields.includes(fieldId);
   };
 
@@ -313,7 +323,7 @@ export const SurveyFill: React.FC = () => {
       });
 
       if (!updated) {
-        throw new Error('鎻愪氦澶辫触');
+        throw new Error('提交失败');
       }
 
       const mapped = toSurveyForm(updated);
@@ -329,8 +339,8 @@ export const SurveyFill: React.FC = () => {
 
       navigate(`/reports/${form.id}`);
     } catch (error) {
-      console.error('鎻愪氦骞剁敓鎴愭姤鍛婂け璐?', error);
-      alert(error instanceof Error ? error.message : '鐢熸垚鎶ュ憡澶辫触锛岃妫€鏌ョ綉缁滄垨 API 閰嶇疆');
+      console.error('提交并生成报告失败:', error);
+      alert(error instanceof Error ? error.message : '生成报告失败，请检查网络或 API 配置');
     } finally {
       setSubmitting(false);
     }
@@ -346,7 +356,7 @@ export const SurveyFill: React.FC = () => {
   }, [autoSaveState, dirty, lastSavedAt]);
 
   if (initializing || !form || !template) {
-    return <div className="p-20 text-center">鍔犺浇涓?..</div>;
+    return <div className="p-20 text-center">加载中...</div>;
   }
 
   return (
@@ -373,7 +383,7 @@ export const SurveyFill: React.FC = () => {
                 disabled={saving || submitting}
                 className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
               >
-                {saving ? '姝ｅ湪淇濆瓨...' : '淇濆瓨鑽夌'}
+                {saving ? '正在保存...' : '保存草稿'}
               </button>
               <button
                 onClick={handleSubmit}
@@ -390,7 +400,7 @@ export const SurveyFill: React.FC = () => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    AI 鍒嗘瀽涓?..
+                    AI 分析中...
                   </>
                 ) : (
                   '提交并生成报告'
@@ -433,12 +443,13 @@ export const SurveyFill: React.FC = () => {
                       <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
                         {field.label}
                         {field.required && <span className="text-red-500">*</span>}
-                        {readOnly && <span className="text-xs text-slate-400 ml-2">(宸查濉紝涓嶅彲淇敼)</span>}
+                        {readOnly && <span className="text-xs text-slate-400 ml-2">(已预填，不可修改)</span>}
                       </label>
 
                       {field.type === 'text' && (
                         <input
                           readOnly={readOnly}
+                          placeholder={field.placeholder}
                           className={`w-full px-4 py-2 border rounded-lg outline-none ${
                             readOnly
                               ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
@@ -453,6 +464,7 @@ export const SurveyFill: React.FC = () => {
                         <input
                           type="number"
                           readOnly={readOnly}
+                          placeholder={field.placeholder}
                           className={`w-full px-4 py-2 border rounded-lg outline-none ${
                             readOnly
                               ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
@@ -474,7 +486,7 @@ export const SurveyFill: React.FC = () => {
                           value={form.data[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                         >
-                          <option value="">璇烽€夋嫨</option>
+                          <option value="">请选择</option>
                           {field.options?.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -515,6 +527,7 @@ export const SurveyFill: React.FC = () => {
                         <textarea
                           readOnly={readOnly}
                           rows={4}
+                          placeholder={field.placeholder}
                           className={`w-full px-4 py-2 border rounded-lg outline-none ${
                             readOnly
                               ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'

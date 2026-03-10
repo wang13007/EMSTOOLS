@@ -1,4 +1,4 @@
-export enum UserType {
+﻿export enum UserType {
   INTERNAL = 'internal',
   EXTERNAL = 'external',
 }
@@ -150,6 +150,7 @@ export interface SurveyTemplate {
   industry: string;
   sections: SurveySection[];
   createTime: string;
+  readonlyContent?: string;
 }
 
 export interface SurveySection {
@@ -168,6 +169,7 @@ export interface SurveyField {
   type: 'text' | 'number' | 'select' | 'multiselect' | 'textarea';
   options?: string[];
   required?: boolean;
+  placeholder?: string;
   visibleWhen?: {
     fieldId: string;
     values: string[];

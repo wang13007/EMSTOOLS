@@ -602,7 +602,7 @@ export const ProductCapabilities: React.FC = () => {
 
             <button onClick={handleAdd} className={`${BUTTON_BASE} bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200`}>
               <ICONS.Plus className="w-4 h-4" />
-              新增产品能力
+              新增能力
             </button>
           </div>
         </div>

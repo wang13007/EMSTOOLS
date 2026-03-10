@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { ICONS } from '../constants';
 import { SurveyTemplate } from '../types';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
@@ -30,7 +30,7 @@ export const SurveyTemplates: React.FC = () => {
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">调研模板管理</h2>
-          <p className="text-slate-500">系统内置 1 个标准模板，仅支持查看内容，不支持新增、编辑、删除。</p>
+          <p className="text-slate-500">模板内容为只读展示，可在新建调研表单时进行选择。</p>
         </div>
         <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-semibold">
           预置模板: {templates.length} 个
@@ -59,7 +59,7 @@ export const SurveyTemplates: React.FC = () => {
 
                 <h3 className="text-lg font-bold text-slate-900 mb-2">{tpl.name}</h3>
                 <p className="text-sm text-slate-500 mb-4">
-                  包含 {tpl.sections.length} 个章节，共 {fieldCount} 个调研字段。
+                  包含 {tpl.sections.length} 个章节，共 {fieldCount} 个字段。
                 </p>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-50">
@@ -73,7 +73,7 @@ export const SurveyTemplates: React.FC = () => {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-5 text-sm text-slate-600">
-        当前模板总计 {summary.totalSections} 个章节，{summary.totalFields} 个字段。新建调研表单将自动使用该模板发起。
+        当前模板总计 {summary.totalSections} 个章节，{summary.totalFields} 个字段。
       </div>
 
       {selectedTemplate && (
@@ -84,7 +84,8 @@ export const SurveyTemplates: React.FC = () => {
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">{selectedTemplate.name}</h3>
                   <p className="text-xs text-slate-500 mt-1">
-                    共 {selectedTemplate.sections.length} 个章节，{selectedTemplate.sections.reduce((acc, s) => acc + s.fields.length, 0)} 个字段
+                    共 {selectedTemplate.sections.length} 个章节，
+                    {selectedTemplate.sections.reduce((acc, s) => acc + s.fields.length, 0)} 个字段
                   </p>
                 </div>
                 <button
@@ -97,6 +98,13 @@ export const SurveyTemplates: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
+                {selectedTemplate.readonlyContent && (
+                  <div className="bg-white rounded-2xl border border-blue-100 p-6">
+                    <h4 className="font-bold text-slate-900 mb-3">模板只读内容</h4>
+                    <pre className="text-xs leading-6 text-slate-700 whitespace-pre-wrap">{selectedTemplate.readonlyContent}</pre>
+                  </div>
+                )}
+
                 {selectedTemplate.sections.map((section) => (
                   <div key={section.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                     <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
@@ -122,6 +130,7 @@ export const SurveyTemplates: React.FC = () => {
                               ))}
                             </div>
                           )}
+                          {field.placeholder && <p className="text-xs text-slate-400">示例: {field.placeholder}</p>}
                         </div>
                       ))}
                     </div>

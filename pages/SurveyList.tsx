@@ -7,6 +7,19 @@ import { surveyService, userService } from '../src/services/supabaseService';
 export const SurveyList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [surveys, setSurveys] = useState<SurveyForm[]>([]);
+  const [isExternalView, setIsExternalView] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('ems_user');
+      if (!raw) return;
+      const user = JSON.parse(raw);
+      const type = user?.type || user?.user_type;
+      setIsExternalView(type === 'external');
+    } catch {
+      setIsExternalView(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchSurveys = async () => {
@@ -51,6 +64,7 @@ export const SurveyList: React.FC = () => {
     if (!keyword) return surveys;
     return surveys.filter((item) => {
       return (
+        (item.name || '').toLowerCase().includes(keyword) ||
         (item.projectName || '').toLowerCase().includes(keyword) ||
         (item.customerName || '').toLowerCase().includes(keyword)
       );
@@ -92,7 +106,7 @@ export const SurveyList: React.FC = () => {
           <div className="relative">
             <input
               type="text"
-              placeholder="搜索项目或客户..."
+              placeholder="搜索项目"
               className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none w-64 shadow-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -115,11 +129,20 @@ export const SurveyList: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
-        <table className="w-full text-left min-w-[980px]">
+        <table className={`w-full text-left ${isExternalView ? 'min-w-[1240px]' : 'min-w-[1120px]'}`}>
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
+              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">表单名称</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">项目名称</th>
-              <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">客户名称</th>
+              {!isExternalView && (
+                <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">客户名称</th>
+              )}
+              {isExternalView && (
+                <>
+                  <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">创建人</th>
+                  <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">提交人</th>
+                </>
+              )}
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">状态</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">报告</th>
               <th className="px-4 py-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider">创建时间</th>
@@ -131,12 +154,19 @@ export const SurveyList: React.FC = () => {
             {filteredSurveys.length > 0 ? (
               filteredSurveys.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-4 text-sm text-slate-700">{item.name || '-'}</td>
                   <td className="px-4 py-4 font-bold text-slate-900 text-sm">
                     <Link to={`/surveys/fill/${item.id}`} className="hover:text-blue-600 transition-colors">
                       {item.projectName}
                     </Link>
                   </td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{item.customerName}</td>
+                  {!isExternalView && <td className="px-4 py-4 text-sm text-slate-700">{item.customerName || '-'}</td>}
+                  {isExternalView && (
+                    <>
+                      <td className="px-4 py-4 text-sm text-slate-700">{item.creator || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-slate-700">{item.submitter || '-'}</td>
+                    </>
+                  )}
                   <td className="px-4 py-4">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -176,7 +206,7 @@ export const SurveyList: React.FC = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-6 py-20 text-center text-slate-400">
+                <td colSpan={isExternalView ? 8 : 7} className="px-6 py-20 text-center text-slate-400">
                   <div className="flex flex-col items-center">
                     <ICONS.Form className="w-12 h-12 mb-4 opacity-20" />
                     <p className="mt-2 font-medium">未找到符合条件的调研记录</p>

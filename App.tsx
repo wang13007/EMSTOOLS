@@ -39,17 +39,11 @@ const isExternalAllowedPath = (pathname: string) => {
   );
 };
 
-const NoMenuLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="min-h-screen bg-slate-50">
-    <div className="max-w-7xl mx-auto p-8">{children}</div>
-  </div>
-);
-
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const currentUser = getCurrentUserFromStorage();
-  const noMenu = isExternalUser(currentUser) || location.pathname.includes('/authorized/surveys/fill/');
-  return noMenu ? <NoMenuLayout>{children}</NoMenuLayout> : <Layout>{children}</Layout>;
+  const hideSidebar = isExternalUser(currentUser) || location.pathname.includes('/authorized/surveys/fill/');
+  return <Layout hideSidebar={hideSidebar}>{children}</Layout>;
 };
 
 const PlaceholderPage = ({ title }: { title: string }) => (

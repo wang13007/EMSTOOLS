@@ -1,4 +1,4 @@
-import { UserType } from '../../types';
+﻿import { UserType } from '../../types';
 
 export type RoleOption = {
   id: string;
@@ -11,11 +11,11 @@ const ROLE_STORAGE_KEY = 'ems_role_management_roles';
 const inferRoleType = (role: any): UserType => {
   const direct = role?.type || role?.user_type;
   if (direct === UserType.INTERNAL || direct === UserType.EXTERNAL) return direct;
-  const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
-  return source.includes('客户') || source.includes('外部') ? UserType.EXTERNAL : UserType.INTERNAL;
-};
 
-const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
+  const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
+  const externalKeywords = ['外部', '客户', 'customer', 'client', 'external'];
+  return externalKeywords.some((keyword) => source.includes(keyword)) ? UserType.EXTERNAL : UserType.INTERNAL;
+};
 
 export const normalizeRoleOptions = (roles: any[]): RoleOption[] => {
   const deduped = new Map<string, RoleOption>();
@@ -23,7 +23,7 @@ export const normalizeRoleOptions = (roles: any[]): RoleOption[] => {
     const id = String(role?.id || '').trim();
     const name = String(role?.name || '').trim();
     if (!id || !name) return;
-    if (!hasChinese(name)) return;
+
     const type = inferRoleType(role);
     const key = `${type}:${name}`;
     if (!deduped.has(key)) {

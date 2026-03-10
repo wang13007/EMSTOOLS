@@ -25,7 +25,7 @@ const inferRoleType = (role: any): 'internal' | 'external' => {
   }
 
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
-  const externalKeywords = ['澶栭儴', '瀹㈡埛', 'customer', 'client', 'external'];
+  const externalKeywords = ['外部', '客户', 'customer', 'client', 'external'];
   return externalKeywords.some((keyword) => source.includes(keyword)) ? 'external' : 'internal';
 };
 
@@ -463,7 +463,7 @@ export const surveyService = {
       const orFilters = externalUserIds
         .flatMap((id) => [`creator_id.eq.${id}`, `submitter_id.eq.${id}`, `pre_sales_responsible_id.eq.${id}`])
         .join(',');
-      const requests: Promise<any>[] = [
+      const requests = [
         supabase.from('survey_forms').select('*').or(orFilters),
         ...externalUserIds.map((id) =>
           supabase.from('survey_forms').select('*').contains('data', { external_access_user_ids: [id] })
