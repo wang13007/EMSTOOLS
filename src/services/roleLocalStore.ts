@@ -8,9 +8,22 @@ export type RoleOption = {
 
 const ROLE_STORAGE_KEY = 'ems_role_management_roles';
 
+const normalizeRoleType = (value: any): UserType | null => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const normalized = raw.toLowerCase();
+  if (normalized === UserType.INTERNAL || normalized.includes('internal') || raw.includes('内部')) {
+    return UserType.INTERNAL;
+  }
+  if (normalized === UserType.EXTERNAL || normalized.includes('external') || raw.includes('外部') || raw.includes('客户')) {
+    return UserType.EXTERNAL;
+  }
+  return null;
+};
+
 const inferRoleType = (role: any): UserType => {
-  const direct = role?.type || role?.user_type;
-  if (direct === UserType.INTERNAL || direct === UserType.EXTERNAL) return direct;
+  const direct = normalizeRoleType(role?.type || role?.user_type);
+  if (direct) return direct;
 
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
   const externalKeywords = ['外部', '客户', 'customer', 'client', 'external'];

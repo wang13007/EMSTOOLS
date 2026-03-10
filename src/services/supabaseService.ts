@@ -15,12 +15,33 @@ const dedupeStringArray = (values: Array<string | undefined | null>) => {
 const isUuid = (value: string | null | undefined) => Boolean(value && UUID_REGEX.test(value));
 
 const normalizeUserType = (value: any): 'internal' | 'external' => {
-  return value === 'internal' ? 'internal' : 'external';
+  const raw = String(value ?? '').trim();
+  const normalized = raw.toLowerCase();
+  if (normalized === 'internal' || normalized.includes('internal') || raw.includes('内部')) {
+    return 'internal';
+  }
+  if (normalized === 'external' || normalized.includes('external') || raw.includes('外部') || raw.includes('客户')) {
+    return 'external';
+  }
+  return 'external';
+};
+
+const normalizeRoleType = (value: any): 'internal' | 'external' | null => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const normalized = raw.toLowerCase();
+  if (normalized === 'internal' || normalized.includes('internal') || raw.includes('内部')) {
+    return 'internal';
+  }
+  if (normalized === 'external' || normalized.includes('external') || raw.includes('外部') || raw.includes('客户')) {
+    return 'external';
+  }
+  return null;
 };
 
 const inferRoleType = (role: any): 'internal' | 'external' => {
-  const directType = role?.type || role?.user_type;
-  if (directType === 'internal' || directType === 'external') {
+  const directType = normalizeRoleType(role?.type || role?.user_type);
+  if (directType) {
     return directType;
   }
 

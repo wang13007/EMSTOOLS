@@ -295,7 +295,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
       )}
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm relative z-0">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 shrink-0 shadow-sm relative z-40 overflow-visible">
           <div className="flex items-center gap-4" />
           <div className="flex items-center gap-6">
             <div className="relative" ref={messagePanelRef}>
@@ -314,7 +314,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
               </button>
 
               {messagePanelOpen && (
-                <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-20">
+                <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-xl shadow-xl p-4 z-50">
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <p className="text-sm font-bold text-slate-900">{getDisplayName(currentUser)}</p>
@@ -367,7 +367,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-40 rounded-xl border border-slate-200 bg-white shadow-xl p-2 z-20">
+                <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white shadow-xl p-2 z-50">
                   <button
                     type="button"
                     onClick={handleLogout}

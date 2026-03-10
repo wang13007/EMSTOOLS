@@ -35,9 +35,22 @@ const DEFAULT_FORM: FormState = {
 
 const RESET_PASSWORD_DEFAULT = '1234';
 
+const normalizeRoleType = (value: any): UserType | null => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const normalized = raw.toLowerCase();
+  if (normalized === UserType.INTERNAL || normalized.includes('internal') || raw.includes('内部')) {
+    return UserType.INTERNAL;
+  }
+  if (normalized === UserType.EXTERNAL || normalized.includes('external') || raw.includes('外部') || raw.includes('客户')) {
+    return UserType.EXTERNAL;
+  }
+  return null;
+};
+
 const inferRoleType = (role: any): UserType => {
-  const directType = role?.type || role?.user_type;
-  if (directType === UserType.INTERNAL || directType === UserType.EXTERNAL) return directType;
+  const directType = normalizeRoleType(role?.type || role?.user_type);
+  if (directType) return directType;
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
   const externalKeywords = ['客户', '外部', 'customer', 'client', 'external'];
   return externalKeywords.some((keyword) => source.includes(keyword)) ? UserType.EXTERNAL : UserType.INTERNAL;

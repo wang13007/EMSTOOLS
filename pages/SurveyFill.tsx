@@ -430,6 +430,7 @@ export const SurveyFill: React.FC = () => {
   }
 
   const isCompleted = form.status === SurveyStatus.COMPLETED;
+  const isAuthorizedFill = location.pathname.includes('/authorized/surveys/fill/');
 
   return (
     <div className="animate-fadeIn">
@@ -450,7 +451,7 @@ export const SurveyFill: React.FC = () => {
               >
                 返回列表
               </button>
-              {!isCompleted && (
+              {!isCompleted && !isAuthorizedFill && (
                 <button
                   onClick={handleCopyExternalLink}
                   disabled={submitting}

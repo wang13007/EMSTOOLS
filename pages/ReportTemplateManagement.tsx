@@ -7,6 +7,7 @@ import Portal from '../src/components/Portal';
 import {
   applyReportTemplateNameOverrides,
   applySurveyTemplateNameOverrides,
+  setReportTemplateDescriptionById,
   setReportTemplateNameById,
 } from '../src/services/templateNameStore';
 
@@ -46,6 +47,18 @@ export const ReportTemplateManagement: React.FC = () => {
       return;
     }
     setReportTemplateNameById(template.id, normalized);
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleEditDescription = (template: ReportTemplate) => {
+    const nextDescription = window.prompt('请输入新的模板描述', template.description || '');
+    if (nextDescription === null) return;
+    const normalized = nextDescription.trim();
+    if (!normalized) {
+      alert('模板描述不能为空');
+      return;
+    }
+    setReportTemplateDescriptionById(template.id, normalized);
     setRefreshKey((prev) => prev + 1);
   };
 
@@ -119,6 +132,13 @@ export const ReportTemplateManagement: React.FC = () => {
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100"
                   >
                     修改名称
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEditDescription(selectedTemplate)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100"
+                  >
+                    修改描述
                   </button>
                   <button
                     onClick={() => setSelectedTemplateId(null)}
