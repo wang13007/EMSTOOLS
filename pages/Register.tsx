@@ -33,6 +33,21 @@ export const Register: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
+    if (!formData.name.trim()) {
+      setError('姓名为必填项');
+      return false;
+    }
+
+    if (!formData.phone.trim()) {
+      setError('手机号为必填项');
+      return false;
+    }
+
+    if (!formData.email.trim()) {
+      setError('邮箱为必填项');
+      return false;
+    }
+
     if (formData.username.length < 4 || formData.username.length > 50) {
       setError('用户名长度必须在4-50字符之间');
       return false;
@@ -48,12 +63,12 @@ export const Register: React.FC = () => {
       return false;
     }
 
-    if (formData.phone && !/^\d+$/.test(formData.phone)) {
+    if (!/^\d+$/.test(formData.phone)) {
       setError('手机号必须为数字格式');
       return false;
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setError('邮箱格式不正确');
       return false;
     }
@@ -152,7 +167,7 @@ export const Register: React.FC = () => {
 
             <div>
               <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-1">
-                手机号
+                手机号 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -160,6 +175,7 @@ export const Register: React.FC = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
+                required
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 placeholder="请输入手机号"
               />
@@ -167,7 +183,7 @@ export const Register: React.FC = () => {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-                邮箱
+                邮箱 <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -175,6 +191,7 @@ export const Register: React.FC = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
+                required
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 placeholder="请输入邮箱"
               />

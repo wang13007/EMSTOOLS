@@ -1,4 +1,4 @@
-export interface LoginRequest {
+﻿export interface LoginRequest {
   username: string;
   password: string;
 }
@@ -10,8 +10,8 @@ export interface LoginOptions {
 export interface RegisterRequest {
   name: string;
   username: string;
-  phone?: string;
-  email?: string;
+  phone: string;
+  email: string;
   password: string;
   confirm_password: string;
 }
@@ -50,12 +50,8 @@ const generateSecureToken = (): string => {
 export const authService = {
   async login(data: LoginRequest, options?: LoginOptions): Promise<{ user: UserInfo; token: string }> {
     try {
-      console.log('登录请求:', data);
-
       const { userService, roleService } = await import('../services/supabaseService');
-
       const users = await userService.getUsers();
-      console.log('数据库用户列表:', users);
 
       let currentUser = users.find((u: any) => u.username === data.username);
       if (!currentUser) {
@@ -64,12 +60,8 @@ export const authService = {
         }
 
         const roles = await roleService.getRoles();
-        const customerRole = roles.find(
-          (r: any) => r.name === '客户用户' || r.name === '外部客户' || r.type === 'external'
-        );
-        if (!customerRole) {
-          throw new Error('系统配置错误，未找到外部角色');
-        }
+        const customerRole = roles.find((r: any) => r.name === '客户用户' || r.name === '外部客户' || r.type === 'external');
+        if (!customerRole) throw new Error('系统配置错误，未找到外部角色');
 
         const createdUser = await userService.createUser({
           user_name: data.username,
@@ -80,31 +72,21 @@ export const authService = {
           role_id: customerRole.id,
           status: 'enabled',
         });
-        if (!createdUser) {
-          throw new Error('自动创建外部用户失败');
-        }
+        if (!createdUser) throw new Error('自动创建外部用户失败');
         currentUser = createdUser;
       }
 
       const stored = String(currentUser.password_hash || '');
-
-      if (stored === data.password) {
-        console.warn('检测到明文密码，建议使用哈希值');
-      }
-
-      if (stored !== data.password) {
-        throw new Error('账号或密码错误');
-      }
+      if (stored !== data.password) throw new Error('账号或密码错误');
 
       const roles = await roleService.getRoles();
       const roleName = roles.find((r: any) => r.id === currentUser.role_id)?.name || '外部客户';
 
-      const userType = currentUser.user_type || currentUser.type || 'external';
       const userInfo: UserInfo = {
         id: currentUser.id,
         username: currentUser.username,
         name: currentUser.user_name || currentUser.name || currentUser.username,
-        type: userType,
+        type: currentUser.user_type || currentUser.type || 'external',
         role: roleName,
         role_id: currentUser.role_id,
         role_ids: Array.isArray(currentUser.role_ids)
@@ -122,11 +104,8 @@ export const authService = {
 
       localStorage.setItem('ems_user', JSON.stringify(userInfo));
       localStorage.setItem('ems_token', token);
-
-      console.log('登录成功:', { user: userInfo, token });
       return { user: userInfo, token };
     } catch (error) {
-      console.error('登录失败:', error);
       const msg = error instanceof Error ? error.message : '登录失败，请检查账号和密码';
       throw new Error(msg);
     }
@@ -134,25 +113,20 @@ export const authService = {
 
   async register(data: RegisterRequest): Promise<{ user: UserInfo; token: string }> {
     try {
-      console.log('注册请求:', data);
+      if (!data.username?.trim() || !data.name?.trim() || !data.phone?.trim() || !data.email?.trim()) {
+        throw new Error('用户名、姓名、手机号、邮箱均为必填项');
+      }
 
       const { userService, roleService } = await import('../services/supabaseService');
-
       const users = await userService.getUsers();
       const existingUser = users.find((u: any) => u.username === data.username);
-      if (existingUser) {
-        throw new Error('用户名已存在');
-      }
+      if (existingUser) throw new Error('用户名已存在');
 
       const roles = await roleService.getRoles();
-      console.log('角色列表:', roles);
-
       const customerRole = roles.find((r: any) => r.name === '客户用户' || r.name === '外部客户');
-      if (!customerRole) {
-        throw new Error('系统配置错误，未找到客户角色');
-      }
+      if (!customerRole) throw new Error('系统配置错误，未找到客户角色');
 
-      const userData = {
+      const createdUser = await userService.createUser({
         user_name: data.name,
         username: data.username,
         password_hash: data.password,
@@ -162,12 +136,8 @@ export const authService = {
         status: 'enabled',
         email: data.email,
         phone: data.phone,
-      };
-
-      const createdUser = await userService.createUser(userData);
-      if (!createdUser) {
-        throw new Error('用户创建失败');
-      }
+      });
+      if (!createdUser) throw new Error('用户创建失败');
 
       const userInfo: UserInfo = {
         id: createdUser.id,
@@ -184,14 +154,10 @@ export const authService = {
       };
 
       const token = generateSecureToken();
-
       localStorage.setItem('ems_user', JSON.stringify(userInfo));
       localStorage.setItem('ems_token', token);
-
-      console.log('注册成功:', { user: userInfo, token });
       return { user: userInfo, token };
     } catch (error) {
-      console.error('注册失败:', error);
       const msg = error instanceof Error ? error.message : '注册失败，请稍后重试';
       throw new Error(msg);
     }

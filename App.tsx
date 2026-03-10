@@ -1,4 +1,4 @@
-
+﻿
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
@@ -12,11 +12,45 @@ import { PreSalesConfig } from './pages/PreSalesConfig';
 import { UserManagement } from './pages/UserManagement';
 import { RoleManagement } from './pages/RoleManagement';
 import { ProductCapabilities } from './pages/ProductCapabilities';
+import { ReportTemplateManagement } from './pages/ReportTemplateManagement';
 import { MessageCenter } from './pages/MessageCenter';
 import { LogManagement } from './pages/LogManagement';
 import { Dictionaries } from './pages/Dictionaries';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+
+const getCurrentUserFromStorage = () => {
+  try {
+    const raw = localStorage.getItem('ems_user');
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const isExternalUser = (user: any) => user?.type === 'external' || user?.user_type === 'external';
+
+const isExternalAllowedPath = (pathname: string) => {
+  return (
+    pathname === '/customer-survey/list' ||
+    /^\/surveys\/fill\/[^/]+$/.test(pathname) ||
+    /^\/authorized\/surveys\/fill\/[^/]+$/.test(pathname)
+  );
+};
+
+const NoMenuLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="min-h-screen bg-slate-50">
+    <div className="max-w-7xl mx-auto p-8">{children}</div>
+  </div>
+);
+
+const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const location = useLocation();
+  const currentUser = getCurrentUserFromStorage();
+  const noMenu = isExternalUser(currentUser) || location.pathname.includes('/authorized/surveys/fill/');
+  return noMenu ? <NoMenuLayout>{children}</NoMenuLayout> : <Layout>{children}</Layout>;
+};
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="h-full flex flex-col items-center justify-center text-slate-400 py-20 animate-fadeIn">
@@ -24,19 +58,28 @@ const PlaceholderPage = ({ title }: { title: string }) => (
        <svg className="w-12 h-12 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
     </div>
     <h2 className="text-2xl font-bold text-slate-900 mb-2">{title}</h2>
-    <p className="text-slate-500">该功能模块正在建设中，预计下个版本发布。</p>
+    <p className="text-slate-500">该功能模块正在建设中，预计在后续版本发布。</p>
   </div>
 );
 
-// 路由保护组件
+// 璺敱淇濇姢缁勪欢
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const isLoggedIn = !!localStorage.getItem('ems_token');
   const redirect = encodeURIComponent(`${location.pathname}${location.search}`);
-  return isLoggedIn ? <>{children}</> : <Navigate to={`/login?redirect=${redirect}`} replace />;
+  if (!isLoggedIn) {
+    return <Navigate to={`/login?redirect=${redirect}`} replace />;
+  }
+
+  const currentUser = getCurrentUserFromStorage();
+  if (isExternalUser(currentUser) && !isExternalAllowedPath(location.pathname)) {
+    return <Navigate to="/customer-survey/list" replace />;
+  }
+
+  return <>{children}</>;
 };
 
-// 公共路由组件（不需要登录）
+// 鍏叡璺敱缁勪欢锛堜笉闇€瑕佺櫥褰曪級
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const isLoggedIn = !!localStorage.getItem('ems_token');
@@ -49,118 +92,125 @@ const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        {/* 公共路由 */}
+        {/* 鍏叡璺敱 */}
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-        {/* 受保护的路由 */}
+        {/* 鍙椾繚鎶ょ殑璺敱 */}
         <Route path="/" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <Dashboard />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
-        {/* 一级菜单: 客户调研管理 */}
+        {/* 涓€绾ц彍鍗? 瀹㈡埛璋冪爺绠＄悊 */}
         <Route path="/customer-survey/list" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <SurveyList />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/customer-survey/templates" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <SurveyTemplates />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         
-        {/* 调研功能扩展路径 */}
+        {/* 璋冪爺鍔熻兘鎵╁睍璺緞 */}
         <Route path="/surveys/new" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <SurveyCreate />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/surveys/fill/:id" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <SurveyFill />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/authorized/surveys/fill/:id" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <SurveyFill />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         
-        {/* 一级菜单: 产品方案管理 */}
+        {/* 涓€绾ц彍鍗? 浜у搧鏂规绠＄悊 */}
         <Route path="/product-solution/capabilities" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <ProductCapabilities />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         
-        {/* 报告详情 */}
+        {/* 鎶ュ憡璇︽儏 */}
+        <Route path="/product-solution/report-templates" element={
+          <ProtectedRoute>
+            <AppLayout>
+              <ReportTemplateManagement />
+            </AppLayout>
+          </ProtectedRoute>
+        } />
         <Route path="/reports/:id" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <ReportDetail />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
 
-        {/* 一级菜单: 系统设置 */}
+        {/* 涓€绾ц彍鍗? 绯荤粺璁剧疆 */}
         <Route path="/settings/users" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <UserManagement />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/settings/roles" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <RoleManagement />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/settings/pre-sales" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <PreSalesConfig />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/settings/dictionaries" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <Dictionaries />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/settings/messages" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <MessageCenter />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
         <Route path="/settings/logs" element={
           <ProtectedRoute>
-            <Layout>
+            <AppLayout>
               <LogManagement />
-            </Layout>
+            </AppLayout>
           </ProtectedRoute>
         } />
 
@@ -172,3 +222,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

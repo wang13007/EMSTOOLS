@@ -236,6 +236,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {isMenuOpen('product') && (
               <div className="mt-1 space-y-1 animate-fadeIn">
                 <SubItem to="/product-solution/capabilities" label="产品能力维护" />
+                <SubItem to="/product-solution/report-templates" label="报告模板管理" />
               </div>
             )}
           </div>

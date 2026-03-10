@@ -353,7 +353,7 @@ export const SurveyCreate: React.FC = () => {
         <div className="pt-4 flex justify-end gap-4">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/customer-survey/list')}
             className="px-6 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors"
           >
             取消

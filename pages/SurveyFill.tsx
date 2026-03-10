@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
@@ -84,7 +84,7 @@ export const SurveyFill: React.FC = () => {
 
       if (!resolvedId) {
         setInitializing(false);
-        alert('未找到该表单');
+        alert('鏈壘鍒拌琛ㄥ崟');
         navigate('/customer-survey/list');
         return;
       }
@@ -110,7 +110,7 @@ export const SurveyFill: React.FC = () => {
       }
       if (!survey) {
         setInitializing(false);
-        alert('未找到该表单');
+        alert('鏈壘鍒拌琛ㄥ崟');
         navigate('/customer-survey/list');
         return;
       }
@@ -142,7 +142,7 @@ export const SurveyFill: React.FC = () => {
     const handler = (event: BeforeUnloadEvent) => {
       if (!dirty && autoSaveState !== 'saving') return;
       event.preventDefault();
-      event.returnValue = '当前有未保存修改，确认离开吗？';
+      event.returnValue = '褰撳墠鏈夋湭淇濆瓨淇敼锛岀‘璁ょ寮€鍚楋紵';
       return event.returnValue;
     };
     window.addEventListener('beforeunload', handler);
@@ -173,7 +173,7 @@ export const SurveyFill: React.FC = () => {
         });
 
         if (!updated) {
-          throw new Error('保存草稿失败');
+          throw new Error('淇濆瓨鑽夌澶辫触');
         }
 
         const mapped = toSurveyForm(updated);
@@ -191,10 +191,10 @@ export const SurveyFill: React.FC = () => {
         }, 1800);
         return true;
       } catch (error) {
-        console.error('保存草稿失败:', error);
+        console.error('淇濆瓨鑽夌澶辫触:', error);
         setAutoSaveState('error');
         if (alertOnError) {
-          alert('保存草稿失败，请重试');
+          alert('淇濆瓨鑽夌澶辫触锛岃閲嶈瘯');
         }
         return false;
       } finally {
@@ -277,6 +277,20 @@ export const SurveyFill: React.FC = () => {
     await persistDraft({ silent: false, alertOnError: true });
   };
 
+  const saveBeforeLeave = async () => {
+    if (!dirty) return true;
+    const saved = await persistDraft({ silent: true, alertOnError: false });
+    if (saved) return true;
+    return window.confirm('自动保存草稿失败，是否仍返回调研表单列表？');
+  };
+
+  const handleBackToList = async () => {
+    if (submitting) return;
+    const canLeave = await saveBeforeLeave();
+    if (!canLeave) return;
+    navigate('/customer-survey/list');
+  };
+
   const handleSubmit = async () => {
     if (!form) return;
     setSubmitting(true);
@@ -299,7 +313,7 @@ export const SurveyFill: React.FC = () => {
       });
 
       if (!updated) {
-        throw new Error('提交失败');
+        throw new Error('鎻愪氦澶辫触');
       }
 
       const mapped = toSurveyForm(updated);
@@ -315,8 +329,8 @@ export const SurveyFill: React.FC = () => {
 
       navigate(`/reports/${form.id}`);
     } catch (error) {
-      console.error('提交并生成报告失败:', error);
-      alert(error instanceof Error ? error.message : '生成报告失败，请检查网络或 API 配置');
+      console.error('鎻愪氦骞剁敓鎴愭姤鍛婂け璐?', error);
+      alert(error instanceof Error ? error.message : '鐢熸垚鎶ュ憡澶辫触锛岃妫€鏌ョ綉缁滄垨 API 閰嶇疆');
     } finally {
       setSubmitting(false);
     }
@@ -332,7 +346,7 @@ export const SurveyFill: React.FC = () => {
   }, [autoSaveState, dirty, lastSavedAt]);
 
   if (initializing || !form || !template) {
-    return <div className="p-20 text-center">加载中...</div>;
+    return <div className="p-20 text-center">鍔犺浇涓?..</div>;
   }
 
   return (
@@ -343,16 +357,23 @@ export const SurveyFill: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-slate-900">{form.name}</h2>
               <p className="text-slate-500">
-                {form.customerName} · {form.projectName}
+                {form.customerName} 路 {form.projectName}
               </p>
             </div>
             <div className="flex gap-4 shrink-0">
+              <button
+                onClick={handleBackToList}
+                disabled={submitting}
+                className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
+              >
+                返回列表
+              </button>
               <button
                 onClick={saveDraft}
                 disabled={saving || submitting}
                 className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
               >
-                {saving ? '正在保存...' : '保存草稿'}
+                {saving ? '姝ｅ湪淇濆瓨...' : '淇濆瓨鑽夌'}
               </button>
               <button
                 onClick={handleSubmit}
@@ -369,7 +390,7 @@ export const SurveyFill: React.FC = () => {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    AI 分析中...
+                    AI 鍒嗘瀽涓?..
                   </>
                 ) : (
                   '提交并生成报告'
@@ -412,7 +433,7 @@ export const SurveyFill: React.FC = () => {
                       <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
                         {field.label}
                         {field.required && <span className="text-red-500">*</span>}
-                        {readOnly && <span className="text-xs text-slate-400 ml-2">(已预填，不可修改)</span>}
+                        {readOnly && <span className="text-xs text-slate-400 ml-2">(宸查濉紝涓嶅彲淇敼)</span>}
                       </label>
 
                       {field.type === 'text' && (
@@ -453,7 +474,7 @@ export const SurveyFill: React.FC = () => {
                           value={form.data[field.id] || ''}
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                         >
-                          <option value="">请选择</option>
+                          <option value="">璇烽€夋嫨</option>
                           {field.options?.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -514,3 +535,4 @@ export const SurveyFill: React.FC = () => {
     </div>
   );
 };
+
