@@ -298,13 +298,11 @@ const normalizeUser = (user: any) => {
 export const userService = {
   async getUsers() {
     try {
-      console.log('Start fetching user list');
       const { data, error } = await supabase.from('users').select('*');
       if (error) {
         console.error('Failed to fetch users:', error);
         return [];
       }
-      console.log('Fetched users successfully, count:', data?.length || 0);
       return (data || []).map(normalizeUser);
     } catch (error) {
       console.error('Unexpected error while fetching users:', error);
@@ -336,8 +334,6 @@ export const userService = {
 
   async createUser(user: any) {
     try {
-      console.log('开始创建用户，输入数据:', user);
-
       const { data: roles, error: rolesError } = await supabase.from('roles').select('*');
       if (rolesError) {
         console.error('获取角色列表失败:', rolesError);
@@ -391,7 +387,6 @@ export const userService = {
 
       for (const dbUser of payloads) {
         let payload = { ...dbUser };
-        console.log('处理后的数据库用户数据:', payload);
 
         while (true) {
           const { data, error } = await supabase.from('users').insert(payload).select().single();
@@ -399,7 +394,6 @@ export const userService = {
           if (!error) {
             const createdUserId = data.user_id || data.id;
             cacheRoleIdsForUser(createdUserId, roleIds);
-            console.log('创建用户成功:', data);
             return normalizeUser({ ...data, role_ids: roleIds });
           }
 
@@ -471,8 +465,6 @@ export const userService = {
         : [{ ...baseUser }];
 
       for (const dbUser of payloads) {
-        console.log('处理后的数据库用户数据:', dbUser);
-
         const primary = await supabase.from('users').update(dbUser).eq('user_id', id).select().single();
         if (!primary.error) {
           const updatedUserId = primary.data?.user_id || primary.data?.id;

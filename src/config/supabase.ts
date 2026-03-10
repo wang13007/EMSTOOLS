@@ -27,10 +27,12 @@ const detectSupabaseRole = (jwt: string) => {
   }
 };
 
-console.info('[supabase] client initialized:', {
-  url: supabaseUrl,
-  keyRole: detectSupabaseRole(supabaseKey),
-});
+if (import.meta.env.DEV) {
+  console.info('[supabase] client initialized:', {
+    url: supabaseUrl,
+    keyRole: detectSupabaseRole(supabaseKey),
+  });
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
