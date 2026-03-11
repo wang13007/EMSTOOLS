@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ICONS } from '../constants';
 import { Role, UserStatus, UserType } from '../types';
 import Portal from '../src/components/Portal';
-import { getRoleManagementRoleRecords, saveRoleManagementRoles } from '../src/services/roleLocalStore';
+import { roleService } from '../src/services/supabaseService';
 
 type PermissionAction = {
   key: string;
@@ -160,13 +160,6 @@ const LEGACY_PERMISSION_KEY_MAP: Record<string, string[]> = {
   'system:logs': ['logs:view'],
 };
 
-const buildPermissionRecord = (keys: string[]) => {
-  return keys.reduce<Record<string, boolean>>((acc, key) => {
-    acc[key] = true;
-    return acc;
-  }, {});
-};
-
 const normalizePermissionRecord = (permissions: Record<string, boolean> | undefined) => {
   const normalized: Record<string, boolean> = {};
   Object.entries(permissions || {}).forEach(([key, enabled]) => {
@@ -204,130 +197,62 @@ const getEnabledPermissionLabels = (permissions: Record<string, boolean> | undef
   return [...known, ...unknown];
 };
 
-const INITIAL_ROLES: Role[] = [
-  {
-    id: 'role-1',
-    name: '超级管理员',
-    description: '拥有系统全部模块访问权限。',
-    type: UserType.INTERNAL,
-    status: UserStatus.ENABLED,
-    createTime: '2023-01-01',
-    permissions: buildPermissionRecord(ORDERED_PERMISSION_KEYS),
-  },
-  {
-    id: 'role-2',
-    name: '售前工程师',
-    description: '负责调研、填写与报告生成。',
-    type: UserType.INTERNAL,
-    status: UserStatus.ENABLED,
-    createTime: '2023-05-12',
-    permissions: buildPermissionRecord([
-      'dashboard:view',
-      'survey_form:view',
-      'survey_form:create',
-      'survey_form:edit',
-      'survey_form:submit',
-      'survey_form:generate_report',
-      'survey_form:view_report',
-      'survey_form:share_report',
-      'survey_form:export_report',
-      'survey_template:view',
-      'capability:view',
-      'capability:edit',
-      'capability:import',
-      'capability:export',
-      'report_template:view',
-      'user:view',
-      'role:view',
-      'pre_sales:view',
-      'message:view',
-    ]),
-  },
-  {
-    id: 'role-3',
-    name: '外部客户',
-    description: '仅可访问授权范围内调研表单。',
-    type: UserType.EXTERNAL,
-    status: UserStatus.ENABLED,
-    createTime: '2024-02-15',
-    permissions: buildPermissionRecord([
-      'survey_form:view',
-      'survey_form:submit',
-      'survey_form:view_report',
-      'survey_form:share_report',
-      'survey_form:export_report',
-    ]),
-  },
-];
+const normalizeRoleType = (value: any): UserType => {
+  const raw = String(value ?? '').trim();
+  const normalized = raw.toLowerCase();
+  if (normalized === UserType.INTERNAL || normalized.includes('internal') || raw.includes('内部')) {
+    return UserType.INTERNAL;
+  }
+  if (normalized === UserType.EXTERNAL || normalized.includes('external') || raw.includes('外部') || raw.includes('客户')) {
+    return UserType.EXTERNAL;
+  }
+  return UserType.INTERNAL;
+};
 
-const PRESET_ROLE_IDS = new Set(['role-1', 'role-2', 'role-3']);
+const normalizeRoleStatus = (value: any): UserStatus => {
+  return String(value ?? '').toLowerCase() === UserStatus.DISABLED ? UserStatus.DISABLED : UserStatus.ENABLED;
+};
+
+const normalizeRoleRecord = (role: any): Role => {
+  return {
+    id: String(role?.id || ''),
+    name: String(role?.name || ''),
+    description: String(role?.description || ''),
+    type: normalizeRoleType(role?.type || role?.user_type),
+    permissions: normalizePermissionRecord(role?.permissions || {}),
+    status: normalizeRoleStatus(role?.status),
+    createTime: role?.create_time
+      ? new Date(role.create_time).toISOString().slice(0, 10)
+      : role?.createTime || new Date().toISOString().slice(0, 10),
+  };
+};
 
 export const RoleManagement: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Partial<Role> | null>(null);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState('');
 
-  useEffect(() => {
-    const localRoles = getRoleManagementRoleRecords();
-    if (Array.isArray(localRoles) && localRoles.length > 0) {
-      const defaultRoleMap = new Map(INITIAL_ROLES.map((r) => [r.id, r]));
-      const normalized = localRoles.map((role: any) => {
-        const defaults = defaultRoleMap.get(role.id);
-        return {
-          ...(defaults || {}),
-          ...role,
-          permissions: normalizePermissionRecord(role.permissions || defaults?.permissions || {}),
-          status: role.status || defaults?.status || UserStatus.ENABLED,
-          type: role.type || defaults?.type || UserType.INTERNAL,
-          createTime: role.createTime || defaults?.createTime || new Date().toISOString().slice(0, 10),
-        } as Role;
-      });
-      setRoles(normalized);
-      return;
+  const loadRoles = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const roleList = await roleService.getRoles();
+      setRoles((roleList || []).map(normalizeRoleRecord));
+    } catch (loadError) {
+      console.error('加载角色失败:', loadError);
+      setError('加载角色失败，请检查数据库 roles 表配置。');
+    } finally {
+      setLoading(false);
     }
-
-    setRoles(INITIAL_ROLES);
-    saveRoleManagementRoles(INITIAL_ROLES);
   }, []);
 
-  const saveRoles = (newRoles: Role[]) => {
-    setRoles(newRoles);
-    saveRoleManagementRoles(newRoles);
-  };
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingRole?.name) return;
-
-    const normalizedPermissions = normalizePermissionRecord(editingRole.permissions || {});
-
-    if (editingRole.id) {
-      const updatedRole = {
-        ...editingRole,
-        permissions: normalizedPermissions,
-        status: editingRole.status || UserStatus.ENABLED,
-      } as Role;
-      saveRoles(roles.map((r) => (r.id === editingRole.id ? updatedRole : r)));
-      setSaveSuccessMessage('角色权限更新成功');
-    } else {
-      const newRole: Role = {
-        id: `role-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        name: editingRole.name,
-        description: editingRole.description || '',
-        type: editingRole.type || UserType.INTERNAL,
-        permissions: normalizedPermissions,
-        status: UserStatus.ENABLED,
-        createTime: new Date().toISOString().slice(0, 10),
-      };
-      saveRoles([...roles, newRole]);
-      setSaveSuccessMessage('角色创建成功');
-    }
-
-    setIsModalOpen(false);
-    setEditingRole(null);
-    window.setTimeout(() => setSaveSuccessMessage(''), 3000);
-  };
+  useEffect(() => {
+    void loadRoles();
+  }, [loadRoles]);
 
   const togglePermission = (key: string) => {
     if (!editingRole) return;
@@ -343,6 +268,97 @@ export const RoleManagement: React.FC = () => {
     }, {});
   }, [roles]);
 
+  const closeModal = () => {
+    if (saving) return;
+    setIsModalOpen(false);
+    setEditingRole(null);
+  };
+
+  const openCreateModal = () => {
+    setEditingRole({
+      name: '',
+      description: '',
+      type: UserType.INTERNAL,
+      status: UserStatus.ENABLED,
+      permissions: {},
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (role: Role) => {
+    setEditingRole({
+      ...role,
+      permissions: normalizePermissionRecord(role.permissions),
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRole?.name || saving) return;
+
+    const name = editingRole.name.trim();
+    if (!name) {
+      setError('角色名称不能为空。');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        name,
+        description: editingRole.description || '',
+        type: editingRole.type || UserType.INTERNAL,
+        user_type: editingRole.type || UserType.INTERNAL,
+        permissions: normalizePermissionRecord(editingRole.permissions || {}),
+        status: normalizeRoleStatus(editingRole.status),
+      };
+
+      if (editingRole.id) {
+        const updated = await roleService.updateRole(editingRole.id, payload);
+        if (!updated) throw new Error('角色更新失败，请检查数据库 roles 表。');
+        setSaveSuccessMessage('角色权限更新成功');
+      } else {
+        const created = await roleService.createRole(payload);
+        if (!created) throw new Error('角色创建失败，请检查数据库 roles 表。');
+        setSaveSuccessMessage('角色创建成功');
+      }
+
+      setIsModalOpen(false);
+      setEditingRole(null);
+      window.setTimeout(() => setSaveSuccessMessage(''), 3000);
+      await loadRoles();
+    } catch (saveError) {
+      const message = saveError instanceof Error ? saveError.message : '角色保存失败，请稍后重试。';
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (role: Role) => {
+    if (saving) return;
+    if (!window.confirm(`确定要删除角色「${role.name}」吗？`)) return;
+
+    setSaving(true);
+    setError('');
+    try {
+      const ok = await roleService.deleteRole(role.id);
+      if (!ok) {
+        throw new Error('删除角色失败：可能是预置角色不可删除，或该角色已被引用。');
+      }
+      setSaveSuccessMessage('角色删除成功');
+      window.setTimeout(() => setSaveSuccessMessage(''), 3000);
+      await loadRoles();
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : '删除角色失败，请稍后重试。';
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {saveSuccessMessage && (
@@ -350,96 +366,85 @@ export const RoleManagement: React.FC = () => {
           {saveSuccessMessage}
         </div>
       )}
+      {error && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          {error}
+        </div>
+      )}
 
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">角色管理</h2>
-          <p className="text-slate-500">按左侧菜单结构分配角色权限，并可细化到菜单操作级别。</p>
+          <p className="text-slate-500">角色数据直接来自数据库 roles 表，和用户管理使用同一数据源。</p>
         </div>
         <button
-          onClick={() => {
-            setEditingRole({ permissions: {} });
-            setIsModalOpen(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95"
+          onClick={openCreateModal}
+          disabled={saving || loading}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95 disabled:opacity-60"
         >
           <ICONS.Plus className="w-4 h-4" />
           新增角色
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {roles.map((role) => {
-          const labels = rolePreviewMap[role.id] || [];
-          const shownLabels = labels.slice(0, 6);
-          const remainCount = labels.length - shownLabels.length;
-          return (
-            <div key={role.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col">
-              <div className="p-6 border-b border-slate-100">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-bold text-slate-900">{role.name}</h3>
-                  <div className="flex gap-2">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.type === UserType.INTERNAL ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
-                      {role.type === UserType.INTERNAL ? '内部' : '外部'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {role.status === UserStatus.ENABLED ? '启用' : '禁用'}
-                    </span>
+      {loading ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center text-slate-400">加载中...</div>
+      ) : roles.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center text-slate-400">暂无角色数据</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {roles.map((role) => {
+            const labels = rolePreviewMap[role.id] || [];
+            const shownLabels = labels.slice(0, 6);
+            const remainCount = labels.length - shownLabels.length;
+
+            return (
+              <div key={role.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col">
+                <div className="p-6 border-b border-slate-100">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-bold text-slate-900">{role.name}</h3>
+                    <div className="flex gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.type === UserType.INTERNAL ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>
+                        {role.type === UserType.INTERNAL ? '内部' : '外部'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                        {role.status === UserStatus.ENABLED ? '启用' : '禁用'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-500 line-clamp-2 h-10">{role.description || '-'}</p>
+                </div>
+
+                <div className="p-6 flex-1">
+                  <div className="flex flex-wrap gap-2">
+                    {shownLabels.map((label) => (
+                      <span key={`${role.id}_${label}`} className="px-2 py-1 bg-slate-100 rounded text-[10px] font-medium text-slate-600">
+                        {label}
+                      </span>
+                    ))}
+                    {remainCount > 0 && (
+                      <span className="px-2 py-1 bg-blue-50 rounded text-[10px] font-semibold text-blue-700">+{remainCount}</span>
+                    )}
+                    {!labels.length && <span className="text-xs text-slate-400">未授权任何权限</span>}
                   </div>
                 </div>
-                <p className="text-sm text-slate-500 line-clamp-2 h-10">{role.description || '-'}</p>
-              </div>
 
-              <div className="p-6 flex-1">
-                <div className="flex flex-wrap gap-2">
-                  {shownLabels.map((label) => (
-                    <span key={`${role.id}_${label}`} className="px-2 py-1 bg-slate-100 rounded text-[10px] font-medium text-slate-600">
-                      {label}
-                    </span>
-                  ))}
-                  {remainCount > 0 && (
-                    <span className="px-2 py-1 bg-blue-50 rounded text-[10px] font-semibold text-blue-700">
-                      +{remainCount}
-                    </span>
-                  )}
-                  {!labels.length && <span className="text-xs text-slate-400">未授权任何权限</span>}
+                <div className="p-4 bg-slate-50 rounded-b-2xl border-t border-slate-100 flex justify-between items-center">
+                  <span className="text-[10px] text-slate-400 font-medium">创建于 {role.createTime}</span>
+                  <div className="flex gap-3">
+                    <button onClick={() => openEditModal(role)} disabled={saving} className="text-blue-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline">
+                      编辑权限
+                    </button>
+                    <button onClick={() => void handleDelete(role)} disabled={saving} className="text-rose-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline">
+                      删除
+                    </button>
+                  </div>
                 </div>
               </div>
-
-              <div className="p-4 bg-slate-50 rounded-b-2xl border-t border-slate-100 flex justify-between items-center">
-                <span className="text-[10px] text-slate-400 font-medium">创建于 {role.createTime}</span>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setEditingRole({ ...role, permissions: normalizePermissionRecord(role.permissions) });
-                      setIsModalOpen(true);
-                    }}
-                    className="text-blue-600 font-bold text-xs hover:underline"
-                  >
-                    编辑权限
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (PRESET_ROLE_IDS.has(role.id)) {
-                        setSaveSuccessMessage('预置角色不可删除');
-                        window.setTimeout(() => setSaveSuccessMessage(''), 3000);
-                        return;
-                      }
-                      if (window.confirm('确定要删除该角色吗？')) {
-                        saveRoles(roles.filter((r) => r.id !== role.id));
-                      }
-                    }}
-                    disabled={PRESET_ROLE_IDS.has(role.id)}
-                    className={`font-bold text-xs ${PRESET_ROLE_IDS.has(role.id) ? 'text-slate-300 cursor-not-allowed' : 'text-rose-600 hover:underline'}`}
-                  >
-                    {PRESET_ROLE_IDS.has(role.id) ? '预置角色' : '删除'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {isModalOpen && (
         <Portal>
@@ -447,7 +452,7 @@ export const RoleManagement: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-slideUp flex flex-col">
               <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center shrink-0">
                 <h3 className="text-xl font-bold text-slate-900">{editingRole?.id ? '编辑角色权限' : '新增角色'}</h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                   <ICONS.Plus className="w-6 h-6 rotate-45" />
                 </button>
               </div>
@@ -458,7 +463,7 @@ export const RoleManagement: React.FC = () => {
                   <input
                     required
                     value={editingRole?.name || ''}
-                    onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
+                    onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), name: e.target.value }))}
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="例如：实施经理"
                   />
@@ -468,22 +473,36 @@ export const RoleManagement: React.FC = () => {
                   <label className="text-xs font-bold text-slate-500 uppercase">角色描述</label>
                   <textarea
                     value={editingRole?.description || ''}
-                    onChange={(e) => setEditingRole({ ...editingRole, description: e.target.value })}
+                    onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), description: e.target.value }))}
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">类型 <span className="text-rose-600">*</span></label>
-                  <select
-                    required
-                    value={editingRole?.type || UserType.INTERNAL}
-                    onChange={(e) => setEditingRole({ ...editingRole, type: e.target.value as UserType })}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                  >
-                    <option value={UserType.INTERNAL}>内部用户</option>
-                    <option value={UserType.EXTERNAL}>外部客户</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">类型 <span className="text-rose-600">*</span></label>
+                    <select
+                      required
+                      value={editingRole?.type || UserType.INTERNAL}
+                      onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), type: e.target.value as UserType }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value={UserType.INTERNAL}>内部用户</option>
+                      <option value={UserType.EXTERNAL}>外部客户</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">状态 <span className="text-rose-600">*</span></label>
+                    <select
+                      required
+                      value={editingRole?.status || UserStatus.ENABLED}
+                      onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), status: e.target.value as UserStatus }))}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      <option value={UserStatus.ENABLED}>启用</option>
+                      <option value={UserStatus.DISABLED}>禁用</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -518,11 +537,11 @@ export const RoleManagement: React.FC = () => {
                 </div>
 
                 <div className="pt-4 flex justify-end gap-3 shrink-0">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">
+                  <button type="button" onClick={closeModal} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">
                     取消
                   </button>
-                  <button type="submit" className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200">
-                    保存角色
+                  <button type="submit" disabled={saving} className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 disabled:opacity-60">
+                    {saving ? '保存中...' : '保存角色'}
                   </button>
                 </div>
               </form>
