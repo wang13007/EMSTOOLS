@@ -148,8 +148,10 @@ const buildTemplateSections = (
     .filter(Boolean)
     .join('\n');
 
-  const gaps = aiReport?.keyGaps?.length ? aiReport.keyGaps.map((item) => `- ${item}`).join('\n') : '- 暂无关键差距数据';
-  const actions = aiReport?.nextSteps?.length ? aiReport.nextSteps.map((item, idx) => `${idx + 1}. ${item}`).join('\n') : '1. 完善基础数据采集\n2. 完成实施方案评审';
+  const gaps = aiReport?.keyGaps?.length ? aiReport.keyGaps.map((item) => `关键差距：${item}`).join('\n') : '暂无关键差距数据。';
+  const actions = aiReport?.nextSteps?.length
+    ? aiReport.nextSteps.map((item, idx) => `步骤${idx + 1}：${item}`).join('\n')
+    : '步骤1：完善基础数据采集\n步骤2：完成实施方案评审';
   const recommendations = [
     `软件建议：${aiReport?.softwareRecommendations?.join('；') || '未提供'}`,
     `硬件建议：${aiReport?.hardwareRecommendations?.join('；') || '未提供'}`,
@@ -158,10 +160,10 @@ const buildTemplateSections = (
   const capabilityMatchSummary = capabilityMatches.length
     ? [
         `匹配结果：${capabilityMatches.filter((item) => item.matched).length}/${capabilityMatches.length} 已匹配`,
-        ...capabilityMatches.map(
-          (item, idx) =>
-            `${idx + 1}. ${item.name}（${item.type}）- ${item.matched ? '已匹配' : '待匹配'}；${item.reasons.join('；')}`,
-        ),
+        ...capabilityMatches.map((item, idx) => {
+          const reasonText = item.reasons.length ? item.reasons.join('；') : '无补充说明';
+          return `第${idx + 1}项：${item.name}（${item.type}），状态：${item.matched ? '已匹配' : '待匹配'}。依据：${reasonText}`;
+        }),
       ].join('\n')
     : '暂无产品能力数据。';
 
@@ -254,28 +256,28 @@ const buildTemplateCharts = (
 };
 
 const composeTemplateReportContent = (
-  renderedTemplate: string,
+  _renderedTemplate: string,
   sections: TemplateReportSection[],
   charts: TemplateChartBlock[],
 ) => {
   const sectionContent = sections
-    .map((section) => `### ${section.title}\n${section.content}`)
+    .map((section) => `${section.title}\n${section.content}`)
     .join('\n\n');
 
   const chartContent = charts
     .map((chart) => {
-      const points = chart.data.map((point) => `- ${point.name}: ${point.value}`).join('\n');
-      return `### ${chart.title}\n${chart.summary}\n${points}`;
+      const points = chart.data
+        .map((point, idx) => `数据${idx + 1}：${point.name}，数值 ${point.value}`)
+        .join('\n');
+      return `${chart.title}\n${chart.summary}\n${points}`;
     })
     .join('\n\n');
 
   return [
-    renderedTemplate,
-    '',
-    '## 自动生成分析正文',
+    '自动生成分析正文',
     sectionContent,
     '',
-    '## 图表信息',
+    '图表信息',
     chartContent,
   ].join('\n');
 };
@@ -286,7 +288,7 @@ const buildFallbackTemplateReport = (
   capabilityMatches: ProductCapabilityMatch[] = [],
 ): TemplateReportResult => {
   const surveyTemplate = SURVEY_TEMPLATES.find((item) => item.id === surveyForm.templateId) || SURVEY_TEMPLATES[0];
-  const content = `# 模板输出报告（回退）
+  const content = `模板输出报告（回退）
 
 项目名称：{{project_name}}
 客户名称：{{client_name}}
