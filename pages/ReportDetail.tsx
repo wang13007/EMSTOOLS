@@ -117,6 +117,19 @@ const ZH = {
   richBody: '\u6a21\u677f\u6b63\u6587\uff08\u5bcc\u6587\u672c\uff09',
   templateInsight: '\u6a21\u677f\u62a5\u544a\u4e3b\u89c2\u6d1e\u5bdf',
   chartSnapshot: '\u5173\u952e\u56fe\u8868\u5feb\u7167',
+  fullNarrative: '\u5b8c\u6574\u5206\u6790\u6b63\u6587',
+  moduleLibrary: '\u63a8\u8350\u80fd\u529b\u6a21\u5757\u5e93',
+  detailFindings: '\u8be6\u7ec6\u8bca\u65ad\u8981\u70b9',
+  implementationRoadmap: '\u5206\u9636\u6bb5\u5b9e\u65bd\u8def\u7ebf',
+  riskControl: '\u98ce\u9669\u4e0e\u63a7\u5236\u63aa\u65bd',
+  kpiAndAcceptance: 'KPI \u4e0e\u9a8c\u6536\u6307\u6807',
+  investmentBreakdown: '\u6295\u5165\u62c6\u89e3',
+  expectedBenefits: '\u9884\u671f\u6536\u76ca',
+  operationMechanism: '\u8fd0\u8425\u673a\u5236\u5efa\u8bae',
+  dataGovernance: '\u6570\u636e\u6cbb\u7406\u89c4\u5212',
+  softwareSuggestion: '\u8f6f\u4ef6\u5efa\u8bae',
+  hardwareSuggestion: '\u786c\u4ef6\u5efa\u8bae',
+  consultingSuggestion: '\u54a8\u8be2\u5efa\u8bae',
   exportPrefix: '\u5bfc\u51fa',
   defaultReportName: '\u62a5\u544a',
   valueLabel: '\u6570\u503c',
@@ -128,6 +141,16 @@ const splitParagraphs = (content?: string) => {
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean);
+};
+
+const toDisplayList = (value: unknown, fallback: string[]) => {
+  if (Array.isArray(value)) {
+    const normalized = Array.from(new Set(value.map((item) => String(item || '').trim()).filter(Boolean)));
+    if (normalized.length) {
+      return normalized;
+    }
+  }
+  return fallback;
 };
 
 const toReportBundle = (survey: SurveyForm, rawStored: any): { bundle: ReportBundle; shouldPersist: boolean } => {
@@ -277,6 +300,64 @@ export const ReportDetail: React.FC = () => {
       .split(/\n{2,}/)
       .map((block) => block.trim())
       .filter(Boolean);
+  }, [data]);
+
+  const aiExtended = useMemo(() => {
+    const ai = (data?.report?.aiReport || {}) as any;
+    const project = data?.survey?.projectName || '本项目';
+    const customer = data?.survey?.customerName || '客户方';
+
+    return {
+      fullNarrative: String(
+        ai.fullNarrative
+          || `${ai.summary || ''}\n\n${ai.energyStructureAnalysis || ''}\n${ai.savingPotential || ''}\n${ai.roiAnalysis || ''}`,
+      ).trim(),
+      detailedFindings: toDisplayList(ai.detailedFindings, [
+        `${project} 当前缺少统一的数据口径与质量监控，存在统计偏差风险。`,
+        `针对 ${customer} 的运营场景，能源异常发现与处置仍偏人工流程。`,
+        '关键设备运行策略未形成可复制的标准化规则库。',
+        '跨部门协同缺乏固定节奏，问题闭环与复盘机制有待强化。',
+      ]),
+      phasedRoadmap: toDisplayList(ai.phasedRoadmap, [
+        '0-30天：完成点位复核、数据接入清单与试点范围确认。',
+        '31-90天：完成看板、告警、分析模型上线并持续优化。',
+        '91-180天：复制至更多系统/区域并固化经营协同机制。',
+      ]),
+      riskMitigations: toDisplayList(ai.riskMitigations, [
+        '建立数据质量稽核机制，降低统计口径不一致风险。',
+        '采用灰度发布与回滚预案，降低集成上线风险。',
+        '建立跨部门例会与升级路径，降低协同执行风险。',
+      ]),
+      kpiSuggestions: toDisplayList(ai.kpiSuggestions, [
+        '综合能耗强度同比下降 5%-10%',
+        '异常告警处置闭环时长下降 40%+',
+        '能源数据完整率保持在 98%+',
+      ]),
+      investmentBreakdown: toDisplayList(ai.investmentBreakdown, [
+        '计量采集层投入：仪表、传感器、网关与安装调试。',
+        '平台与集成投入：应用配置、接口开发与联调验收。',
+        '运营服务投入：培训赋能、持续优化与运维支持。',
+      ]),
+      expectedBenefits: toDisplayList(ai.expectedBenefits, [
+        '直接收益：能源成本下降与电费优化可量化兑现。',
+        '间接收益：设备稳定性提升并减少故障停机损失。',
+        '管理收益：提升经营决策时效与透明度。',
+      ]),
+      operationMechanism: toDisplayList(ai.operationMechanism, [
+        '建立“日监控、周复盘、月经营”三级运营节奏。',
+        '按角色绑定指标责任并纳入绩效考核。',
+        '形成问题清单、整改清单、复盘清单三清单机制。',
+      ]),
+      dataGovernancePlan: toDisplayList(ai.dataGovernancePlan, [
+        '统一主数据编码、计量口径、指标定义与时间粒度。',
+        '建设数据质量看板，持续监测完整性与准确性。',
+        '建立权限分级与审计日志，保障数据安全合规。',
+      ]),
+      recommendedModules: toDisplayList(ai.recommendedModules, []),
+      softwareRecommendations: toDisplayList(ai.softwareRecommendations, []),
+      hardwareRecommendations: toDisplayList(ai.hardwareRecommendations, []),
+      consultingRecommendations: toDisplayList(ai.consultingRecommendations, []),
+    };
   }, [data]);
 
   if (!data) {
@@ -510,6 +591,132 @@ export const ReportDetail: React.FC = () => {
                   </ol>
                 </div>
               </div>
+            </article>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-lg font-bold text-slate-900">{ZH.fullNarrative}</h3>
+            <div className="space-y-3 text-sm leading-8 text-slate-700">
+              {splitParagraphs(aiExtended.fullNarrative).map((line, idx) => (
+                <p key={`full_narrative_${idx}`} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                  {line}
+                </p>
+              ))}
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.moduleLibrary}</h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.softwareSuggestion}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiExtended.softwareRecommendations.map((item, idx) => (
+                      <span key={`software_${idx}`} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{item}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.hardwareSuggestion}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiExtended.hardwareRecommendations.map((item, idx) => (
+                      <span key={`hardware_${idx}`} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{item}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.consultingSuggestion}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiExtended.consultingRecommendations.map((item, idx) => (
+                      <span key={`consulting_${idx}`} className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{item}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.capabilityMatch}</p>
+                  <ul className="space-y-2 text-sm text-slate-700">
+                    {aiExtended.recommendedModules.map((item, idx) => (
+                      <li key={`module_${idx}`} className="rounded-lg bg-slate-50 px-3 py-2">{idx + 1}. {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.detailFindings}</h3>
+              <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.detailedFindings.map((item, idx) => (
+                  <li key={`finding_${idx}`} className="rounded-lg bg-rose-50 px-3 py-2 text-rose-800">{idx + 1}. {item}</li>
+                ))}
+              </ul>
+            </article>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.implementationRoadmap}</h3>
+              <ol className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.phasedRoadmap.map((item, idx) => (
+                  <li key={`roadmap_${idx}`} className="rounded-lg bg-slate-50 px-3 py-2">{idx + 1}. {item}</li>
+                ))}
+              </ol>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.riskControl}</h3>
+              <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.riskMitigations.map((item, idx) => (
+                  <li key={`risk_${idx}`} className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">{idx + 1}. {item}</li>
+                ))}
+              </ul>
+            </article>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.kpiAndAcceptance}</h3>
+              <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.kpiSuggestions.map((item, idx) => (
+                  <li key={`kpi_${idx}`} className="rounded-lg bg-cyan-50 px-3 py-2 text-cyan-900">{idx + 1}. {item}</li>
+                ))}
+              </ul>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.investmentBreakdown}</h3>
+              <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.investmentBreakdown.map((item, idx) => (
+                  <li key={`invest_${idx}`} className="rounded-lg bg-indigo-50 px-3 py-2 text-indigo-900">{idx + 1}. {item}</li>
+                ))}
+              </ul>
+              <h4 className="mb-2 mt-4 text-sm font-semibold text-slate-900">{ZH.expectedBenefits}</h4>
+              <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.expectedBenefits.map((item, idx) => (
+                  <li key={`benefit_${idx}`} className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-900">{idx + 1}. {item}</li>
+                ))}
+              </ul>
+            </article>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.operationMechanism}</h3>
+              <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.operationMechanism.map((item, idx) => (
+                  <li key={`operation_${idx}`} className="rounded-lg bg-slate-50 px-3 py-2">{idx + 1}. {item}</li>
+                ))}
+              </ul>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.dataGovernance}</h3>
+              <ul className="space-y-2 text-sm leading-7 text-slate-700">
+                {aiExtended.dataGovernancePlan.map((item, idx) => (
+                  <li key={`governance_${idx}`} className="rounded-lg bg-slate-50 px-3 py-2">{idx + 1}. {item}</li>
+                ))}
+              </ul>
             </article>
           </section>
         </div>
