@@ -4,6 +4,11 @@ import { User, UserStatus, UserType } from '../types';
 import { roleService, userService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
 import ActionDialog from '../src/components/ActionDialog';
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  validateBasicUserInput,
+} from '../src/utils/userValidation';
 
 type RoleLite = {
   id: string;
@@ -302,10 +307,8 @@ export const UserManagement: React.FC = () => {
       const phone = form.phone.trim();
       const email = form.email.trim();
 
-      if (!username) throw new Error('请输入用户名');
-      if (!name) throw new Error('请输入姓名');
-      if (!phone) throw new Error('请输入手机号');
-      if (!email) throw new Error('请输入邮箱');
+      const basicValidationError = validateBasicUserInput({ username, name, phone, email });
+      if (basicValidationError) throw new Error(basicValidationError);
       if (!form.roleIds.length) throw new Error('请至少选择一个角色');
       const roleValidation = await validateSelectedRoles(form.type, form.roleIds, editingUserId);
       if (!roleValidation.ok) throw new Error(roleValidation.message);
@@ -519,10 +522,12 @@ export const UserManagement: React.FC = () => {
                     <label className="text-xs font-bold text-slate-500 uppercase">用户名 <span className="text-rose-600">*</span></label>
                     <input
                       required
+                      minLength={USERNAME_MIN_LENGTH}
+                      maxLength={USERNAME_MAX_LENGTH}
                       value={form.username}
                       onChange={(e) => setForm((prev) => ({ ...prev, username: e.target.value }))}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                      placeholder="请输入用户名"
+                      placeholder={`请输入用户名(${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH}字符)`}
                     />
                   </div>
                   <div className="space-y-1">
@@ -580,6 +585,9 @@ export const UserManagement: React.FC = () => {
                     <label className="text-xs font-bold text-slate-500 uppercase">手机号 <span className="text-rose-600">*</span></label>
                     <input
                       required
+                      inputMode="numeric"
+                      pattern="\\d+"
+                      title="手机号必须为数字"
                       value={form.phone}
                       onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
                       className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"

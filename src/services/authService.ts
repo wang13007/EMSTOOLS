@@ -1,4 +1,6 @@
-﻿export interface LoginRequest {
+﻿import { validateRegisterInput } from '../utils/userValidation';
+
+export interface LoginRequest {
   username: string;
   password: string;
 }
@@ -113,13 +115,20 @@ export const authService = {
 
   async register(data: RegisterRequest): Promise<{ user: UserInfo; token: string }> {
     try {
-      if (!data.username?.trim() || !data.name?.trim() || !data.phone?.trim() || !data.email?.trim()) {
-        throw new Error('用户名、姓名、手机号、邮箱均为必填项');
-      }
+      const normalizedData: RegisterRequest = {
+        ...data,
+        name: String(data.name || '').trim(),
+        username: String(data.username || '').trim(),
+        phone: String(data.phone || '').trim(),
+        email: String(data.email || '').trim(),
+      };
+
+      const validationError = validateRegisterInput(normalizedData);
+      if (validationError) throw new Error(validationError);
 
       const { userService, roleService } = await import('../services/supabaseService');
       const users = await userService.getUsers();
-      const existingUser = users.find((u: any) => u.username === data.username);
+      const existingUser = users.find((u: any) => u.username === normalizedData.username);
       if (existingUser) throw new Error('用户名已存在');
 
       const roles = await roleService.getRoles();
@@ -127,30 +136,30 @@ export const authService = {
       if (!customerRole) throw new Error('系统配置错误，未找到客户角色');
 
       const createdUser = await userService.createUser({
-        user_name: data.name,
-        username: data.username,
-        password_hash: data.password,
+        user_name: normalizedData.name,
+        username: normalizedData.username,
+        password_hash: normalizedData.password,
         type: 'external',
         user_type: 'external',
         role_id: customerRole.id,
         status: 'enabled',
-        email: data.email,
-        phone: data.phone,
+        email: normalizedData.email,
+        phone: normalizedData.phone,
       });
       if (!createdUser) throw new Error('用户创建失败');
 
       const userInfo: UserInfo = {
         id: createdUser.id,
         username: createdUser.username,
-        name: createdUser.name || data.name,
+        name: createdUser.name || normalizedData.name,
         type: createdUser.user_type || createdUser.type || 'external',
         role: customerRole.name || '外部客户',
         role_id: createdUser.role_id,
         role_ids: Array.isArray(createdUser.role_ids)
           ? createdUser.role_ids.filter(Boolean)
           : [createdUser.role_id].filter(Boolean),
-        email: createdUser.email || data.email,
-        phone: createdUser.phone || data.phone,
+        email: createdUser.email || normalizedData.email,
+        phone: createdUser.phone || normalizedData.phone,
       };
 
       const token = generateSecureToken();

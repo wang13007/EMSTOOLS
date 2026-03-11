@@ -2,6 +2,13 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { authService } from '../src/services/authService';
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  validateRegisterInput,
+} from '../src/utils/userValidation';
 
 export const Register: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -33,46 +40,11 @@ export const Register: React.FC = () => {
   };
 
   const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
-      setError('姓名为必填项');
+    const errorMessage = validateRegisterInput(formData);
+    if (errorMessage) {
+      setError(errorMessage);
       return false;
     }
-
-    if (!formData.phone.trim()) {
-      setError('手机号为必填项');
-      return false;
-    }
-
-    if (!formData.email.trim()) {
-      setError('邮箱为必填项');
-      return false;
-    }
-
-    if (formData.username.length < 4 || formData.username.length > 50) {
-      setError('用户名长度必须在4-50字符之间');
-      return false;
-    }
-
-    if (formData.password.length < 4 || formData.password.length > 32) {
-      setError('密码长度必须在4-32字符之间');
-      return false;
-    }
-
-    if (formData.password !== formData.confirm_password) {
-      setError('两次输入的密码不一致');
-      return false;
-    }
-
-    if (!/^\d+$/.test(formData.phone)) {
-      setError('手机号必须为数字格式');
-      return false;
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setError('邮箱格式不正确');
-      return false;
-    }
-
     return true;
   };
 
@@ -158,10 +130,10 @@ export const Register: React.FC = () => {
                 value={formData.username}
                 onChange={handleChange}
                 required
-                minLength={4}
-                maxLength={50}
+                minLength={USERNAME_MIN_LENGTH}
+                maxLength={USERNAME_MAX_LENGTH}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="请输入登录账号(4-50字符)"
+                placeholder={`请输入登录账号(${USERNAME_MIN_LENGTH}-${USERNAME_MAX_LENGTH}字符)`}
               />
             </div>
 
@@ -208,8 +180,8 @@ export const Register: React.FC = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                minLength={4}
-                maxLength={32}
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={PASSWORD_MAX_LENGTH}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 placeholder="请输入密码"
               />
@@ -226,8 +198,8 @@ export const Register: React.FC = () => {
                 value={formData.confirm_password}
                 onChange={handleChange}
                 required
-                minLength={4}
-                maxLength={32}
+                minLength={PASSWORD_MIN_LENGTH}
+                maxLength={PASSWORD_MAX_LENGTH}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 placeholder="请再次输入密码"
               />
