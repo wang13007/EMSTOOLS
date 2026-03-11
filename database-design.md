@@ -1,412 +1,240 @@
-# EMS 售前调研工具 - 数据库设计
+﻿# 数据库设计（基于 `supabase-init.sql`）
 
-## 1. 数据库表结构
+更新时间：2026-03-11
 
-### 1.1 用户表 (`users`)
+## 1. 设计说明
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 用户ID |
-| `user_id` | `uuid` | `DEFAULT gen_random_uuid()` | 用户唯一标识ID |
-| `user_name` | `varchar(50)` | `UNIQUE NOT NULL` | 用户名/账号 |
-| `name` | `varchar(50)` | | 用户真实姓名 |
-| `password_hash` | `varchar(255)` | `NOT NULL` | 密码哈希值 |
-| `type` | `varchar(20)` | `NOT NULL CHECK (type IN ('internal', 'external'))` | 用户类型 |
-| `role_id` | `uuid` | `REFERENCES roles(id)` | 角色ID |
-| `phone` | `varchar(20)` | | 手机号码 |
-| `email` | `varchar(100)` | | 电子邮箱 |
-| `status` | `varchar(20)` | `NOT NULL CHECK (status IN ('enabled', 'disabled'))` | 用户状态 |
-| `last_login_time` | `timestamp with time zone` | | 最后登录时间 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
-| `create_by` | `varchar(100)` | | 创建人 |
-| `is_deleted` | `boolean` | `DEFAULT false` | 是否已删除 |
-| `update_time` | `timestamp with time zone` | `DEFAULT NOW()` | 更新时间 |
+| 项目 | 内容 |
+| --- | --- |
+| 数据库 | Supabase PostgreSQL |
+| 结构来源 | `supabase-init.sql`（并兼容 `supabase-repair-existing.sql`） |
+| 兼容策略 | 兼容历史字段、历史状态值、中英文字段差异 |
+| 安全策略 | 主要业务表已启用 RLS（Authenticated 基础策略） |
 
-### 1.2 角色表 (`roles`)
+## 2. 主要数据表（字段级）
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 角色ID |
-| `name` | `varchar(50)` | `UNIQUE NOT NULL` | 角色名称 |
-| `description` | `text` | | 角色描述 |
-| `permissions` | `jsonb` | `DEFAULT '{}'::jsonb` | 权限配置 |
-| `status` | `varchar(20)` | `NOT NULL CHECK (status IN ('enabled', 'disabled'))` | 角色状态 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
-| `update_time` | `timestamp with time zone` | `DEFAULT NOW()` | 更新时间 |
+### 2.1 `roles`
 
-### 1.3 调研表单表 (`survey_forms`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 角色主键 |
+| `name` | `varchar(50)` | NOT NULL, UNIQUE | 角色名称 |
+| `description` | `text` | NULL | 角色描述 |
+| `permissions` | `jsonb` | NOT NULL, DEFAULT `'{}'::jsonb` | 权限矩阵 |
+| `type` | `varchar(20)` | NOT NULL, CHECK(`internal`,`external`) | 角色类型 |
+| `user_type` | `varchar(20)` | NOT NULL, CHECK(`internal`,`external`) | 兼容字段 |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `enabled`, CHECK(`enabled`,`disabled`) | 状态 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
+| `update_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 更新时间 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 表单ID |
-| `name` | `varchar(200)` | `NOT NULL` | 表单名称 |
-| `customer_name` | `varchar(200)` | `NOT NULL` | 客户名称 |
-| `project_name` | `varchar(200)` | `NOT NULL` | 项目名称 |
-| `industry` | `varchar(100)` | `NOT NULL` | 所属行业 |
-| `region` | `varchar(100)` | `NOT NULL` | 所属区域 |
-| `template_id` | `uuid` | `REFERENCES survey_templates(id)` | 模板ID |
-| `status` | `varchar(20)` | `NOT NULL CHECK (status IN ('草稿', '填写中', '已完成'))` | 表单状态 |
-| `report_status` | `varchar(20)` | `NOT NULL CHECK (report_status IN ('未生成', '已生成'))` | 报告状态 |
-| `creator_id` | `uuid` | `REFERENCES users(id)` | 创建人ID |
-| `submitter_id` | `uuid` | `REFERENCES users(id)` | 提交人ID |
-| `pre_sales_responsible_id` | `uuid` | `REFERENCES users(id)` | 售前负责人ID |
-| `data` | `jsonb` | `DEFAULT '{}'::jsonb` | 表单数据 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
-| `update_time` | `timestamp with time zone` | `DEFAULT NOW()` | 更新时间 |
+### 2.2 `users`
 
-### 1.4 调研报告表 (`survey_reports`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 用户主键 |
+| `user_id` | `uuid` | NOT NULL, DEFAULT `gen_random_uuid()` | 业务用户ID（兼容） |
+| `username` | `varchar(50)` | NULL | 登录名 |
+| `user_name` | `varchar(50)` | NULL | 显示名/兼容字段 |
+| `user_realname` | `varchar(100)` | NULL | 真实姓名（兼容） |
+| `name` | `varchar(100)` | NULL | 姓名 |
+| `password_hash` | `varchar(255)` | NOT NULL, DEFAULT `'1234'` | 密码字段（当前实现） |
+| `type` | `varchar(20)` | NOT NULL, DEFAULT `external`, CHECK(`internal`,`external`) | 用户类型 |
+| `user_type` | `varchar(20)` | NOT NULL, DEFAULT `external`, CHECK(`internal`,`external`) | 兼容类型字段 |
+| `role_id` | `uuid` | FK -> `roles.id`, NULL | 主角色 |
+| `role_ids` | `uuid[]` | NOT NULL, DEFAULT `'{}'::uuid[]` | 多角色 |
+| `phone` | `varchar(20)` | NULL | 手机号 |
+| `email` | `varchar(100)` | NULL | 邮箱 |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `enabled`, CHECK(`enabled`,`disabled`) | 账号状态 |
+| `last_login_time` | `timestamptz` | NULL | 最近登录时间 |
+| `creator` | `varchar(100)` | NULL | 创建者 |
+| `create_by` | `varchar(100)` | NULL | 兼容创建者字段 |
+| `is_deleted` | `boolean` | NOT NULL, DEFAULT `false` | 软删除标记 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
+| `update_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 更新时间 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 报告ID |
-| `form_id` | `uuid` | `REFERENCES survey_forms(id) UNIQUE` | 关联表单ID |
-| `content` | `text` | `NOT NULL` | 报告内容 |
-| `generate_time` | `timestamp with time zone` | `DEFAULT NOW()` | 生成时间 |
+### 2.3 `survey_templates`
 
-### 1.5 调研模板表 (`survey_templates`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 模板ID |
+| `name` | `varchar(100)` | NOT NULL, UNIQUE | 模板名 |
+| `industry` | `varchar(100)` | NOT NULL | 行业 |
+| `sections` | `jsonb` | NOT NULL, DEFAULT `'[]'::jsonb` | 模板结构 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
+| `update_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 更新时间 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 模板ID |
-| `name` | `varchar(100)` | `UNIQUE NOT NULL` | 模板名称 |
-| `industry` | `varchar(100)` | `NOT NULL` | 适用行业 |
-| `sections` | `jsonb` | `NOT NULL` | 模板 sections 配置 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
-| `update_time` | `timestamp with time zone` | `DEFAULT NOW()` | 更新时间 |
+### 2.4 `survey_forms`
 
-### 1.6 字典类型表 (`dict_types`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 表单ID |
+| `name` | `varchar(200)` | NOT NULL | 表单名称 |
+| `customer_name` | `varchar(200)` | NOT NULL | 客户名称 |
+| `project_name` | `varchar(200)` | NOT NULL | 项目名称 |
+| `industry` | `varchar(100)` | NOT NULL | 行业 |
+| `region` | `varchar(100)` | NOT NULL | 区域 |
+| `template_id` | `uuid` | FK -> `survey_templates.id`, NULL | 模板ID |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `draft`, CHECK(`draft`,`in_progress`,`completed` + 中文兼容值) | 调研状态 |
+| `report_status` | `varchar(20)` | NOT NULL, DEFAULT `pending`, CHECK(`pending`,`generated` + 中文兼容值) | 报告状态 |
+| `creator_id` | `uuid` | FK -> `users.id`, NULL | 创建人 |
+| `submitter_id` | `uuid` | FK -> `users.id`, NULL | 提交人 |
+| `pre_sales_responsible_id` | `uuid` | FK -> `users.id`, NULL | 售前负责人 |
+| `data` | `jsonb` | NOT NULL, DEFAULT `'{}'::jsonb` | 调研结构化数据 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
+| `update_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 更新时间 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `type_id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 类型ID |
-| `type_name` | `varchar(100)` | `NOT NULL` | 类型名称 |
-| `type_code` | `varchar(50)` | `UNIQUE NOT NULL` | 类型编码 |
-| `description` | `text` | | 类型描述 |
-| `status` | `varchar(20)` | `NOT NULL CHECK (status IN ('enabled', 'disabled'))` | 状态 |
-| `sort_order` | `integer` | `DEFAULT 0` | 排序顺序 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
-| `creator_id` | `uuid` | `REFERENCES users(id)` | 创建人ID |
+### 2.5 `survey_reports`
 
-### 1.7 字典项表 (`dict_items`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 报告ID |
+| `form_id` | `uuid` | NOT NULL, UNIQUE, FK -> `survey_forms.id` | 对应表单ID |
+| `content` | `text` | NOT NULL | 报告正文 |
+| `generate_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 生成时间 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `item_id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 项ID |
-| `type_id` | `uuid` | `REFERENCES dict_types(type_id)` | 类型ID |
-| `item_label` | `varchar(100)` | `NOT NULL` | 显示标签 |
-| `item_value` | `varchar(100)` | `NOT NULL` | 实际值 |
-| `sort_order` | `integer` | `DEFAULT 0` | 排序顺序 |
-| `status` | `varchar(20)` | `NOT NULL CHECK (status IN ('enabled', 'disabled'))` | 状态 |
-| `ext1` | `varchar(100)` | | 扩展字段1 |
-| `ext2` | `varchar(100)` | | 扩展字段2 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
-| `creator_id` | `uuid` | `REFERENCES users(id)` | 创建人ID |
+### 2.6 `dict_types`
 
-### 1.8 区域字典表 (`region_dicts`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `type_id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 字典类型ID |
+| `type_name` | `varchar(100)` | NOT NULL | 类型名称 |
+| `type_code` | `varchar(50)` | NOT NULL, UNIQUE | 类型编码 |
+| `description` | `text` | NULL | 描述 |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `enabled`, CHECK(`enabled`,`disabled`) | 状态 |
+| `sort_order` | `integer` | NOT NULL, DEFAULT `0` | 排序 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
+| `creator_id` | `uuid` | NULL | 创建者 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `region_id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 区域ID |
-| `region_name` | `varchar(100)` | `NOT NULL` | 区域名称 |
-| `region_code` | `varchar(50)` | `UNIQUE NOT NULL` | 区域编码 |
-| `parent_id` | `uuid` | `REFERENCES region_dicts(region_id)` | 父区域ID |
-| `region_level` | `integer` | `NOT NULL` | 区域级别 |
-| `sort_order` | `integer` | `DEFAULT 0` | 排序顺序 |
-| `status` | `varchar(20)` | `NOT NULL CHECK (status IN ('enabled', 'disabled'))` | 状态 |
-| `is_system` | `boolean` | `DEFAULT false` | 是否系统内置 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
+### 2.7 `dict_items`
 
-### 1.9 产品能力表 (`product_capabilities`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `item_id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 字典项ID |
+| `type_id` | `uuid` | NOT NULL, FK -> `dict_types.type_id` | 类型ID |
+| `item_label` | `varchar(100)` | NOT NULL | 显示值 |
+| `item_value` | `varchar(100)` | NOT NULL | 存储值 |
+| `sort_order` | `integer` | NOT NULL, DEFAULT `0` | 排序 |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `enabled`, CHECK(`enabled`,`disabled`) | 状态 |
+| `ext1` | `varchar(255)` | NULL | 扩展字段1 |
+| `ext2` | `varchar(255)` | NULL | 扩展字段2 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
+| `creator_id` | `uuid` | NULL | 创建者 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 能力ID |
-| `name` | `varchar(100)` | `UNIQUE NOT NULL` | 能力名称 |
-| `type` | `varchar(20)` | `NOT NULL CHECK (type IN ('软件', '硬件', '咨询'))` | 产品类型 |
-| `industries` | `jsonb` | `DEFAULT '[]'::jsonb` | 适用行业 |
-| `scenarios` | `jsonb` | `DEFAULT '[]'::jsonb` | 适用场景 |
-| `description` | `text` | `NOT NULL` | 能力描述 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
+### 2.8 `region_dicts`
 
-### 1.10 系统日志表 (`system_logs`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `region_id` | `varchar(64)` | PK, NOT NULL | 区域ID |
+| `region_name` | `varchar(100)` | NOT NULL | 区域名称 |
+| `region_code` | `varchar(50)` | NOT NULL, UNIQUE | 区域编码 |
+| `parent_id` | `varchar(64)` | NULL | 上级区域ID |
+| `region_level` | `integer` | NOT NULL | 层级 |
+| `sort_order` | `integer` | NOT NULL, DEFAULT `0` | 排序 |
+| `status` | `varchar(20)` | NOT NULL, DEFAULT `enabled` | 状态 |
+| `is_system` | `boolean` | NOT NULL, DEFAULT `false` | 是否系统预置 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 日志ID |
-| `operator_id` | `uuid` | `REFERENCES users(id)` | 操作人ID |
-| `type` | `varchar(20)` | `NOT NULL CHECK (type IN ('login', 'survey', 'user', 'system'))` | 日志类型 |
-| `content` | `text` | `NOT NULL` | 日志内容 |
-| `ip_address` | `varchar(50)` | | IP地址 |
-| `result` | `varchar(20)` | `NOT NULL CHECK (result IN ('成功', '失败'))` | 操作结果 |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 日志时间 |
+### 2.9 `product_capabilities`
 
-### 1.11 消息表 (`messages`)
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 能力ID |
+| `name` | `varchar(100)` | NOT NULL, UNIQUE | 能力名称 |
+| `type` | `varchar(20)` | NOT NULL, DEFAULT `software`, CHECK(`software`,`hardware`,`consulting`,`retrofit_construction`) | 能力类型 |
+| `industries` | `jsonb` | NOT NULL, DEFAULT `'[]'::jsonb` | 适用行业 |
+| `scenarios` | `jsonb` | NOT NULL, DEFAULT `'[]'::jsonb` | 适用场景 |
+| `description` | `text` | NOT NULL, DEFAULT `''` | 描述 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
 
-| 字段名 | 数据类型 | 约束 | 描述 |
-|-------|---------|------|------|
-| `id` | `uuid` | `PRIMARY KEY DEFAULT gen_random_uuid()` | 消息ID |
-| `title` | `varchar(100)` | `NOT NULL` | 消息标题 |
-| `content` | `text` | `NOT NULL` | 消息内容 |
-| `type` | `varchar(20)` | `NOT NULL CHECK (type IN ('system', 'report'))` | 消息类型 |
-| `read` | `boolean` | `DEFAULT false` | 是否已读 |
-| `cleared` | `boolean` | `DEFAULT false` | 是否已清除 |
-| `target_role_id` | `uuid` | `REFERENCES roles(id)` | 目标角色ID |
-| `target_user_id` | `uuid` | `REFERENCES users(id)` | 目标用户ID |
-| `project_id` | `uuid` | `REFERENCES survey_forms(id)` | 关联项目ID |
-| `create_time` | `timestamp with time zone` | `DEFAULT NOW()` | 创建时间 |
+### 2.10 `system_logs`
 
-## 2. 索引设计
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 日志ID |
+| `operator_id` | `uuid` | NULL, FK -> `users.id` | 操作人 |
+| `type` | `varchar(20)` | NOT NULL, CHECK(`login`,`survey`,`user`,`system`) | 日志类型 |
+| `content` | `text` | NOT NULL | 日志内容 |
+| `ip_address` | `varchar(64)` | NULL | IP地址 |
+| `result` | `varchar(20)` | NOT NULL, DEFAULT `成功`, CHECK(`成功`,`失败`) | 操作结果 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
 
-### 2.1 用户表索引
-- `CREATE INDEX idx_users_username ON users(user_name);`
-- `CREATE INDEX idx_users_type ON users(type);`
-- `CREATE INDEX idx_users_status ON users(status);`
+### 2.11 `messages`
 
-### 2.2 调研表单索引
-- `CREATE INDEX idx_survey_forms_status ON survey_forms(status);`
-- `CREATE INDEX idx_survey_forms_creator_id ON survey_forms(creator_id);`
-- `CREATE INDEX idx_survey_forms_customer_name ON survey_forms(customer_name);`
-- `CREATE INDEX idx_survey_forms_project_name ON survey_forms(project_name);`
-
-### 2.3 字典表索引
-- `CREATE INDEX idx_dict_items_type_id ON dict_items(type_id);`
-- `CREATE INDEX idx_region_dicts_parent_id ON region_dicts(parent_id);`
-
-### 2.4 日志表索引
-- `CREATE INDEX idx_system_logs_operator_id ON system_logs(operator_id);`
-- `CREATE INDEX idx_system_logs_type ON system_logs(type);`
-- `CREATE INDEX idx_system_logs_create_time ON system_logs(create_time);`
-
-### 2.5 消息表索引
-- `CREATE INDEX idx_messages_target_user_id ON messages(target_user_id);`
-- `CREATE INDEX idx_messages_target_role_id ON messages(target_role_id);`
-- `CREATE INDEX idx_messages_read ON messages(read);`
+| 字段 | 类型 | 约束 | 说明 |
+| --- | --- | --- | --- |
+| `id` | `uuid` | PK, NOT NULL, DEFAULT `gen_random_uuid()` | 消息ID |
+| `title` | `varchar(150)` | NOT NULL | 标题 |
+| `content` | `text` | NOT NULL | 正文 |
+| `type` | `varchar(20)` | NOT NULL, DEFAULT `system`, CHECK(`system`,`report`) | 消息类型 |
+| `read` | `boolean` | NOT NULL, DEFAULT `false` | 已读标记 |
+| `cleared` | `boolean` | NOT NULL, DEFAULT `false` | 清理标记 |
+| `target_role_id` | `uuid` | NULL, FK -> `roles.id` | 目标角色 |
+| `target_user_id` | `uuid` | NULL, FK -> `users.id` | 目标用户 |
+| `project_id` | `uuid` | NULL, FK -> `survey_forms.id` | 关联项目 |
+| `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
 
 ## 3. 外键关系
 
-| 外键字段 | 引用表 | 引用字段 | 约束 |
-|---------|-------|---------|------|
-| `users.role_id` | `roles` | `id` | `ON DELETE SET NULL` |
-| `survey_forms.template_id` | `survey_templates` | `id` | `ON DELETE SET NULL` |
-| `survey_forms.creator_id` | `users` | `id` | `ON DELETE SET NULL` |
-| `survey_forms.submitter_id` | `users` | `id` | `ON DELETE SET NULL` |
-| `survey_forms.pre_sales_responsible_id` | `users` | `id` | `ON DELETE SET NULL` |
-| `survey_reports.form_id` | `survey_forms` | `id` | `ON DELETE CASCADE` |
-| `dict_items.type_id` | `dict_types` | `type_id` | `ON DELETE CASCADE` |
-| `dict_types.creator_id` | `users` | `id` | `ON DELETE SET NULL` |
-| `region_dicts.parent_id` | `region_dicts` | `region_id` | `ON DELETE SET NULL` |
-| `system_logs.operator_id` | `users` | `id` | `ON DELETE SET NULL` |
-| `messages.target_role_id` | `roles` | `id` | `ON DELETE SET NULL` |
-| `messages.target_user_id` | `users` | `id` | `ON DELETE SET NULL` |
-| `messages.project_id` | `survey_forms` | `id` | `ON DELETE SET NULL` |
+| 子表.字段 | 父表.字段 | 关系说明 |
+| --- | --- | --- |
+| `users.role_id` | `roles.id` | 用户主角色 |
+| `survey_forms.template_id` | `survey_templates.id` | 表单模板 |
+| `survey_forms.creator_id` | `users.id` | 表单创建人 |
+| `survey_forms.submitter_id` | `users.id` | 表单提交人 |
+| `survey_forms.pre_sales_responsible_id` | `users.id` | 售前负责人 |
+| `survey_reports.form_id` | `survey_forms.id` | 一表单一报告 |
+| `dict_items.type_id` | `dict_types.type_id` | 字典项从属类型 |
+| `messages.target_role_id` | `roles.id` | 角色定向消息 |
+| `messages.target_user_id` | `users.id` | 用户定向消息 |
+| `messages.project_id` | `survey_forms.id` | 项目关联消息 |
+| `system_logs.operator_id` | `users.id` | 日志操作人 |
 
-## 4. 数据库初始化脚本
+## 4. 关键约束
 
-### 4.1 创建扩展
+| 对象 | 约束 |
+| --- | --- |
+| `roles.status` / `users.status` / `dict_types.status` / `dict_items.status` | `enabled` / `disabled` |
+| `roles.type` / `roles.user_type` / `users.type` / `users.user_type` | `internal` / `external` |
+| `survey_forms.status` | `draft` / `in_progress` / `completed`（兼容中文值） |
+| `survey_forms.report_status` | `pending` / `generated`（兼容中文值） |
+| `product_capabilities.type` | `software` / `hardware` / `consulting` / `retrofit_construction` |
+| `system_logs.type` | `login` / `survey` / `user` / `system` |
+| `system_logs.result` | `成功` / `失败` |
+| `messages.type` | `system` / `report` |
+| `survey_reports.form_id` | UNIQUE（一个调研对应一个报告） |
 
-```sql
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-```
+## 5. 索引与唯一性（核心）
 
-### 4.2 创建表
+| 表 | 索引/唯一项 | 说明 |
+| --- | --- | --- |
+| `users` | `id`, `user_id` 唯一相关索引 | 兼容双主键语义查询 |
+| `users` | `username` / `user_name` 唯一约束（脚本含兼容处理） | 防止账号重复 |
+| `roles` | `name` UNIQUE | 角色名唯一 |
+| `survey_templates` | `name` UNIQUE | 模板名唯一 |
+| `survey_reports` | `form_id` UNIQUE | 一表单一报告 |
+| `dict_types` | `type_code` UNIQUE | 类型编码唯一 |
+| `region_dicts` | `region_code` UNIQUE | 区域编码唯一 |
+| `product_capabilities` | `name` UNIQUE | 能力名唯一 |
 
-```sql
--- 创建角色表
-CREATE TABLE IF NOT EXISTS roles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(50) UNIQUE NOT NULL,
-  description TEXT,
-  permissions JSONB DEFAULT '{}'::jsonb,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('enabled', 'disabled')),
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  update_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+## 6. RLS 策略
 
--- 创建用户表
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID DEFAULT gen_random_uuid(),
-  user_name VARCHAR(50) UNIQUE NOT NULL,
-  name VARCHAR(50),
-  password_hash VARCHAR(255) NOT NULL,
-  type VARCHAR(20) NOT NULL CHECK (type IN ('internal', 'external')),
-  role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-  phone VARCHAR(20),
-  email VARCHAR(100),
-  status VARCHAR(20) NOT NULL CHECK (status IN ('enabled', 'disabled')),
-  last_login_time TIMESTAMP WITH TIME ZONE,
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  create_by VARCHAR(100),
-  is_deleted BOOLEAN DEFAULT false,
-  update_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+| 项目 | 当前实现 |
+| --- | --- |
+| 启用范围 | `roles`, `users`, `survey_forms`, `survey_reports`, `dict_types`, `dict_items`, `region_dicts`, `product_capabilities`, `system_logs`, `messages` |
+| 基础策略 | 以 `auth.role() = 'authenticated'` 作为访问门槛 |
+| 风险提示 | 当前为基础放行策略，生产建议按角色与数据归属细分 |
 
--- 创建调研模板表
-CREATE TABLE IF NOT EXISTS survey_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) UNIQUE NOT NULL,
-  industry VARCHAR(100) NOT NULL,
-  sections JSONB NOT NULL,
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  update_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+## 7. 种子数据
 
--- 创建调研表单表
-CREATE TABLE IF NOT EXISTS survey_forms (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(200) NOT NULL,
-  customer_name VARCHAR(200) NOT NULL,
-  project_name VARCHAR(200) NOT NULL,
-  industry VARCHAR(100) NOT NULL,
-  region VARCHAR(100) NOT NULL,
-  template_id UUID REFERENCES survey_templates(id) ON DELETE SET NULL,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('草稿', '填写中', '已完成')),
-  report_status VARCHAR(20) NOT NULL CHECK (report_status IN ('未生成', '已生成')),
-  creator_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  submitter_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  pre_sales_responsible_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  data JSONB DEFAULT '{}'::jsonb,
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  update_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+| 类别 | 内容 |
+| --- | --- |
+| 预置角色 | 超级管理员、售前工程师、外部客户等角色 |
+| 管理员账号 | 若不存在则创建默认管理员记录 |
+| 字典数据 | 初始化字典类型与字典项 |
 
--- 创建调研报告表
-CREATE TABLE IF NOT EXISTS survey_reports (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  form_id UUID REFERENCES survey_forms(id) ON DELETE CASCADE UNIQUE,
-  content TEXT NOT NULL,
-  generate_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+## 8. 升级与修复
 
--- 创建字典类型表
-CREATE TABLE IF NOT EXISTS dict_types (
-  type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type_name VARCHAR(100) NOT NULL,
-  type_code VARCHAR(50) UNIQUE NOT NULL,
-  description TEXT,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('enabled', 'disabled')),
-  sort_order INTEGER DEFAULT 0,
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  creator_id UUID REFERENCES users(id) ON DELETE SET NULL
-);
-
--- 创建字典项表
-CREATE TABLE IF NOT EXISTS dict_items (
-  item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type_id UUID REFERENCES dict_types(type_id) ON DELETE CASCADE,
-  item_label VARCHAR(100) NOT NULL,
-  item_value VARCHAR(100) NOT NULL,
-  sort_order INTEGER DEFAULT 0,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('enabled', 'disabled')),
-  ext1 VARCHAR(100),
-  ext2 VARCHAR(100),
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  creator_id UUID REFERENCES users(id) ON DELETE SET NULL
-);
-
--- 创建区域字典表
-CREATE TABLE IF NOT EXISTS region_dicts (
-  region_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  region_name VARCHAR(100) NOT NULL,
-  region_code VARCHAR(50) UNIQUE NOT NULL,
-  parent_id UUID REFERENCES region_dicts(region_id) ON DELETE SET NULL,
-  region_level INTEGER NOT NULL,
-  sort_order INTEGER DEFAULT 0,
-  status VARCHAR(20) NOT NULL CHECK (status IN ('enabled', 'disabled')),
-  is_system BOOLEAN DEFAULT false,
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 创建产品能力表
-CREATE TABLE IF NOT EXISTS product_capabilities (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) UNIQUE NOT NULL,
-  type VARCHAR(20) NOT NULL CHECK (type IN ('软件', '硬件', '咨询')),
-  industries JSONB DEFAULT '[]'::jsonb,
-  scenarios JSONB DEFAULT '[]'::jsonb,
-  description TEXT NOT NULL,
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 创建系统日志表
-CREATE TABLE IF NOT EXISTS system_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  operator_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  type VARCHAR(20) NOT NULL CHECK (type IN ('login', 'survey', 'user', 'system')),
-  content TEXT NOT NULL,
-  ip_address VARCHAR(50),
-  result VARCHAR(20) NOT NULL CHECK (result IN ('成功', '失败')),
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 创建消息表
-CREATE TABLE IF NOT EXISTS messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title VARCHAR(100) NOT NULL,
-  content TEXT NOT NULL,
-  type VARCHAR(20) NOT NULL CHECK (type IN ('system', 'report')),
-  read BOOLEAN DEFAULT false,
-  cleared BOOLEAN DEFAULT false,
-  target_role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
-  target_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  project_id UUID REFERENCES survey_forms(id) ON DELETE SET NULL,
-  create_time TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 创建索引
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(user_name);
-CREATE INDEX IF NOT EXISTS idx_users_type ON users(type);
-CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
-CREATE INDEX IF NOT EXISTS idx_survey_forms_status ON survey_forms(status);
-CREATE INDEX IF NOT EXISTS idx_survey_forms_creator_id ON survey_forms(creator_id);
-CREATE INDEX IF NOT EXISTS idx_survey_forms_customer_name ON survey_forms(customer_name);
-CREATE INDEX IF NOT EXISTS idx_survey_forms_project_name ON survey_forms(project_name);
-CREATE INDEX IF NOT EXISTS idx_dict_items_type_id ON dict_items(type_id);
-CREATE INDEX IF NOT EXISTS idx_region_dicts_parent_id ON region_dicts(parent_id);
-CREATE INDEX IF NOT EXISTS idx_system_logs_operator_id ON system_logs(operator_id);
-CREATE INDEX IF NOT EXISTS idx_system_logs_type ON system_logs(type);
-CREATE INDEX IF NOT EXISTS idx_system_logs_create_time ON system_logs(create_time);
-CREATE INDEX IF NOT EXISTS idx_messages_target_user_id ON messages(target_user_id);
-CREATE INDEX IF NOT EXISTS idx_messages_target_role_id ON messages(target_role_id);
-CREATE INDEX IF NOT EXISTS idx_messages_read ON messages(read);
-```
-
-### 4.3 初始化数据
-
-```sql
--- 插入默认角色
-INSERT INTO roles (name, description, permissions, status) VALUES
-('超级管理员', '系统最高权限', '{"users": true, "roles": true, "surveys": true, "templates": true, "dictionaries": true, "reports": true, "logs": true, "messages": true}', 'enabled'),
-('售前工程师', '售前调研管理权限', '{"surveys": true, "reports": true, "messages": true}', 'enabled'),
-('客户用户', '客户填写权限', '{"surveys": true, "messages": true}', 'enabled');
-
--- 插入默认模板
-INSERT INTO survey_templates (name, industry, sections) VALUES
-('通用制造业调研模板', '制造业', '[{"id": "section1", "title": "企业基本信息", "fields": [{"id": "company_name", "label": "企业名称", "type": "text", "required": true}, {"id": "company_size", "label": "企业规模", "type": "select", "options": ["小型", "中型", "大型"], "required": true}]}]'),
-('能源行业调研模板', '能源', '[{"id": "section1", "title": "能源使用情况", "fields": [{"id": "energy_type", "label": "主要能源类型", "type": "multiselect", "options": ["电力", "天然气", "煤炭", "可再生能源"], "required": true}]}]');
-
--- 插入默认字典类型
-INSERT INTO dict_types (type_name, type_code, description, status) VALUES
-('行业类型', 'industry', '企业所属行业', 'enabled'),
-('区域类型', 'region', '地理区域', 'enabled');
-
--- 插入默认字典项
-INSERT INTO dict_items (type_id, item_label, item_value, status) VALUES
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '制造业', 'manufacturing', 'enabled'),
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '能源', 'energy', 'enabled'),
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '建筑', 'construction', 'enabled'),
-((SELECT type_id FROM dict_types WHERE type_code = 'industry'), '交通', 'transportation', 'enabled');
-
--- 插入默认区域
-INSERT INTO region_dicts (region_name, region_code, region_level, status, is_system) VALUES
-('中国', 'CN', 1, 'enabled', true),
-('北京市', 'CN_BJ', 2, 'enabled', true),
-('上海市', 'CN_SH', 2, 'enabled', true),
-('广东省', 'CN_GD', 2, 'enabled', true);
-
--- 插入默认产品能力
-INSERT INTO product_capabilities (name, type, industries, scenarios, description) VALUES
-('智能能源监控系统', '软件', '["制造业", "能源", "建筑"]', '["工厂", "办公楼", "数据中心"]', '实时监控能源使用情况，提供节能建议'),
-('能效分析服务', '咨询', '["制造业", "能源", "建筑", "交通"]', '["企业整体能效提升", "节能改造项目"]', '专业的能效分析和优化方案设计'),
-('智能电表', '硬件', '["能源", "建筑"]', '["电力计量", "能耗监测"]', '高精度智能电表，支持远程抄表和数据分析');
-```
+| 场景 | 脚本 | 作用 |
+| --- | --- | --- |
+| 新环境部署 | `supabase-init.sql` | 一次性建表、约束、RLS、种子数据 |
+| 老环境修复 | `supabase-repair-existing.sql` | 历史字段修复、UUID转型、外键重建、脏数据清理、索引补齐 |
