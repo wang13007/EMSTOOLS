@@ -63,7 +63,9 @@ export const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [validatingRoles, setValidatingRoles] = useState(false);
   const [error, setError] = useState('');
+  const [roleValidationMessage, setRoleValidationMessage] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -191,6 +193,23 @@ export const UserManagement: React.FC = () => {
 
   const availableRoles = useMemo(() => roles.filter((r) => r.type === form.type), [roles, form.type]);
 
+  const getRoleTypeValidationMessage = (type: UserType) => {
+    return type === UserType.INTERNAL ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色';
+  };
+
+  const validateSelectedRoles = async (userType: UserType, roleIds: string[], userId: string | null) => {
+    if (!roleIds.length) {
+      return { ok: false, message: '请至少选择一个角色' };
+    }
+    try {
+      const ok = await userService.validateUserRoles(userId, userType, roleIds);
+      return ok ? { ok: true, message: '' } : { ok: false, message: getRoleTypeValidationMessage(userType) };
+    } catch (validationError) {
+      console.error('校验用户角色失败:', validationError);
+      return { ok: false, message: '角色校验失败，请稍后重试' };
+    }
+  };
+
   useEffect(() => {
     setForm((prev) => {
       const availableRoleIdSet = new Set(availableRoles.map((r) => r.id));
@@ -205,6 +224,29 @@ export const UserManagement: React.FC = () => {
       return { ...prev, roleIds: nextRoleIds };
     });
   }, [availableRoles]);
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    let canceled = false;
+
+    const runValidation = async () => {
+      if (!form.roleIds.length) {
+        setValidatingRoles(false);
+        setRoleValidationMessage('请至少选择一个角色');
+        return;
+      }
+      setValidatingRoles(true);
+      const validation = await validateSelectedRoles(form.type, form.roleIds, editingUserId);
+      if (canceled) return;
+      setRoleValidationMessage(validation.message);
+      setValidatingRoles(false);
+    };
+
+    void runValidation();
+    return () => {
+      canceled = true;
+    };
+  }, [isModalOpen, form.type, form.roleIds, editingUserId]);
 
   const filteredUsers = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
@@ -230,6 +272,8 @@ export const UserManagement: React.FC = () => {
     setModalMode('create');
     setEditingUserId(null);
     setError('');
+    setValidatingRoles(false);
+    setRoleValidationMessage('');
     setForm({ ...DEFAULT_FORM, type: defaultType, roleIds: defaultRoleIds });
     setIsModalOpen(true);
   };
@@ -245,6 +289,8 @@ export const UserManagement: React.FC = () => {
     setModalMode('edit');
     setEditingUserId(user.id);
     setError('');
+    setValidatingRoles(false);
+    setRoleValidationMessage('');
     setForm({
       username: user.username || '',
       name: user.name || user.user_name || '',
@@ -260,6 +306,8 @@ export const UserManagement: React.FC = () => {
     if (submitting) return;
     setModalMode('create');
     setEditingUserId(null);
+    setValidatingRoles(false);
+    setRoleValidationMessage('');
     setIsModalOpen(false);
   };
 
@@ -288,6 +336,9 @@ export const UserManagement: React.FC = () => {
       if (!phone) throw new Error('请输入手机号');
       if (!email) throw new Error('请输入邮箱');
       if (!form.roleIds.length) throw new Error('请至少选择一个角色');
+      const roleValidation = await validateSelectedRoles(form.type, form.roleIds, editingUserId);
+      if (!roleValidation.ok) throw new Error(roleValidation.message);
+      setRoleValidationMessage('');
 
       const payload = {
         user_name: name,
@@ -547,6 +598,8 @@ export const UserManagement: React.FC = () => {
                       )}
                     </div>
                     <p className="text-[11px] text-slate-400">角色列表来自角色管理和系统角色配置。</p>
+                    {validatingRoles && <p className="text-[11px] text-slate-400">正在校验角色配置...</p>}
+                    {roleValidationMessage && <p className="text-[11px] text-rose-500">{roleValidationMessage}</p>}
                     {selectedRoleNames && <p className="text-xs text-slate-500">已选：{selectedRoleNames}</p>}
                   </div>
                 </div>
@@ -579,7 +632,7 @@ export const UserManagement: React.FC = () => {
                   <button type="button" onClick={closeModal} className="px-6 py-2 rounded-xl font-bold text-slate-600 hover:bg-slate-100">
                     取消
                   </button>
-                  <button type="submit" disabled={submitting} className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 disabled:opacity-60">
+                  <button type="submit" disabled={submitting || validatingRoles} className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-200 disabled:opacity-60">
                     {submitting ? '提交中...' : modalMode === 'create' ? '创建' : '保存'}
                   </button>
                 </div>
