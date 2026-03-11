@@ -1,4 +1,4 @@
-﻿import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
+import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { SurveyForm } from '../types';
 import { getReportTemplateNameById, getSurveyTemplateNameById } from '../src/services/templateNameStore';
@@ -127,7 +127,7 @@ const renderTemplateContent = (content: string, valueMap: Record<string, unknown
   }));
 
   const renderedContent = content.replace(PLACEHOLDER_REGEX, (_, key: string) => {
-    if (!(key in valueMap)) return `【未配置字段:${key}】`;
+    if (!(key in valueMap)) return '【字段未配置】';
     return toDisplayValue(valueMap[key]);
   });
 
@@ -237,7 +237,7 @@ const buildTemplateCharts = (
       title: '基线能耗/费用',
       type: 'bar',
       data: [
-        { name: '年总用电量(kWh)', value: annualPower },
+        { name: '年总用电量（千瓦时）', value: annualPower },
         { name: '年总电费(万元)', value: annualCost },
       ],
       summary: annualPower || annualCost ? '图表展示当前项目基线能耗与费用规模' : '模板字段未提供能耗与费用数据，图表值为0',
