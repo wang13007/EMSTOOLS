@@ -317,14 +317,19 @@ export const userService = {
   async validateUserRoles(_userId: string | null, userType: string, roleIds: string[]) {
     const selectedRoleIds = dedupeStringArray(roleIds);
     if (!selectedRoleIds.length) return false;
+    const validRoleIds = selectedRoleIds.filter((roleId) => isUuid(roleId));
+    if (validRoleIds.length !== selectedRoleIds.length) {
+      console.warn('检测到非UUID角色ID，已拒绝校验:', selectedRoleIds.filter((roleId) => !isUuid(roleId)));
+      return false;
+    }
 
-    const { data, error } = await supabase.from('roles').select('*').in('id', selectedRoleIds);
+    const { data, error } = await supabase.from('roles').select('*').in('id', validRoleIds);
     if (error || !data) {
       console.error('校验用户角色失败:', error);
       return false;
     }
 
-    if (data.length !== selectedRoleIds.length) {
+    if (data.length !== validRoleIds.length) {
       return false;
     }
 

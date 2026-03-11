@@ -3,7 +3,6 @@ import { ICONS } from '../constants';
 import { User, UserStatus, UserType } from '../types';
 import { roleService, userService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
-import { getRoleManagementRoles } from '../src/services/roleLocalStore';
 import ActionDialog from '../src/components/ActionDialog';
 
 type RoleLite = {
@@ -129,7 +128,6 @@ export const UserManagement: React.FC = () => {
     setError('');
     try {
       const [userList, roleList] = await Promise.all([userService.getUsers(), roleService.getRoles()]);
-      const managedRoles = getRoleManagementRoles();
       const databaseRoles = (roleList || [])
         .map((role: any) => {
           const id = String(role?.id || '').trim();
@@ -142,34 +140,7 @@ export const UserManagement: React.FC = () => {
           } as RoleLite;
         })
         .filter((role: RoleLite | null): role is RoleLite => Boolean(role));
-      const roleMergedMap = new Map<string, any>();
-
-      databaseRoles.forEach((role) => {
-        if (!role?.id || !role?.name) return;
-        roleMergedMap.set(role.id, role);
-      });
-
-      if (!databaseRoles.length) {
-        managedRoles.forEach((role) => {
-          if (!role?.id || !role?.name) return;
-          roleMergedMap.set(role.id, role);
-        });
-      } else {
-        managedRoles.forEach((role) => {
-          if (!role?.id || !role?.name || roleMergedMap.has(role.id)) return;
-          roleMergedMap.set(role.id, role);
-        });
-      }
-
-      const roleSource = Array.from(roleMergedMap.values());
-
-      setRoles(
-        roleSource.map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          type: inferRoleType(r),
-        }))
-      );
+      setRoles(databaseRoles);
       setUsers(normalizeUsers(userList || []));
     } catch (e) {
       console.error('加载用户数据失败:', e);
@@ -597,7 +568,7 @@ export const UserManagement: React.FC = () => {
                         ))
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400">角色列表来自角色管理和系统角色配置。</p>
+                    <p className="text-[11px] text-slate-400">角色列表来自数据库 roles 表配置。</p>
                     {validatingRoles && <p className="text-[11px] text-slate-400">正在校验角色配置...</p>}
                     {roleValidationMessage && <p className="text-[11px] text-rose-500">{roleValidationMessage}</p>}
                     {selectedRoleNames && <p className="text-xs text-slate-500">已选：{selectedRoleNames}</p>}
