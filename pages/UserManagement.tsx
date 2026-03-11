@@ -586,7 +586,7 @@ export const UserManagement: React.FC = () => {
                     <input
                       required
                       inputMode="numeric"
-                      pattern="\\d+"
+                      pattern="[0-9]+"
                       title="手机号必须为数字"
                       value={form.phone}
                       onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
