@@ -394,35 +394,87 @@ export const ReportDetail: React.FC = () => {
       const safeTypeName = reportTypeLabel.replace(/[\\/:*?"<>|]/g, '_');
       const fileBaseName = `${safeProjectName}-${safeTypeName}`;
 
+      const maxCanvasEdge = 14000;
+      const baseScale = Math.min(window.devicePixelRatio || 1.5, 2);
+      const safeScale = Math.max(
+        0.8,
+        Math.min(
+          baseScale,
+          maxCanvasEdge / Math.max(target.scrollHeight || 1, target.scrollWidth || 1),
+        ),
+      );
+
       const canvas = await html2canvas(target, {
-        scale: 2,
+        scale: safeScale,
         useCORS: true,
         backgroundColor: '#ffffff',
+        logging: false,
+        onclone: (doc) => {
+          const root = doc.querySelector('[data-export-root="report"]') as HTMLElement | null;
+          if (root) {
+            root.style.opacity = '1';
+            root.style.animation = 'none';
+            root.style.transform = 'none';
+          }
+          doc.querySelectorAll<HTMLElement>('*').forEach((node) => {
+            node.style.animation = 'none';
+            node.style.transition = 'none';
+          });
+        },
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      if (!canvas.width || !canvas.height) {
+        throw new Error('empty canvas');
+      }
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const margin = 6;
+      const renderWidth = pageWidth - margin * 2;
+      const renderHeight = pageHeight - margin * 2;
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      const pxPerMm = canvas.width / renderWidth;
+      const pageCanvasHeightPx = Math.max(1, Math.floor(renderHeight * pxPerMm));
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      let renderedPx = 0;
+      let pageIndex = 0;
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      while (renderedPx < canvas.height) {
+        const sliceHeight = Math.min(pageCanvasHeightPx, canvas.height - renderedPx);
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = sliceHeight;
+
+        const ctx = pageCanvas.getContext('2d');
+        if (!ctx) throw new Error('canvas context is null');
+        ctx.drawImage(
+          canvas,
+          0,
+          renderedPx,
+          canvas.width,
+          sliceHeight,
+          0,
+          0,
+          pageCanvas.width,
+          pageCanvas.height,
+        );
+
+        const pageImage = pageCanvas.toDataURL('image/jpeg', 0.95);
+        const pageImageHeightMm = sliceHeight / pxPerMm;
+
+        if (pageIndex > 0) {
+          pdf.addPage();
+        }
+        pdf.addImage(pageImage, 'JPEG', margin, margin, renderWidth, pageImageHeightMm);
+
+        renderedPx += sliceHeight;
+        pageIndex += 1;
       }
 
       pdf.save(`${fileBaseName}.pdf`);
     } catch (error) {
-      console.error('导出 PDF 失败:', error);
+      console.error('Export PDF failed:', error);
       window.alert(ZH.exportFail);
     } finally {
       setExporting(false);
@@ -435,7 +487,7 @@ export const ReportDetail: React.FC = () => {
   };
 
   return (
-    <div ref={exportRootRef} className="space-y-6 animate-fadeIn pb-20">
+    <div ref={exportRootRef} data-export-root="report" className="space-y-6 pb-20">
       <section className="relative overflow-hidden rounded-3xl border border-blue-200/70 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 shadow-sm">
         <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-200/30" />
         <div className="absolute -bottom-12 left-1/3 h-32 w-32 rounded-full bg-cyan-200/30" />
@@ -842,4 +894,3 @@ export const ReportDetail: React.FC = () => {
     </div>
   );
 };
-
