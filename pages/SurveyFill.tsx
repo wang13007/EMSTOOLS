@@ -6,6 +6,7 @@ import { generateEnergyReport } from '../services/geminiService';
 import { buildReportBundle, PreSalesContactInfo } from '../services/reportService';
 import { surveyService, userService } from '../src/services/supabaseService';
 import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
+import { usePermission } from '../src/auth/usePermission';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -89,6 +90,7 @@ const formatTime = (iso?: string) => {
 };
 
 export const SurveyFill: React.FC = () => {
+  const { hasPermission, guardPermission } = usePermission();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,6 +102,9 @@ export const SurveyFill: React.FC = () => {
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState('');
   const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(SURVEY_TEMPLATES), []);
+  const canEditSurvey = hasPermission('survey_form:edit');
+  const canSubmitSurvey = hasPermission('survey_form:submit') && hasPermission('survey_form:generate_report');
+  const canShareSurvey = hasPermission('survey_form:share_report');
 
   const persistLockRef = useRef(false);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -184,6 +189,10 @@ export const SurveyFill: React.FC = () => {
       const silent = options?.silent ?? false;
       const alertOnError = options?.alertOnError ?? true;
       if (!form) return false;
+      if (!canEditSurvey) {
+        if (alertOnError) guardPermission('survey_form:edit', '保存草稿');
+        return false;
+      }
       if (persistLockRef.current) return false;
 
       persistLockRef.current = true;
@@ -234,11 +243,11 @@ export const SurveyFill: React.FC = () => {
         }
       }
     },
-    [form]
+    [form, canEditSurvey, guardPermission]
   );
 
   useEffect(() => {
-    if (!form || initializing || submitting || form.status === SurveyStatus.COMPLETED) return;
+    if (!form || initializing || submitting || form.status === SurveyStatus.COMPLETED || !canEditSurvey) return;
     if (!dirty) return;
 
     if (autoSaveTimerRef.current) {
@@ -254,7 +263,7 @@ export const SurveyFill: React.FC = () => {
         window.clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [dirty, form, initializing, submitting, persistDraft]);
+  }, [dirty, form, initializing, submitting, persistDraft, canEditSurvey]);
 
   const template = useMemo(() => {
     if (!form) return null;
@@ -301,7 +310,10 @@ export const SurveyFill: React.FC = () => {
   };
 
   const handleFieldChange = (fieldId: string, value: any) => {
-    if (!form || form.status === SurveyStatus.COMPLETED) return;
+    if (!form || form.status === SurveyStatus.COMPLETED || !canEditSurvey) {
+      if (!canEditSurvey) guardPermission('survey_form:edit', '编辑表单');
+      return;
+    }
     setForm({
       ...form,
       data: { ...form.data, [fieldId]: value },
@@ -332,6 +344,10 @@ export const SurveyFill: React.FC = () => {
   };
 
   const handleCopyExternalLink = async () => {
+    if (!canShareSurvey) {
+      guardPermission('survey_form:share_report', '复制外链填写地址');
+      return;
+    }
     if (!form) return;
     try {
       const nextData = {
@@ -363,6 +379,10 @@ export const SurveyFill: React.FC = () => {
   };
 
   const handleSubmit = async () => {
+    if (!canSubmitSurvey) {
+      guardPermission('survey_form:submit', '提交并生成报告');
+      return;
+    }
     if (!form) return;
     setSubmitting(true);
     try {
@@ -451,7 +471,7 @@ export const SurveyFill: React.FC = () => {
               >
                 返回列表
               </button>
-              {!isCompleted && !isAuthorizedFill && (
+              {!isCompleted && !isAuthorizedFill && canShareSurvey && (
                 <button
                   onClick={handleCopyExternalLink}
                   disabled={submitting}
@@ -463,7 +483,7 @@ export const SurveyFill: React.FC = () => {
                   复制外链填写地址
                 </button>
               )}
-              {!isCompleted && (
+              {!isCompleted && canEditSurvey && (
                 <>
                   <button
                     onClick={saveDraft}
@@ -474,7 +494,7 @@ export const SurveyFill: React.FC = () => {
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={submitting || autoSaveState === 'saving'}
+                    disabled={submitting || autoSaveState === 'saving' || !canSubmitSurvey}
                     className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70"
                   >
                     {submitting ? (
@@ -526,7 +546,7 @@ export const SurveyFill: React.FC = () => {
                   if (!shouldShowField(field)) return null;
 
                   const readOnly = isFieldReadOnly(field.id);
-                  const disabled = readOnly || isCompleted;
+                  const disabled = readOnly || isCompleted || !canEditSurvey;
 
                   return (
                     <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>

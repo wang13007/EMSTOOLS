@@ -3,6 +3,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { UserType } from '../types';
 import { messageService, roleService, userService } from '../src/services/supabaseService';
+import {
+  cachePermissionKeys,
+  hasPermission,
+  readPermissionKeySet,
+  resolvePermissionKeysByUserAndRoles,
+} from '../src/auth/permissions';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -105,12 +111,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
       if (!localIds.length) {
         const fallback = { ...localUser, role: localUser?.role || getDefaultRoleLabel(localUser?.type || localUser?.user_type) };
         setCurrentUser(fallback);
+        cachePermissionKeys(Array.isArray(fallback?.permissions) ? fallback.permissions : []);
         return;
       }
 
       const [users, roles] = await Promise.all([userService.getUsers(), roleService.getRoles()]);
       const roleNameMap = new Map((roles || []).map((role: any) => [role.id, role.name]));
       const dbUser = (users || []).find((u: any) => localIds.includes(u.id) || localIds.includes(u.user_id));
+      const permissionKeys = resolvePermissionKeysByUserAndRoles(dbUser || localUser, roles || []);
 
       const roleIds = Array.isArray(dbUser?.role_ids)
         ? dbUser.role_ids.filter(Boolean)
@@ -130,10 +138,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
           roleNames.length > 0
             ? roleNames.join('、')
             : localUser?.role || getDefaultRoleLabel(dbUser?.type || dbUser?.user_type || localUser?.type || localUser?.user_type),
+        permissions: permissionKeys,
       };
 
       setCurrentUser(merged);
       localStorage.setItem('ems_user', JSON.stringify(merged));
+      cachePermissionKeys(permissionKeys);
     } catch (error) {
       console.error('解析当前用户信息失败:', error);
       setCurrentUser(null);
@@ -239,6 +249,25 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
     return displayName ? displayName.charAt(0).toUpperCase() : 'U';
   }, [currentUser]);
 
+  const permissionSet = useMemo(() => {
+    if (Array.isArray(currentUser?.permissions)) {
+      return new Set(currentUser.permissions);
+    }
+    return readPermissionKeySet();
+  }, [currentUser]);
+
+  const canDashboardView = hasPermission('dashboard:view', permissionSet);
+  const canSurveyFormView = hasPermission('survey_form:view', permissionSet);
+  const canSurveyTemplateView = hasPermission('survey_template:view', permissionSet);
+  const canCapabilityView = hasPermission('capability:view', permissionSet);
+  const canReportTemplateView = hasPermission('report_template:view', permissionSet);
+  const canUserView = hasPermission('user:view', permissionSet);
+  const canRoleView = hasPermission('role:view', permissionSet);
+  const canPreSalesView = hasPermission('pre_sales:view', permissionSet);
+  const canDictionaryView = hasPermission('dictionary:view', permissionSet);
+  const canMessageView = hasPermission('message:view', permissionSet);
+  const canLogsView = hasPermission('logs:view', permissionSet);
+
   const roleText = currentUser?.role || getDefaultRoleLabel(currentUser?.type || currentUser?.user_type);
 
   return (
@@ -255,41 +284,49 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
           </div>
 
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-hide">
-            <SidebarItem to="/" icon={ICONS.Dashboard} label="售前综合看板" isActive={location.pathname === '/'} />
+            {canDashboardView && (
+              <SidebarItem to="/" icon={ICONS.Dashboard} label="售前综合看板" isActive={location.pathname === '/'} />
+            )}
 
-            <div className="pt-2">
-              <SidebarItem label="客户调研管理" icon={ICONS.Form} isExpanded={isMenuOpen('survey')} onClick={() => toggleMenu('survey')} />
-              {isMenuOpen('survey') && (
-                <div className="mt-1 space-y-1 animate-fadeIn">
-                  <SubItem to="/customer-survey/list" label="调研表单列表" />
-                  <SubItem to="/customer-survey/templates" label="调研模板管理" />
-                </div>
-              )}
-            </div>
+            {(canSurveyFormView || canSurveyTemplateView) && (
+              <div className="pt-2">
+                <SidebarItem label="客户调研管理" icon={ICONS.Form} isExpanded={isMenuOpen('survey')} onClick={() => toggleMenu('survey')} />
+                {isMenuOpen('survey') && (
+                  <div className="mt-1 space-y-1 animate-fadeIn">
+                    {canSurveyFormView && <SubItem to="/customer-survey/list" label="调研表单列表" />}
+                    {canSurveyTemplateView && <SubItem to="/customer-survey/templates" label="调研模板管理" />}
+                  </div>
+                )}
+              </div>
+            )}
 
-            <div className="pt-2">
-              <SidebarItem label="产品方案管理" icon={ICONS.Report} isExpanded={isMenuOpen('product')} onClick={() => toggleMenu('product')} />
-              {isMenuOpen('product') && (
-                <div className="mt-1 space-y-1 animate-fadeIn">
-                  <SubItem to="/product-solution/capabilities" label="产品能力维护" />
-                  <SubItem to="/product-solution/report-templates" label="报告模板管理" />
-                </div>
-              )}
-            </div>
+            {(canCapabilityView || canReportTemplateView) && (
+              <div className="pt-2">
+                <SidebarItem label="产品方案管理" icon={ICONS.Report} isExpanded={isMenuOpen('product')} onClick={() => toggleMenu('product')} />
+                {isMenuOpen('product') && (
+                  <div className="mt-1 space-y-1 animate-fadeIn">
+                    {canCapabilityView && <SubItem to="/product-solution/capabilities" label="产品能力维护" />}
+                    {canReportTemplateView && <SubItem to="/product-solution/report-templates" label="报告模板管理" />}
+                  </div>
+                )}
+              </div>
+            )}
 
-            <div className="pt-2">
-              <SidebarItem label="系统设置" icon={ICONS.Settings} isExpanded={isMenuOpen('settings')} onClick={() => toggleMenu('settings')} />
-              {isMenuOpen('settings') && (
-                <div className="mt-1 space-y-1 animate-fadeIn">
-                  <SubItem to="/settings/users" label="用户管理" />
-                  <SubItem to="/settings/roles" label="角色管理" />
-                  <SubItem to="/settings/pre-sales" label="售前配置" />
-                  <SubItem to="/settings/dictionaries" label="字典管理" />
-                  <SubItem to="/settings/messages" label="消息中心" />
-                  <SubItem to="/settings/logs" label="日志管理" />
-                </div>
-              )}
-            </div>
+            {(canUserView || canRoleView || canPreSalesView || canDictionaryView || canMessageView || canLogsView) && (
+              <div className="pt-2">
+                <SidebarItem label="系统设置" icon={ICONS.Settings} isExpanded={isMenuOpen('settings')} onClick={() => toggleMenu('settings')} />
+                {isMenuOpen('settings') && (
+                  <div className="mt-1 space-y-1 animate-fadeIn">
+                    {canUserView && <SubItem to="/settings/users" label="用户管理" />}
+                    {canRoleView && <SubItem to="/settings/roles" label="角色管理" />}
+                    {canPreSalesView && <SubItem to="/settings/pre-sales" label="售前配置" />}
+                    {canDictionaryView && <SubItem to="/settings/dictionaries" label="字典管理" />}
+                    {canMessageView && <SubItem to="/settings/messages" label="消息中心" />}
+                    {canLogsView && <SubItem to="/settings/logs" label="日志管理" />}
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
         </aside>
       )}

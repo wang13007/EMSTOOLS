@@ -4,6 +4,7 @@ import { User, UserStatus, UserType } from '../types';
 import { roleService, userService } from '../src/services/supabaseService';
 import Portal from '../src/components/Portal';
 import ActionDialog from '../src/components/ActionDialog';
+import { usePermission } from '../src/auth/usePermission';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -62,6 +63,7 @@ const inferRoleType = (role: any): UserType => {
 };
 
 export const UserManagement: React.FC = () => {
+  const { hasPermission, guardPermission } = usePermission();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [roles, setRoles] = useState<RoleLite[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -243,6 +245,7 @@ export const UserManagement: React.FC = () => {
   }, [editingUserId, users]);
 
   const openCreateModal = () => {
+    if (!guardPermission('user:create', '新建用户')) return;
     const defaultType = UserType.EXTERNAL;
     const defaultRoleIds = roles.filter((r) => r.type === defaultType).slice(0, 1).map((r) => r.id);
     setModalMode('create');
@@ -255,6 +258,7 @@ export const UserManagement: React.FC = () => {
   };
 
   const openEditModal = (user: UserRow) => {
+    if (!guardPermission('user:edit', '编辑用户')) return;
     const type = (user.type || user.user_type || UserType.EXTERNAL) as UserType;
     const typedRoles = roles.filter((r) => r.type === type);
     const typedRoleSet = new Set(typedRoles.map((r) => r.id));
@@ -310,6 +314,8 @@ export const UserManagement: React.FC = () => {
       const basicValidationError = validateBasicUserInput({ username, name, phone, email });
       if (basicValidationError) throw new Error(basicValidationError);
       if (!form.roleIds.length) throw new Error('请至少选择一个角色');
+      if (modalMode === 'create' && !hasPermission('user:create')) throw new Error('无权限：无法新建用户');
+      if (modalMode === 'edit' && !hasPermission('user:edit')) throw new Error('无权限：无法编辑用户');
       const roleValidation = await validateSelectedRoles(form.type, form.roleIds, editingUserId);
       if (!roleValidation.ok) throw new Error(roleValidation.message);
       setRoleValidationMessage('');
@@ -357,6 +363,7 @@ export const UserManagement: React.FC = () => {
   };
 
   const handleToggleStatus = async (u: UserRow) => {
+    if (!guardPermission('user:edit', '修改用户状态')) return;
     const nextStatus = u.status === UserStatus.ENABLED ? UserStatus.DISABLED : UserStatus.ENABLED;
     const updated = await userService.updateUser(u.id, { status: nextStatus });
     if (updated) {
@@ -365,10 +372,12 @@ export const UserManagement: React.FC = () => {
   };
 
   const handleResetPassword = (u: UserRow) => {
+    if (!guardPermission('user:edit', '重置密码')) return;
     setPendingResetUser(u);
   };
 
   const handleDelete = (u: UserRow) => {
+    if (!guardPermission('user:delete', '删除用户')) return;
     setPendingDeleteUser(u);
   };
 
@@ -432,13 +441,24 @@ export const UserManagement: React.FC = () => {
               </svg>
             </div>
           </div>
-          <button
-            onClick={openCreateModal}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95"
-          >
-            <ICONS.Plus className="w-4 h-4" />
-            新建用户
-          </button>
+          {hasPermission('user:create') ? (
+            <button
+              onClick={openCreateModal}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95"
+            >
+              <ICONS.Plus className="w-4 h-4" />
+              新建用户
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => guardPermission('user:create', '新建用户')}
+              className="bg-slate-200 text-slate-500 px-4 py-2 rounded-xl font-bold flex items-center gap-2"
+            >
+              <ICONS.Plus className="w-4 h-4" />
+              新建用户
+            </button>
+          )}
         </div>
       </div>
 
@@ -485,15 +505,17 @@ export const UserManagement: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-left space-x-3">
-                      <button onClick={() => openEditModal(u)} className="text-blue-600 font-bold text-sm hover:underline">编辑</button>
-                      <button onClick={() => handleResetPassword(u)} className="text-amber-600 font-bold text-sm hover:underline">重置密码</button>
-                      <button
-                        onClick={() => handleToggleStatus(u)}
-                        className={`${u.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
-                      >
-                        {u.status === UserStatus.ENABLED ? '禁用' : '启用'}
-                      </button>
-                      <button onClick={() => handleDelete(u)} className="text-red-600 font-bold text-sm hover:underline">删除</button>
+                      {hasPermission('user:edit') && <button onClick={() => openEditModal(u)} className="text-blue-600 font-bold text-sm hover:underline">编辑</button>}
+                      {hasPermission('user:edit') && <button onClick={() => handleResetPassword(u)} className="text-amber-600 font-bold text-sm hover:underline">重置密码</button>}
+                      {hasPermission('user:edit') && (
+                        <button
+                          onClick={() => handleToggleStatus(u)}
+                          className={`${u.status === UserStatus.ENABLED ? 'text-rose-600' : 'text-emerald-600'} font-bold text-sm hover:underline`}
+                        >
+                          {u.status === UserStatus.ENABLED ? '禁用' : '启用'}
+                        </button>
+                      )}
+                      {hasPermission('user:delete') && <button onClick={() => handleDelete(u)} className="text-red-600 font-bold text-sm hover:underline">删除</button>}
                     </td>
                   </tr>
                 );

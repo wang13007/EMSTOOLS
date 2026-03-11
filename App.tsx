@@ -1,5 +1,5 @@
 ﻿
-import React from 'react';
+import React, { useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
@@ -18,6 +18,7 @@ import { LogManagement } from './pages/LogManagement';
 import { Dictionaries } from './pages/Dictionaries';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { canAccessPathByPermissions, getDefaultAuthorizedPath, readPermissionKeySet } from './src/auth/permissions';
 
 const getCurrentUserFromStorage = () => {
   try {
@@ -30,14 +31,6 @@ const getCurrentUserFromStorage = () => {
 };
 
 const isExternalUser = (user: any) => user?.type === 'external' || user?.user_type === 'external';
-
-const isExternalAllowedPath = (pathname: string) => {
-  return (
-    pathname === '/customer-survey/list' ||
-    /^\/surveys\/fill\/[^/]+$/.test(pathname) ||
-    /^\/authorized\/surveys\/fill\/[^/]+$/.test(pathname)
-  );
-};
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -59,15 +52,28 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 // 璺敱淇濇姢缁勪欢
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
+  const deniedPathRef = useRef('');
   const isLoggedIn = !!localStorage.getItem('ems_token');
   const redirect = encodeURIComponent(`${location.pathname}${location.search}`);
   if (!isLoggedIn) {
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
-  const currentUser = getCurrentUserFromStorage();
-  if (isExternalUser(currentUser) && !isExternalAllowedPath(location.pathname)) {
-    return <Navigate to="/customer-survey/list" replace />;
+  const permissionSet = readPermissionKeySet();
+  if (!canAccessPathByPermissions(location.pathname, permissionSet)) {
+    const fallbackPath = getDefaultAuthorizedPath(permissionSet);
+    if (fallbackPath === '/login' || fallbackPath === location.pathname) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700 px-6 text-center">
+          当前账号尚未配置可访问页面权限，请联系管理员分配角色权限。
+        </div>
+      );
+    }
+    if (deniedPathRef.current !== location.pathname) {
+      deniedPathRef.current = location.pathname;
+      window.alert('无权限访问该页面');
+    }
+    return <Navigate to={fallbackPath} replace />;
   }
 
   return <>{children}</>;

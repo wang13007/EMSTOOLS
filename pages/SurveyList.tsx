@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { surveyService, userService } from '../src/services/supabaseService';
+import { usePermission } from '../src/auth/usePermission';
 
 type SurveyListItem = SurveyForm & {
   creatorId?: string;
@@ -30,6 +31,7 @@ const formatDateTime = (value?: string) => {
 };
 
 export const SurveyList: React.FC = () => {
+  const { hasPermission, guardPermission } = usePermission();
   const [searchTerm, setSearchTerm] = useState('');
   const [surveys, setSurveys] = useState<SurveyListItem[]>([]);
   const [isExternalView, setIsExternalView] = useState(false);
@@ -118,6 +120,7 @@ export const SurveyList: React.FC = () => {
   }, [filteredSurveys, sortBy, sortOrder]);
 
   const handleDelete = async (id: string) => {
+    if (!guardPermission('survey_form:delete', '删除表单')) return;
     if (!window.confirm('确定要删除该表单吗？')) return;
     const success = await surveyService.deleteSurvey(id);
     if (success) {
@@ -126,6 +129,7 @@ export const SurveyList: React.FC = () => {
   };
 
   const handleRefill = async (id: string) => {
+    if (!guardPermission('survey_form:edit', '重填表单')) return;
     if (!window.confirm('确定要重填该表单吗？状态将回退至草稿。')) return;
     const success = await surveyService.updateSurvey(id, {
       status: SurveyStatus.DRAFT,
@@ -189,13 +193,24 @@ export const SurveyList: React.FC = () => {
             <option value={SurveyStatus.COMPLETED}>{SurveyStatus.COMPLETED}</option>
           </select>
 
-          <Link
-            to="/surveys/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95"
-          >
-            <ICONS.Plus />
-            新建表单
-          </Link>
+          {hasPermission('survey_form:create') ? (
+            <Link
+              to="/surveys/new"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95"
+            >
+              <ICONS.Plus />
+              新建表单
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => guardPermission('survey_form:create', '新建表单')}
+              className="bg-slate-200 text-slate-500 px-5 py-2 rounded-xl font-bold flex items-center gap-2"
+            >
+              <ICONS.Plus />
+              新建表单
+            </button>
+          )}
         </div>
       </div>
 
@@ -263,7 +278,7 @@ export const SurveyList: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-4 py-4">
-                    {item.reportStatus === ReportStatus.GENERATED ? (
+                    {item.reportStatus === ReportStatus.GENERATED && hasPermission('survey_form:view_report') ? (
                       <Link to={`/reports/${item.id}`} className="text-blue-600 hover:underline text-xs font-bold">
                         查看报告
                       </Link>
@@ -275,14 +290,16 @@ export const SurveyList: React.FC = () => {
                   <td className="px-4 py-4 text-xs text-slate-500">{formatDateTime(item.submitTime)}</td>
                   <td className="px-4 py-4 text-right">
                     <div className="flex justify-end gap-3">
-                      {item.status === SurveyStatus.COMPLETED && (
+                      {item.status === SurveyStatus.COMPLETED && hasPermission('survey_form:edit') && (
                         <button onClick={() => handleRefill(item.id)} className="text-blue-600 hover:text-blue-800 font-bold text-xs">
                           重填
                         </button>
                       )}
-                      <button onClick={() => handleDelete(item.id)} className="text-rose-600 hover:text-rose-800 font-bold text-xs">
-                        删除
-                      </button>
+                      {hasPermission('survey_form:delete') && (
+                        <button onClick={() => handleDelete(item.id)} className="text-rose-600 hover:text-rose-800 font-bold text-xs">
+                          删除
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

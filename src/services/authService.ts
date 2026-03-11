@@ -1,4 +1,5 @@
-﻿import { validateRegisterInput } from '../utils/userValidation';
+﻿import { cachePermissionKeys, resolvePermissionKeysByUserAndRoles } from '../auth/permissions';
+import { validateRegisterInput } from '../utils/userValidation';
 
 export interface LoginRequest {
   username: string;
@@ -38,6 +39,7 @@ export interface UserInfo {
   role_ids?: string[];
   email?: string;
   phone?: string;
+  permissions?: string[];
 }
 
 const generateSecureToken = (): string => {
@@ -54,11 +56,17 @@ export const authService = {
     try {
       const { userService, roleService } = await import('../services/supabaseService');
       const users = await userService.getUsers();
+      const loginIdentifier = String(data.username || '').trim();
+      const normalizedPhone = loginIdentifier.replace(/\s+/g, '');
 
-      let currentUser = users.find((u: any) => u.username === data.username);
+      let currentUser = users.find((u: any) => {
+        const username = String(u.username || '').trim();
+        const phone = String(u.phone || '').replace(/\s+/g, '');
+        return username === loginIdentifier || (normalizedPhone && phone === normalizedPhone);
+      });
       if (!currentUser) {
         if (!options?.autoCreateExternalIfNotExists) {
-          throw new Error('用户不存在');
+          throw new Error('用户不存在（请使用用户名或手机号登录）');
         }
 
         const roles = await roleService.getRoles();
@@ -66,8 +74,8 @@ export const authService = {
         if (!customerRole) throw new Error('系统配置错误，未找到外部角色');
 
         const createdUser = await userService.createUser({
-          user_name: data.username,
-          username: data.username,
+          user_name: loginIdentifier,
+          username: loginIdentifier,
           password_hash: data.password,
           type: 'external',
           user_type: 'external',
@@ -83,6 +91,7 @@ export const authService = {
 
       const roles = await roleService.getRoles();
       const roleName = roles.find((r: any) => r.id === currentUser.role_id)?.name || '外部客户';
+      const permissionKeys = resolvePermissionKeysByUserAndRoles(currentUser, roles || []);
 
       const userInfo: UserInfo = {
         id: currentUser.id,
@@ -96,6 +105,7 @@ export const authService = {
           : [currentUser.role_id].filter(Boolean),
         email: currentUser.email,
         phone: currentUser.phone,
+        permissions: permissionKeys,
       };
 
       const token = generateSecureToken();
@@ -106,6 +116,7 @@ export const authService = {
 
       localStorage.setItem('ems_user', JSON.stringify(userInfo));
       localStorage.setItem('ems_token', token);
+      cachePermissionKeys(permissionKeys);
       return { user: userInfo, token };
     } catch (error) {
       const msg = error instanceof Error ? error.message : '登录失败，请检查账号和密码';
@@ -147,6 +158,7 @@ export const authService = {
         phone: normalizedData.phone,
       });
       if (!createdUser) throw new Error('用户创建失败');
+      const permissionKeys = resolvePermissionKeysByUserAndRoles(createdUser, roles || []);
 
       const userInfo: UserInfo = {
         id: createdUser.id,
@@ -160,11 +172,13 @@ export const authService = {
           : [createdUser.role_id].filter(Boolean),
         email: createdUser.email || normalizedData.email,
         phone: createdUser.phone || normalizedData.phone,
+        permissions: permissionKeys,
       };
 
       const token = generateSecureToken();
       localStorage.setItem('ems_user', JSON.stringify(userInfo));
       localStorage.setItem('ems_token', token);
+      cachePermissionKeys(permissionKeys);
       return { user: userInfo, token };
     } catch (error) {
       const msg = error instanceof Error ? error.message : '注册失败，请稍后重试';
@@ -183,6 +197,7 @@ export const authService = {
   async logout(): Promise<{ success: boolean }> {
     localStorage.removeItem('ems_user');
     localStorage.removeItem('ems_token');
+    cachePermissionKeys([]);
     return { success: true };
   },
 

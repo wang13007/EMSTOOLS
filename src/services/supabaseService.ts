@@ -475,15 +475,15 @@ export const userService = {
         let payload = { ...dbUser };
 
         while (true) {
-          const primary = await supabase.from('users').update(payload).eq('user_id', id).select().single();
-          if (!primary.error) {
+          const primary = await supabase.from('users').update(payload).eq('user_id', id).select().maybeSingle();
+          if (!primary.error && primary.data) {
             const updatedUserId = primary.data?.user_id || primary.data?.id;
             if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
             return normalizeUser({ ...primary.data, role_ids: roleIds.length ? roleIds : undefined });
           }
 
-          const fallback = await supabase.from('users').update(payload).eq('id', id).select().single();
-          if (!fallback.error) {
+          const fallback = await supabase.from('users').update(payload).eq('id', id).select().maybeSingle();
+          if (!fallback.error && fallback.data) {
             const updatedUserId = fallback.data?.user_id || fallback.data?.id;
             if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
             return normalizeUser({ ...fallback.data, role_ids: roleIds.length ? roleIds : undefined });

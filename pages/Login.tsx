@@ -79,7 +79,7 @@ export const Login: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-slate-700 mb-1">
-                登录账号 <span className="text-red-500">*</span>
+                登录账号/手机号 <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -91,7 +91,7 @@ export const Login: React.FC = () => {
                 minLength={4}
                 maxLength={50}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                placeholder="请输入登录账号"
+                placeholder="请输入登录账号或手机号"
               />
             </div>
 

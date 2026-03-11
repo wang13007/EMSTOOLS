@@ -19,6 +19,7 @@ import { ReportResult } from '../services/geminiService';
 import { buildReportBundle, ReportBundle } from '../services/reportService';
 import { userService } from '../src/services/supabaseService';
 import { getProductCapabilities, matchProductCapabilities } from '../src/services/productCapabilityStore';
+import { usePermission } from '../src/auth/usePermission';
 
 type ActiveReportType = 'ai' | 'template';
 
@@ -53,6 +54,7 @@ const IconBadge = ({ children, className }: { children: React.ReactNode; classNa
 );
 
 export const ReportDetail: React.FC = () => {
+  const { hasPermission, guardPermission } = usePermission();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -195,6 +197,7 @@ export const ReportDetail: React.FC = () => {
   const reportTypeLabel = activeType === 'ai' ? 'AI诊断报告' : templateReportLabel;
 
   const handleShare = async () => {
+    if (!guardPermission('survey_form:share_report', '分享报告')) return;
     const shareUrl = `${window.location.origin}${window.location.pathname}#/reports/${id}?type=${activeType}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
@@ -205,6 +208,7 @@ export const ReportDetail: React.FC = () => {
   };
 
   const handleExport = async () => {
+    if (!guardPermission('survey_form:export_report', '导出报告')) return;
     const target = exportRootRef.current;
     if (!target) {
       alert('导出失败：未找到报告内容');
@@ -271,23 +275,27 @@ export const ReportDetail: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleShare}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h8m0 0l-3-3m3 3l-3 3M4 6h8m8 0v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" /></svg>
-              链接分享
-            </button>
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={exporting}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-xl transition-all hover:bg-slate-800 disabled:opacity-70"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v10m0 0l-4-4m4 4l4-4M4 18h16" /></svg>
-              {exporting ? '导出中...' : `导出${reportTypeLabel}PDF`}
-            </button>
+            {hasPermission('survey_form:share_report') && (
+              <button
+                type="button"
+                onClick={handleShare}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h8m0 0l-3-3m3 3l-3 3M4 6h8m8 0v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" /></svg>
+                链接分享
+              </button>
+            )}
+            {hasPermission('survey_form:export_report') && (
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={exporting}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-xl transition-all hover:bg-slate-800 disabled:opacity-70"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v10m0 0l-4-4m4 4l4-4M4 18h16" /></svg>
+                {exporting ? '导出中...' : `导出${reportTypeLabel}PDF`}
+              </button>
+            )}
           </div>
         </div>
       </section>
