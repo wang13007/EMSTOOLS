@@ -406,7 +406,7 @@ export const UserManagement: React.FC = () => {
     try {
       const ok = await userService.deleteUser(pendingDeleteUser.id);
       if (ok) {
-        setUsers((prev) => prev.filter((item) => item.id !== pendingDeleteUser.id));
+        await loadData();
         showInfoDialog('删除成功', `用户 ${pendingDeleteUser.username} 已删除。`, 'success');
       } else {
         showInfoDialog('删除失败', '删除用户失败，请稍后重试。', 'danger');

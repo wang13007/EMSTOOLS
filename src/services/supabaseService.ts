@@ -527,15 +527,63 @@ export const userService = {
 
   async deleteUser(id: string) {
     try {
-      const { error } = await supabase.from('users').delete().eq('user_id', id);
-      if (error) {
-        const { error: fallbackError } = await supabase.from('users').delete().eq('id', id);
-        if (fallbackError) {
-          console.error('删除用户失败:', fallbackError);
-          return false;
+      const targetId = String(id || '').trim();
+      if (!targetId) {
+        console.error('删除用户失败: 用户ID为空');
+        return false;
+      }
+
+      const attemptedIds = dedupeStringArray([targetId]);
+
+      // 先查一遍，补齐 id/user_id 双键候选，避免只按单字段删除导致“0行删除”误判成功
+      const lookup = await supabase
+        .from('users')
+        .select('id,user_id')
+        .or(`id.eq.${targetId},user_id.eq.${targetId}`)
+        .limit(1);
+      if (lookup.error) {
+        console.warn('删除前查询用户失败，继续尝试删除:', lookup.error);
+      } else if (lookup.data?.length) {
+        const row = lookup.data[0] as any;
+        attemptedIds.push(...dedupeStringArray([row?.id, row?.user_id]));
+      }
+
+      let deletedRows: any[] = [];
+      let lastError: any = null;
+
+      for (const candidate of dedupeStringArray(attemptedIds)) {
+        const byUserId = await supabase.from('users').delete().eq('user_id', candidate).select('id,user_id');
+        if (byUserId.error) {
+          lastError = byUserId.error;
+        } else if ((byUserId.data || []).length > 0) {
+          deletedRows = byUserId.data || [];
+          break;
+        }
+
+        const byId = await supabase.from('users').delete().eq('id', candidate).select('id,user_id');
+        if (byId.error) {
+          lastError = byId.error;
+        } else if ((byId.data || []).length > 0) {
+          deletedRows = byId.data || [];
+          break;
         }
       }
-      removeCachedRoleIdsForUser(id);
+
+      if (!deletedRows.length) {
+        if (lastError) {
+          console.error('删除用户失败:', lastError);
+        } else {
+          console.warn('删除用户未生效: 未匹配到可删除记录或受RLS策略限制', { id: targetId });
+        }
+        return false;
+      }
+
+      const cacheIds = dedupeStringArray([
+        targetId,
+        ...deletedRows.map((row) => row?.id),
+        ...deletedRows.map((row) => row?.user_id),
+      ]);
+      cacheIds.forEach((cacheId) => removeCachedRoleIdsForUser(cacheId));
       return true;
     } catch (error) {
       console.error('删除用户过程中发生异常:', error);
