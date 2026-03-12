@@ -7,6 +7,7 @@ import { surveyReportService, surveyService, userService } from '../src/services
 import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 import { usePermission } from '../src/auth/usePermission';
 import { getAllSurveyTemplates, syncImportedTemplatesFromDatabase } from '../src/services/templateStore';
+import { DetailPageHeader } from '../components/DetailPageHeader';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -476,99 +477,111 @@ export const SurveyFill: React.FC = () => {
   const hasGeneratedReport = form.reportStatus === ReportStatus.GENERATED;
 
   return (
-    <div className="animate-fadeIn">
-      <div className="sticky -top-8 z-30 -mx-8 px-8 bg-slate-50 border-b border-slate-200 shadow-sm">
-        <div className="max-w-4xl mx-auto py-3">
-          <div className="flex justify-between items-center gap-4">            <div>
-              <h2 className="text-2xl font-bold text-slate-900">{form.name}</h2>
-              <p className="text-slate-500">
-                {form.customerName} · {form.projectName}
-              </p>
-              {hasGeneratedReport && (
-                <div className="mt-3 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-                  <button
-                    type="button"
-                    className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white"
-                  >
-                    表单
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/reports/${form.id}`)}
-                    disabled={!canViewReport}
-                    className="rounded-lg px-4 py-1.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
-                  >
-                    报告
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-4 shrink-0">
-              <button
-                onClick={handleBackToList}
-                disabled={submitting}
-                className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
-              >
-                返回列表
-              </button>
-              {!isCompleted && !isAuthorizedFill && canShareSurvey && (
+    <div className="animate-fadeIn bg-slate-100/70 pb-20">
+      <div className="sticky top-4 z-30 px-1 pt-4 md:px-0">
+        <div className="mx-auto max-w-4xl">
+          <DetailPageHeader
+            title={form.name}
+            eyebrow={(
+              <>
+                <span className="rounded-lg bg-blue-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white">
+                  {isCompleted ? '已完成' : '调研表单'}
+                </span>
+                <span className="rounded-lg bg-white/80 px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                  {form.customerName || '未填写客户'}
+                </span>
+                <span className="text-xs text-slate-500">{form.projectName || '未填写项目'}</span>
+              </>
+            )}
+            subtitle={(
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>{isCompleted ? '当前为只读查看模式' : '支持自动保存草稿与继续编辑'}</span>
+                {form.region ? <span>区域：{form.region}</span> : null}
+                {form.industry ? <span>行业：{form.industry}</span> : null}
+              </div>
+            )}
+            tabs={hasGeneratedReport ? [
+              {
+                key: 'form',
+                label: '表单',
+                active: true,
+              },
+              {
+                key: 'report',
+                label: '报告',
+                onClick: () => navigate(`/reports/${form.id}`),
+                disabled: !canViewReport,
+              },
+            ] : []}
+            actions={(
+              <>
                 <button
-                  onClick={handleCopyExternalLink}
+                  onClick={handleBackToList}
                   disabled={submitting}
-                  className="px-6 py-2 border border-blue-200 rounded-xl font-bold text-blue-600 hover:bg-blue-50 transition-all bg-white inline-flex items-center gap-2"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14a5 5 0 007.07 0l1.41-1.41a5 5 0 00-7.07-7.07l-1.41 1.41M14 10a5 5 0 00-7.07 0L5.52 11.41a5 5 0 007.07 7.07l1.41-1.41" />
-                  </svg>
-                  复制外链填写地址
+                  返回列表
                 </button>
-              )}
-              {!isCompleted && canEditSurvey && (
-                <>
+                {!isCompleted && !isAuthorizedFill && canShareSurvey && (
                   <button
-                    onClick={saveDraft}
-                    disabled={saving || submitting}
-                    className="px-6 py-2 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-all bg-white"
+                    onClick={handleCopyExternalLink}
+                    disabled={submitting}
+                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm font-bold text-blue-600 shadow-sm transition-all hover:bg-blue-50"
                   >
-                    {saving ? '正在保存...' : '保存草稿'}
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14a5 5 0 007.07 0l1.41-1.41a5 5 0 00-7.07-7.07l-1.41 1.41M14 10a5 5 0 00-7.07 0L5.52 11.41a5 5 0 007.07 7.07l1.41-1.41" />
+                    </svg>
+                    复制外链填写地址
                   </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || autoSaveState === 'saving' || !canSubmitSurvey}
-                    className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70"
-                  >
-                    {submitting ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        AI 分析中...
-                      </>
-                    ) : (
-                      '提交并生成报告'
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div
-            className={`mt-3 px-4 py-2 rounded-xl text-sm border ${
-              autoSaveState === 'error'
-                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                : autoSaveState === 'saving'
-                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            }`}
-          >
-            {autoSaveMessage}
-          </div>
+                )}
+                {!isCompleted && canEditSurvey && (
+                  <>
+                    <button
+                      onClick={saveDraft}
+                      disabled={saving || submitting}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+                    >
+                      {saving ? '正在保存...' : '保存草稿'}
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting || autoSaveState === 'saving' || !canSubmitSurvey}
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-xl transition-all hover:bg-slate-800 disabled:opacity-70"
+                    >
+                      {submitting ? (
+                        <>
+                          <svg className="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          AI 分析中...
+                        </>
+                      ) : (
+                        '提交并生成报告'
+                      )}
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+            footer={(
+              <div
+                className={`rounded-2xl border px-4 py-3 text-sm ${
+                  autoSaveState === 'error'
+                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    : autoSaveState === 'saving'
+                    ? 'border-amber-200 bg-amber-50 text-amber-700'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                }`}
+              >
+                {autoSaveMessage}
+              </div>
+            )}
+          />
         </div>
       </div>
 
