@@ -18,7 +18,7 @@ import { LogManagement } from './pages/LogManagement';
 import { Dictionaries } from './pages/Dictionaries';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
-import { canAccessPathByPermissions, getDefaultAuthorizedPath, readPermissionKeySet } from './src/auth/permissions';
+import { cachePermissionKeys, canAccessPathByPermissions, readPermissionKeySet } from './src/auth/permissions';
 
 const getCurrentUserFromStorage = () => {
   try {
@@ -31,6 +31,12 @@ const getCurrentUserFromStorage = () => {
 };
 
 const isExternalUser = (user: any) => user?.type === 'external' || user?.user_type === 'external';
+
+const clearAuthSession = () => {
+  localStorage.removeItem('ems_user');
+  localStorage.removeItem('ems_token');
+  cachePermissionKeys([]);
+};
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -52,7 +58,7 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 // 璺敱淇濇姢缁勪欢
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const deniedPathRef = useRef('');
+  const hasClearedUnauthorizedRef = useRef(false);
   const isLoggedIn = !!localStorage.getItem('ems_token');
   const redirect = encodeURIComponent(`${location.pathname}${location.search}`);
   if (!isLoggedIn) {
@@ -61,19 +67,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   const permissionSet = readPermissionKeySet();
   if (!canAccessPathByPermissions(location.pathname, permissionSet)) {
-    const fallbackPath = getDefaultAuthorizedPath(permissionSet);
-    if (fallbackPath === '/login' || fallbackPath === location.pathname) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700 px-6 text-center">
-          当前账号尚未配置可访问页面权限，请联系管理员分配角色权限。
-        </div>
-      );
+    if (!hasClearedUnauthorizedRef.current) {
+      clearAuthSession();
+      hasClearedUnauthorizedRef.current = true;
     }
-    if (deniedPathRef.current !== location.pathname) {
-      deniedPathRef.current = location.pathname;
-      window.alert('无权限访问该页面');
-    }
-    return <Navigate to={fallbackPath} replace />;
+    return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
   return <>{children}</>;
