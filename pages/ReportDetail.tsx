@@ -17,7 +17,7 @@ import jsPDF from 'jspdf';
 import { SurveyForm } from '../types';
 import { ReportResult } from '../services/geminiService';
 import { buildReportBundle, ReportBundle } from '../services/reportService';
-import { userService } from '../src/services/supabaseService';
+import { surveyService, userService } from '../src/services/supabaseService';
 import { getProductCapabilities, matchProductCapabilities } from '../src/services/productCapabilityStore';
 import { usePermission } from '../src/auth/usePermission';
 
@@ -190,6 +190,70 @@ const toReportBundle = (survey: SurveyForm, rawStored: any): { bundle: ReportBun
   };
 };
 
+const REPORT_STORAGE_KEY = 'ems_reports';
+
+const readLocalReportMap = (): Record<string, any> => {
+  try {
+    const raw = localStorage.getItem(REPORT_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, any>) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeLocalReport = (surveyId: string, bundle: ReportBundle) => {
+  if (!surveyId) return;
+  const reportMap = readLocalReportMap();
+  reportMap[surveyId] = bundle;
+  localStorage.setItem(REPORT_STORAGE_KEY, JSON.stringify(reportMap));
+};
+
+const mapSurveyRecordToForm = (survey: any): SurveyForm => {
+  const rawData = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  return {
+    id: survey?.id || '',
+    name: survey?.name || '',
+    customerName: survey?.customerName || survey?.customer_name || '',
+    projectName: survey?.projectName || survey?.project_name || '',
+    industry: survey?.industry || '',
+    region: survey?.region || '',
+    templateId: survey?.templateId || survey?.template_id || rawData.template_key || '',
+    status: survey?.status,
+    reportStatus: survey?.reportStatus || survey?.report_status,
+    creator: survey?.creator || survey?.creator_id || '',
+    submitter: survey?.submitter || survey?.submitter_id || '',
+    preSalesResponsible: survey?.preSalesResponsible || survey?.pre_sales_responsible_id || '',
+    createTime: survey?.createTime || survey?.create_time || '',
+    data: rawData,
+  };
+};
+
+const readReportBundleFromSurvey = (survey: any): any => {
+  const rawData = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  return rawData.report_bundle || rawData.reportBundle || null;
+};
+
+const persistReportBundleToSurvey = async (survey: any, bundle: ReportBundle) => {
+  if (!survey?.id) return;
+  writeLocalReport(survey.id, bundle);
+
+  const rawData = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  const current = rawData.report_bundle;
+  if (current?.generatedAt === bundle.generatedAt) return;
+
+  const nextData = {
+    ...rawData,
+    report_bundle: bundle,
+    report_generated_at: bundle.generatedAt,
+  };
+
+  await surveyService.updateSurvey(survey.id, {
+    data: nextData,
+    status: survey.status,
+    report_status: survey.report_status || survey.reportStatus,
+  });
+};
+
 export const ReportDetail: React.FC = () => {
   const { hasPermission, guardPermission } = usePermission();
   const { id } = useParams<{ id: string }>();
@@ -207,17 +271,22 @@ export const ReportDetail: React.FC = () => {
   useEffect(() => {
     const loadReport = async () => {
       try {
-        const surveys = JSON.parse(localStorage.getItem('ems_surveys') || '[]') as SurveyForm[];
-        const reports = JSON.parse(localStorage.getItem('ems_reports') || '{}') as Record<string, any>;
-
-        const survey = surveys.find((item) => item.id === id);
-        if (!survey) {
+        if (!id) {
           window.alert(ZH.notFoundProject);
           navigate('/customer-survey/list');
           return;
         }
 
-        const rawStored = reports[id || ''];
+        let surveyRecord = await surveyService.getSurveyById(id);
+        if (!surveyRecord) {
+          window.alert(ZH.notFoundProject);
+          navigate('/customer-survey/list');
+          return;
+        }
+
+        const survey = mapSurveyRecordToForm(surveyRecord);
+        const localReports = readLocalReportMap();
+        const rawStored = readReportBundleFromSurvey(surveyRecord) || localReports[id];
         if (!rawStored) {
           window.alert(ZH.notFoundReport);
           navigate(`/surveys/fill/${id}`);
@@ -227,9 +296,12 @@ export const ReportDetail: React.FC = () => {
         const { bundle, shouldPersist } = toReportBundle(survey, rawStored);
         setData({ survey, report: bundle });
 
-        if (shouldPersist) {
-          reports[id || ''] = bundle;
-          localStorage.setItem('ems_reports', JSON.stringify(reports));
+        if (shouldPersist || !readReportBundleFromSurvey(surveyRecord)) {
+          await persistReportBundleToSurvey(surveyRecord, bundle);
+          const refreshedSurvey = await surveyService.getSurveyById(id);
+          if (refreshedSurvey) {
+            surveyRecord = refreshedSurvey;
+          }
         }
 
         if (!bundle.preSalesContact?.phone || !bundle.preSalesContact?.email) {
@@ -251,8 +323,7 @@ export const ReportDetail: React.FC = () => {
             };
 
             setData({ survey, report: nextBundle });
-            reports[id || ''] = nextBundle;
-            localStorage.setItem('ems_reports', JSON.stringify(reports));
+            await persistReportBundleToSurvey(surveyRecord, nextBundle);
           }
         }
       } catch (error) {

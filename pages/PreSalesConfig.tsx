@@ -4,6 +4,7 @@ import { DictItem, DictType, PreSalesAssignment, RegionDict, RegionLevel, User }
 import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
 import { INITIAL_REGIONS } from '../constants/regions';
 import Portal from '../src/components/Portal';
+import { roleService, userService } from '../src/services/supabaseService';
 
 type OptionItem = {
   id: string;
@@ -11,7 +12,6 @@ type OptionItem = {
 };
 
 const ASSIGNMENT_STORAGE_KEY = 'ems_presales_assignments';
-const USERS_STORAGE_KEY = 'ems_users';
 const DICT_TYPES_STORAGE_KEY = 'ems_dict_types';
 const DICT_ITEMS_STORAGE_KEY = 'ems_dict_items';
 const REGION_STORAGE_KEY = 'ems_regions';
@@ -59,12 +59,10 @@ const normalizeLabel = (value: string) => {
 
 const isEnabledStatus = (status: unknown) => String(status || '').toLowerCase() !== 'disabled';
 
-const isPreSalesUser = (user: User) => {
-  const source = `${user.role || ''} ${user.name || ''} ${user.user_name || ''}`.toLowerCase();
-  return source.includes('售前')
-    || source.includes('presales')
-    || source.includes('pre-sales')
-    || source.includes('pre sales');
+const isPreSalesEngineerRole = (role: any) => {
+  const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
+  const keywords = ['\u552e\u524d\u5de5\u7a0b\u5e08', 'presales engineer', 'pre-sales engineer', 'pre sales engineer', '\u552e\u524d'];
+  return keywords.some((keyword) => source.includes(keyword));
 };
 
 const toDisplayDate = (value?: string) => {
@@ -85,7 +83,6 @@ export const PreSalesConfig: React.FC = () => {
 
   useEffect(() => {
     const savedAssignments = readCachedJson<PreSalesAssignment[]>(ASSIGNMENT_STORAGE_KEY, []);
-    const savedUsers = readCachedJson<User[]>(USERS_STORAGE_KEY, []);
 
     const dictTypes = readCachedJson<DictType[]>(DICT_TYPES_STORAGE_KEY, INITIAL_DICT_TYPES);
     const dictItems = readCachedJson<DictItem[]>(DICT_ITEMS_STORAGE_KEY, INITIAL_DICT_ITEMS);
@@ -106,9 +103,36 @@ export const PreSalesConfig: React.FC = () => {
     );
 
     setAssignments(savedAssignments);
-    setUsers(savedUsers);
     setIndustryOptions(industries);
     setRegionOptions(mappedRegions);
+
+    const loadPreSalesUsers = async () => {
+      try {
+        const [roles, rawUsers] = await Promise.all([roleService.getRoles(), userService.getUsers()]);
+        const preSalesRoleIds = new Set((roles || []).filter(isPreSalesEngineerRole).map((role: any) => role.id));
+
+        const filteredUsers = (rawUsers || [])
+          .filter((user: any) => isEnabledStatus(user.status))
+          .filter((user: any) => {
+            const roleIds = Array.isArray(user.role_ids) && user.role_ids.length ? user.role_ids : [user.role_id];
+            const byRoleId = roleIds.some((roleId: string) => preSalesRoleIds.has(roleId));
+            if (byRoleId) return true;
+
+            const roleText = `${user.role || ''}`.toLowerCase();
+            return roleText.includes('\u552e\u524d\u5de5\u7a0b\u5e08')
+              || roleText.includes('presales')
+              || roleText.includes('pre-sales')
+              || roleText.includes('pre sales');
+          });
+
+        setUsers(filteredUsers);
+      } catch (error) {
+        console.error('加载售前工程师用户失败:', error);
+        setUsers([]);
+      }
+    };
+
+    void loadPreSalesUsers();
   }, []);
 
   useEffect(() => {
@@ -116,9 +140,7 @@ export const PreSalesConfig: React.FC = () => {
   }, [assignments]);
 
   const selectableUsers = useMemo(() => {
-    const enabledUsers = users.filter((user) => user.status === 'enabled');
-    const preSalesUsers = enabledUsers.filter(isPreSalesUser);
-    return preSalesUsers.length ? preSalesUsers : enabledUsers;
+    return users.filter((user) => isEnabledStatus(user.status));
   }, [users]);
 
   const regionNameMap = useMemo(() => new Map(regionOptions.map((item) => [item.id, item.label])), [regionOptions]);
@@ -158,6 +180,7 @@ export const PreSalesConfig: React.FC = () => {
     if (!userId) return;
     const selectedUser = selectableUsers.find((user) => user.id === userId) || users.find((user) => user.id === userId);
     if (!selectedUser) return;
+    const selectedUserName = selectedUser.name || selectedUser.user_name || selectedUser.username || userId;
 
     if (editingItem) {
       setAssignments((prev) =>
@@ -166,7 +189,7 @@ export const PreSalesConfig: React.FC = () => {
             ? {
                 ...item,
                 userId,
-                userName: selectedUser.name,
+                userName: selectedUserName,
                 regionIds,
                 industryIds,
               }
@@ -179,7 +202,7 @@ export const PreSalesConfig: React.FC = () => {
         {
           id: `ASG-${Date.now()}`,
           userId,
-          userName: selectedUser.name,
+          userName: selectedUserName,
           regionIds,
           industryIds,
           createTime: new Date().toISOString(),

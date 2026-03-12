@@ -12,10 +12,17 @@ import {
 
 type EditableRole = Partial<Role> & {
   permissions?: Record<string, boolean>;
+  isSystemPreset?: boolean;
 };
 
 const normalizeRoleStatus = (value: any): UserStatus =>
   String(value ?? '').toLowerCase() === UserStatus.DISABLED ? UserStatus.DISABLED : UserStatus.ENABLED;
+
+const SYSTEM_PRESET_ROLE_NAMES = ['超级管理员', '售前工程师', '客户用户', '外部客户'];
+const isSystemPresetRoleName = (roleName: string | undefined | null) => {
+  const name = String(roleName || '').trim();
+  return name ? SYSTEM_PRESET_ROLE_NAMES.includes(name) : false;
+};
 
 const normalizeRoleRecord = (role: any): Role => {
   return {
@@ -87,6 +94,7 @@ export const RoleManagement: React.FC = () => {
     setEditingRole({
       ...role,
       permissions: normalizePermissionRecord(role.permissions || {}),
+      isSystemPreset: isSystemPresetRoleName(role.name),
     });
     setIsModalOpen(true);
   };
@@ -112,14 +120,19 @@ export const RoleManagement: React.FC = () => {
     setError('');
 
     try {
-      const payload = {
-        name: roleName,
-        description: String(editingRole.description || ''),
-        type: editingRole.type || UserType.INTERNAL,
-        user_type: editingRole.type || UserType.INTERNAL,
-        permissions: normalizePermissionRecord(editingRole.permissions || {}),
-        status: normalizeRoleStatus(editingRole.status),
-      };
+      const normalizedPermissions = normalizePermissionRecord(editingRole.permissions || {});
+      const payload = editingRole.id && editingRole.isSystemPreset
+        ? {
+            permissions: normalizedPermissions,
+          }
+        : {
+            name: roleName,
+            description: String(editingRole.description || ''),
+            type: editingRole.type || UserType.INTERNAL,
+            user_type: editingRole.type || UserType.INTERNAL,
+            permissions: normalizedPermissions,
+            status: normalizeRoleStatus(editingRole.status),
+          };
 
       if (editingRole.id) {
         const updated = await roleService.updateRole(editingRole.id, payload);
@@ -144,6 +157,10 @@ export const RoleManagement: React.FC = () => {
 
   const handleDelete = async (role: Role) => {
     if (saving) return;
+    if (isSystemPresetRoleName(role.name)) {
+      setError('系统预置角色不可删除，仅可编辑权限。');
+      return;
+    }
     if (!window.confirm(`确定要删除角色「${role.name}」吗？`)) return;
 
     setSaving(true);
@@ -200,6 +217,7 @@ export const RoleManagement: React.FC = () => {
             const labels = rolePreviewMap[role.id] || [];
             const shownLabels = labels.slice(0, 6);
             const remainCount = labels.length - shownLabels.length;
+            const isSystemPreset = isSystemPresetRoleName(role.name);
 
             return (
               <div key={role.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col">
@@ -213,6 +231,11 @@ export const RoleManagement: React.FC = () => {
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${role.status === UserStatus.ENABLED ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                         {role.status === UserStatus.ENABLED ? '启用' : '禁用'}
                       </span>
+                      {isSystemPreset && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-50 text-amber-700">
+                          系统预置
+                        </span>
+                      )}
                     </div>
                   </div>
                   <p className="text-sm text-slate-500 line-clamp-2 h-10">{role.description || '-'}</p>
@@ -238,7 +261,12 @@ export const RoleManagement: React.FC = () => {
                     <button onClick={() => openEditModal(role)} disabled={saving} className="text-blue-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline">
                       编辑权限
                     </button>
-                    <button onClick={() => void handleDelete(role)} disabled={saving} className="text-rose-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline">
+                    <button
+                      onClick={() => void handleDelete(role)}
+                      disabled={saving || isSystemPreset}
+                      className="text-rose-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline"
+                      title={isSystemPreset ? '系统预置角色不可删除' : ''}
+                    >
                       删除
                     </button>
                   </div>
@@ -261,12 +289,18 @@ export const RoleManagement: React.FC = () => {
               </div>
 
               <form className="flex-1 overflow-y-auto p-8 space-y-6" onSubmit={handleSave}>
+                {editingRole.isSystemPreset && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                    系统预置角色不可删除，且仅允许修改权限。
+                  </div>
+                )}
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500 uppercase">角色名称 <span className="text-rose-600">*</span></label>
                   <input
                     required
                     value={editingRole.name || ''}
                     onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), name: e.target.value }))}
+                    disabled={!!editingRole.isSystemPreset}
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="例如：实施经理"
                   />
@@ -277,6 +311,7 @@ export const RoleManagement: React.FC = () => {
                   <textarea
                     value={editingRole.description || ''}
                     onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), description: e.target.value }))}
+                    disabled={!!editingRole.isSystemPreset}
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none h-20 resize-none"
                   />
                 </div>
@@ -288,6 +323,7 @@ export const RoleManagement: React.FC = () => {
                       required
                       value={editingRole.type || UserType.INTERNAL}
                       onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), type: e.target.value as UserType }))}
+                      disabled={!!editingRole.isSystemPreset}
                       className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value={UserType.INTERNAL}>内部用户</option>
@@ -300,6 +336,7 @@ export const RoleManagement: React.FC = () => {
                       required
                       value={editingRole.status || UserStatus.ENABLED}
                       onChange={(e) => setEditingRole((prev) => ({ ...(prev || {}), status: e.target.value as UserStatus }))}
+                      disabled={!!editingRole.isSystemPreset}
                       className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                       <option value={UserStatus.ENABLED}>启用</option>

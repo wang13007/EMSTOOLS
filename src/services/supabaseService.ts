@@ -979,6 +979,13 @@ export const messageService = {
   },
 };
 
+const SYSTEM_PRESET_ROLE_NAMES = ['超级管理员', '售前工程师', '客户用户', '外部客户'];
+
+const isSystemPresetRoleName = (roleName: string | undefined | null) => {
+  const name = String(roleName || '').trim();
+  return name ? SYSTEM_PRESET_ROLE_NAMES.includes(name) : false;
+};
+
 export const roleService = {
   async getRoles() {
     const { data, error } = await supabase.from('roles').select('*');
@@ -999,7 +1006,12 @@ export const roleService = {
   },
 
   async updateRole(id: string, role: any) {
-    const { data, error } = await supabase.from('roles').update(role).eq('id', id).select().single();
+    const { data: roleInfo } = await supabase.from('roles').select('name').eq('id', id).maybeSingle();
+    const payload = isSystemPresetRoleName(roleInfo?.name)
+      ? { permissions: role?.permissions || {} }
+      : role;
+
+    const { data, error } = await supabase.from('roles').update(payload).eq('id', id).select().single();
     if (error) {
       console.error('更新角色失败:', error);
       return null;
@@ -1008,9 +1020,8 @@ export const roleService = {
   },
 
   async deleteRole(id: string) {
-    const protectedRoleNames = ['\u8d85\u7ea7\u7ba1\u7406\u5458', '\u552e\u524d\u5de5\u7a0b\u5e08', '\u5916\u90e8\u5ba2\u6237'];
     const { data: roleInfo } = await supabase.from('roles').select('name').eq('id', id).maybeSingle();
-    if (roleInfo?.name && protectedRoleNames.includes(String(roleInfo.name))) {
+    if (isSystemPresetRoleName(roleInfo?.name)) {
       console.warn('预置角色不可删除:', roleInfo.name);
       return false;
     }

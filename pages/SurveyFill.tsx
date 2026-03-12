@@ -394,11 +394,24 @@ export const SurveyFill: React.FC = () => {
       }
 
       const aiReport = await generateEnergyReport(form);
+      const preSalesContact = await resolvePreSalesContact(form.preSalesResponsible);
       const currentUserId = getCurrentUserId();
       const submitTime = new Date().toISOString();
+      const reportSourceForm: SurveyForm = {
+        ...form,
+        status: SurveyStatus.COMPLETED,
+        reportStatus: ReportStatus.GENERATED,
+        submitter: currentUserId || form.submitter,
+        data: {
+          ...(form.data || {}),
+          submit_time: submitTime,
+        },
+      };
+      const reportBundle = buildReportBundle(reportSourceForm, aiReport, preSalesContact);
       const submittedData = {
-        ...(form.data || {}),
-        submit_time: submitTime,
+        ...reportSourceForm.data,
+        report_bundle: reportBundle,
+        report_generated_at: reportBundle.generatedAt,
       };
 
       const updated = await surveyService.updateSurvey(form.id, {
@@ -418,9 +431,6 @@ export const SurveyFill: React.FC = () => {
       setDirty(false);
       setLastSavedAt(new Date().toISOString());
       setAutoSaveState('saved');
-
-      const preSalesContact = await resolvePreSalesContact(form.preSalesResponsible);
-      const reportBundle = buildReportBundle(mapped, aiReport, preSalesContact);
 
       const reports = JSON.parse(localStorage.getItem('ems_reports') || '{}');
       reports[form.id] = reportBundle;
