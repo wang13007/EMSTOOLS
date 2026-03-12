@@ -21,11 +21,11 @@
 | 客户调研管理 | 调研表单列表 | `/customer-survey/list` | 支持搜索、筛选、排序、删除、重填 |
 | 客户调研管理 | 调研模板查看 | `/customer-survey/templates` | 模板结构查看 |
 | 客户调研管理 | 新建调研 | `/surveys/new` | 支持直接创建/外链创建 |
-| 客户调研管理 | 调研填写 | `/surveys/fill/:id` | 自动保存、提交生成报告 |
+| 客户调研管理 | 调研填写 | `/surveys/fill/:id` | 统一详情头部、自动保存、提交生成报告 |
 | 客户调研管理 | 授权填写 | `/authorized/surveys/fill/:id` | 外部用户授权链路 |
 | 产品方案管理 | 产品能力维护 | `/product-solution/capabilities` | 行内编辑、Excel 导入导出 |
 | 产品方案管理 | 报告模板管理 | `/product-solution/report-templates` | 模板查看与本地覆盖 |
-| 产品方案管理 | 报告详情 | `/reports/:id` | AI/模板报告切换、分享、导出 PDF |
+| 产品方案管理 | 报告详情 | `/reports/:id` | 与表单页统一顶部布局，支持表单/报告切换、分享、导出 PDF |
 | 系统设置 | 用户管理 | `/settings/users` | 用户 CRUD、启停、重置密码 |
 | 系统设置 | 角色管理 | `/settings/roles` | 角色 CRUD、权限矩阵 |
 | 系统设置 | 售前配置 | `/settings/pre-sales` | 售前人员区域/行业分配 |
