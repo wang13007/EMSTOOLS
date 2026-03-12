@@ -53,10 +53,25 @@ export type ReportBundle = {
   aiReport: ReportResult;
   templateReport: TemplateReportResult;
   capabilityMatches: ProductCapabilityMatch[];
+  capabilityRecommendations: CapabilityRecommendationItem[];
   preSalesContact: PreSalesContactInfo;
 };
 
 const PLACEHOLDER_REGEX = /{{\s*([\w.-]+)\s*}}/g;
+
+type RecommendationSource = 'software' | 'hardware' | 'consulting' | 'module';
+
+export type CapabilityRecommendationItem = {
+  capabilityId: string;
+  capabilityName: string;
+  capabilityType: ProductCapabilityMatch['type'];
+  matched: boolean;
+  score: number;
+  reasons: string[];
+  recommendationSource: RecommendationSource;
+  recommendations: string[];
+  actionSuggestion: string;
+};
 
 const toDisplayValue = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '未填写';
@@ -87,6 +102,110 @@ const buildValueMap = (surveyForm: SurveyForm) => {
 
 const dedupeStrings = (values: string[]) => {
   return Array.from(new Set(values.map((value) => String(value || '').trim()).filter(Boolean)));
+};
+
+const normalizeText = (value: unknown) => String(value || '').trim().toLowerCase();
+
+const sanitizeToken = (value: string) => normalizeText(value).replace(/[，。；、,:：()（）[\]{}"'`~!@#$%^&*+\-_=<>?/\\\s]/g, '');
+
+const splitDescriptionKeywords = (value: string) => {
+  return value
+    .split(/[，。；、,:：()（）[\]{}"'`~!@#$%^&*+\-_=<>?/\\\s]+/)
+    .map((item) => sanitizeToken(item))
+    .filter((item) => item.length >= 2);
+};
+
+const getCapabilityKeywords = (capability: ProductCapabilityMatch) => {
+  return dedupeStrings([
+    sanitizeToken(capability.name),
+    ...capability.scenarios.map((item) => sanitizeToken(item)),
+    ...capability.industries.map((item) => sanitizeToken(item)),
+    ...splitDescriptionKeywords(capability.description || ''),
+  ]).filter(Boolean);
+};
+
+const buildRecommendationPool = (aiReport: ReportResult, capability: ProductCapabilityMatch): Array<{ source: RecommendationSource; text: string }> => {
+  const software = dedupeStrings([...(aiReport.softwareRecommendations || []), ...(aiReport.recommendedModules || [])]);
+  const hardware = dedupeStrings(aiReport.hardwareRecommendations || []);
+  const consulting = dedupeStrings(aiReport.consultingRecommendations || []);
+  const moduleOnly = dedupeStrings(aiReport.recommendedModules || []);
+
+  if (capability.type === '软件') {
+    return software.map((text) => ({ source: 'software' as const, text }));
+  }
+  if (capability.type === '硬件') {
+    return hardware.map((text) => ({ source: 'hardware' as const, text }));
+  }
+  if (capability.type === '咨询') {
+    return consulting.map((text) => ({ source: 'consulting' as const, text }));
+  }
+  return dedupeStrings([...consulting, ...hardware, ...moduleOnly]).map((text) => ({ source: 'module' as const, text }));
+};
+
+const scoreRecommendation = (
+  capability: ProductCapabilityMatch,
+  recommendation: string,
+  keywords: string[],
+) => {
+  const recommendationText = normalizeText(recommendation);
+  const recommendationToken = sanitizeToken(recommendationText);
+  let score = 0;
+
+  if (!recommendationText) {
+    return score;
+  }
+
+  if (recommendationToken.includes(sanitizeToken(capability.name))) {
+    score += 4;
+  }
+  if (keywords.some((item) => item && recommendationToken.includes(item))) {
+    score += 2;
+  }
+  if (capability.reasons.some((reason) => recommendationText.includes(normalizeText(reason)))) {
+    score += 1;
+  }
+
+  return score;
+};
+
+export const buildCapabilityRecommendations = (
+  capabilityMatches: ProductCapabilityMatch[],
+  aiReport: ReportResult,
+): CapabilityRecommendationItem[] => {
+  return capabilityMatches.map((capability) => {
+    const keywords = getCapabilityKeywords(capability);
+    const ranked = buildRecommendationPool(aiReport, capability)
+      .map((item, idx) => ({
+        ...item,
+        score: scoreRecommendation(capability, item.text, keywords),
+        idx,
+      }))
+      .sort((a, b) => {
+        if (a.score !== b.score) return b.score - a.score;
+        return a.idx - b.idx;
+      });
+
+    const positiveHits = ranked.filter((item) => item.score > 0).map((item) => item.text);
+    const fallback = capability.matched ? ranked.map((item) => item.text).slice(0, 2) : [];
+    const recommendations = dedupeStrings([...positiveHits, ...fallback]).slice(0, 3);
+    const recommendationSource = ranked.find((item) => item.score > 0)?.source || ranked[0]?.source || 'module';
+
+    return {
+      capabilityId: capability.id,
+      capabilityName: capability.name,
+      capabilityType: capability.type,
+      matched: capability.matched,
+      score: capability.score,
+      reasons: capability.reasons,
+      recommendationSource,
+      recommendations,
+      actionSuggestion: capability.matched
+        ? (recommendations.length
+          ? `建议优先落地：${recommendations[0]}`
+          : `建议优先推进能力“${capability.name}”建设。`)
+        : `当前与能力“${capability.name}”匹配度不足，建议补充业务场景后再定实施范围。`,
+    };
+  });
 };
 
 const enrichAiReportWithCapabilities = (
@@ -139,6 +258,9 @@ const buildTemplateSections = (
   aiReport?: ReportResult,
   capabilityMatches: ProductCapabilityMatch[] = [],
 ): TemplateReportSection[] => {
+  const capabilityRecommendations = aiReport
+    ? buildCapabilityRecommendations(capabilityMatches, aiReport)
+    : [];
   const summary = aiReport?.summary || '基于调研模板字段，系统已完成项目现状梳理。';
   const diagnosis = [
     aiReport?.energyStructureAnalysis,
@@ -166,6 +288,15 @@ const buildTemplateSections = (
         }),
       ].join('\n')
     : '暂无产品能力数据。';
+  const capabilityRecommendationSummary = capabilityRecommendations.length
+    ? [
+        '能力建议映射：',
+        ...capabilityRecommendations.map((item, idx) => {
+          const recommendations = item.recommendations.length ? item.recommendations.join('；') : '暂无直接建议';
+          return `第${idx + 1}项：${item.capabilityName}（${item.capabilityType}），建议：${recommendations}。行动：${item.actionSuggestion}`;
+        }),
+      ].join('\n')
+    : '能力建议映射：暂无可映射建议。';
 
   return [
     {
@@ -186,7 +317,7 @@ const buildTemplateSections = (
     },
     {
       title: '产品能力匹配',
-      content: capabilityMatchSummary,
+      content: `${capabilityMatchSummary}\n${capabilityRecommendationSummary}`,
     },
     {
       title: '实施路径',
@@ -355,12 +486,14 @@ export const buildReportBundle = (
 ): ReportBundle => {
   const capabilityMatches = matchProductCapabilities(surveyForm, getProductCapabilities());
   const enrichedAiReport = enrichAiReportWithCapabilities(aiReport, capabilityMatches);
+  const capabilityRecommendations = buildCapabilityRecommendations(capabilityMatches, enrichedAiReport);
   return {
     surveyId: surveyForm.id,
     generatedAt: new Date().toISOString(),
     aiReport: enrichedAiReport,
     templateReport: generateTemplateReport(surveyForm, enrichedAiReport, capabilityMatches),
     capabilityMatches,
+    capabilityRecommendations,
     preSalesContact,
   };
 };

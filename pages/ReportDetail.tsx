@@ -16,7 +16,12 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { SurveyForm } from '../types';
 import { generateEnergyReport, ReportResult } from '../services/geminiService';
-import { buildReportBundle, ReportBundle } from '../services/reportService';
+import {
+  buildCapabilityRecommendations,
+  buildReportBundle,
+  CapabilityRecommendationItem,
+  ReportBundle,
+} from '../services/reportService';
 import { surveyReportService, surveyService, userService } from '../src/services/supabaseService';
 import { getProductCapabilities, matchProductCapabilities } from '../src/services/productCapabilityStore';
 import { usePermission } from '../src/auth/usePermission';
@@ -130,6 +135,13 @@ const ZH = {
   softwareSuggestion: '\u8f6f\u4ef6\u5efa\u8bae',
   hardwareSuggestion: '\u786c\u4ef6\u5efa\u8bae',
   consultingSuggestion: '\u54a8\u8be2\u5efa\u8bae',
+  capabilityAdviceMatch: '\u5efa\u8bae\u4e0e\u80fd\u529b\u9010\u9879\u5339\u914d',
+  mappingBasis: '\u5339\u914d\u4f9d\u636e',
+  linkedSuggestion: '\u5173\u8054\u5efa\u8bae',
+  actionSuggestion: '\u884c\u52a8\u5efa\u8bae',
+  matched: '\u5df2\u5339\u914d',
+  pendingMatch: '\u5f85\u5339\u914d',
+  noDirectSuggestion: '\u6682\u65e0\u76f4\u63a5\u5efa\u8bae',
   exportPrefix: '\u5bfc\u51fa',
   defaultReportName: '\u62a5\u544a',
   valueLabel: '\u6570\u503c',
@@ -158,8 +170,19 @@ const toReportBundle = (survey: SurveyForm, rawStored: any): { bundle: ReportBun
     const bundle = rawStored as ReportBundle;
     const hasTemplateStructure = Array.isArray(bundle.templateReport?.sections) && Array.isArray(bundle.templateReport?.charts);
     const hasCapabilities = Array.isArray(bundle.capabilityMatches);
-    if (hasTemplateStructure && hasCapabilities) {
+    const hasCapabilityRecommendations = Array.isArray((bundle as any).capabilityRecommendations);
+    if (hasTemplateStructure && hasCapabilities && hasCapabilityRecommendations) {
       return { bundle, shouldPersist: false };
+    }
+
+    if (hasTemplateStructure && hasCapabilities && !hasCapabilityRecommendations) {
+      return {
+        bundle: {
+          ...bundle,
+          capabilityRecommendations: buildCapabilityRecommendations(bundle.capabilityMatches || [], bundle.aiReport),
+        },
+        shouldPersist: true,
+      };
     }
 
     const rebuilt = buildReportBundle(
@@ -393,6 +416,13 @@ export const ReportDetail: React.FC = () => {
 
   const matchedCount = capabilityMatches.filter((item) => item.matched).length;
   const unmatchedCount = Math.max(0, capabilityMatches.length - matchedCount);
+  const capabilityRecommendations = useMemo<CapabilityRecommendationItem[]>(() => {
+    if (!data) return [];
+    if (Array.isArray((data.report as any).capabilityRecommendations) && (data.report as any).capabilityRecommendations.length) {
+      return (data.report as any).capabilityRecommendations as CapabilityRecommendationItem[];
+    }
+    return buildCapabilityRecommendations(capabilityMatches, data.report.aiReport);
+  }, [data, capabilityMatches]);
 
   const scoreChartData = useMemo(() => {
     if (!data) return [];
@@ -773,6 +803,47 @@ export const ReportDetail: React.FC = () => {
                   {line}
                 </p>
               ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-lg font-bold text-slate-900">{ZH.capabilityAdviceMatch}</h3>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {capabilityRecommendations.length ? capabilityRecommendations.map((item) => (
+                <article key={`capability_recommend_${item.capabilityId}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{item.capabilityName}</p>
+                      <p className="text-xs text-slate-500">{item.capabilityType}</p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.matched ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {item.matched ? ZH.matched : ZH.pendingMatch}
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-700">{ZH.mappingBasis}</p>
+                    <p className="mt-1 text-xs leading-6 text-slate-600">{(item.reasons || []).join('；') || ZH.noDirectSuggestion}</p>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-700">{ZH.linkedSuggestion}</p>
+                    <ul className="mt-1 space-y-1 text-xs leading-6 text-slate-700">
+                      {(item.recommendations || []).length ? item.recommendations.map((suggestion, idx) => (
+                        <li key={`${item.capabilityId}_suggest_${idx}`} className="rounded-md bg-white px-2.5 py-1.5">
+                          {idx + 1}. {suggestion}
+                        </li>
+                      )) : (
+                        <li className="rounded-md bg-white px-2.5 py-1.5">{ZH.noDirectSuggestion}</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div className="mt-3 rounded-md bg-blue-50 px-2.5 py-2 text-xs leading-6 text-blue-700">
+                    <span className="font-semibold">{ZH.actionSuggestion}：</span>
+                    {item.actionSuggestion}
+                  </div>
+                </article>
+              )) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">{ZH.noDirectSuggestion}</div>
+              )}
             </div>
           </section>
 
