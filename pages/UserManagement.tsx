@@ -112,9 +112,9 @@ export const UserManagement: React.FC = () => {
       return {
         id: u.id || u.user_id,
         user_id: u.user_id,
-        user_name: u.user_name || u.user_realname || u.username,
+        user_name: u.user_name || u.name || u.username,
         username: u.username,
-        name: u.user_name || u.user_realname || u.name || u.username,
+        name: u.user_name || u.name || u.username,
         phone: u.phone || '',
         email: u.email || '',
         type,

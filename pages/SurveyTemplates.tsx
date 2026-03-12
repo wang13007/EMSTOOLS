@@ -1,7 +1,5 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { ICONS } from '../constants';
-import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
-import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { SurveyField, SurveyTemplate } from '../types';
 import Portal from '../src/components/Portal';
 import {
@@ -9,6 +7,7 @@ import {
   applySurveyTemplateNameOverrides,
   setSurveyTemplateNameById,
 } from '../src/services/templateNameStore';
+import { getAllReportTemplates, getAllSurveyTemplates } from '../src/services/templateStore';
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: '文本',
@@ -65,8 +64,8 @@ export const SurveyTemplates: React.FC = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const templates = useMemo(() => applySurveyTemplateNameOverrides(SURVEY_TEMPLATES), [refreshKey]);
-  const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(REPORT_TEMPLATES), [refreshKey]);
+  const templates = useMemo(() => applySurveyTemplateNameOverrides(getAllSurveyTemplates()), [refreshKey]);
+  const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(getAllReportTemplates()), [refreshKey]);
   const reportTemplateMap = useMemo(() => new Map(reportTemplates.map((item) => [item.id, item])), [reportTemplates]);
 
   const selectedTemplate = useMemo(
@@ -99,7 +98,7 @@ export const SurveyTemplates: React.FC = () => {
           <p className="text-slate-500">模板内容为只读展示，可在新建调研表单时进行选择。</p>
         </div>
         <div className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-semibold">
-          预置模板: {templates.length} 个
+          当前模板: {templates.length} 个
         </div>
       </div>
 

@@ -1,12 +1,12 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
-import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { generateEnergyReport } from '../services/geminiService';
 import { buildReportBundle, PreSalesContactInfo } from '../services/reportService';
 import { surveyReportService, surveyService, userService } from '../src/services/supabaseService';
 import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 import { usePermission } from '../src/auth/usePermission';
+import { getAllSurveyTemplates } from '../src/services/templateStore';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -50,6 +50,8 @@ const resolvePreSalesContact = async (preSalesResponsibleId?: string): Promise<P
 
 const toSurveyForm = (survey: any): SurveyForm => {
   const data = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  const surveyTemplates = getAllSurveyTemplates();
+  const fallbackTemplateId = surveyTemplates[0]?.id || '';
   return {
     id: survey.id,
     name: survey.name || '',
@@ -57,7 +59,7 @@ const toSurveyForm = (survey: any): SurveyForm => {
     projectName: survey.project_name || '',
     industry: survey.industry || '',
     region: survey.region || '',
-    templateId: survey.template_id || data.template_key || SURVEY_TEMPLATES[0].id,
+    templateId: survey.template_id || data.template_key || fallbackTemplateId,
     status: survey.status || SurveyStatus.DRAFT,
     reportStatus: survey.report_status || ReportStatus.NOT_GENERATED,
     creator: survey.creator_id || '',
@@ -101,7 +103,7 @@ export const SurveyFill: React.FC = () => {
   const [dirty, setDirty] = useState(false);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState('');
-  const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(SURVEY_TEMPLATES), []);
+  const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(getAllSurveyTemplates()), []);
   const canEditSurvey = hasPermission('survey_form:edit');
   const canSubmitSurvey = hasPermission('survey_form:submit') && hasPermission('survey_form:generate_report');
   const canShareSurvey = hasPermission('survey_form:share_report');

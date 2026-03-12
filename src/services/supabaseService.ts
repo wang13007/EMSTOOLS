@@ -276,11 +276,12 @@ const normalizeRole = (role: any) => ({
 const normalizeUser = (user: any) => {
   const userType = normalizeUserType(user.user_type || user.type);
   const roleIds = resolveRoleIds(user);
+  const displayName = user.user_name || user.name || user.username;
   return {
     id: user.id || user.user_id,
     user_id: user.user_id,
-    user_name: user.user_realname || user.user_name || user.username,
-    name: user.user_realname || user.user_name || user.username,
+    user_name: displayName,
+    name: displayName,
     username: user.username,
     phone: user.phone,
     email: user.email,
@@ -373,8 +374,6 @@ export const userService = {
         role_ids: roleIds,
         status: user.status || 'enabled',
         create_time: new Date().toISOString(),
-        creator: user.creator || 'system',
-        is_deleted: false,
       };
       if (isUuid(user.user_id)) {
         baseUser.user_id = user.user_id;
@@ -440,7 +439,7 @@ export const userService = {
       if (user.username || user.user_name) {
         baseUser.user_name = user.user_name || user.username;
       }
-      if (user.name || user.user_realname || user.user_name) {
+      if (user.name || user.user_name) {
         baseUser.name = user.name || user.user_name || user.username;
       }
       if (user.password || user.password_hash) {

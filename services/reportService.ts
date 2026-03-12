@@ -1,9 +1,8 @@
-import { REPORT_TEMPLATES } from '../constants/reportTemplatePreset';
-import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { SurveyForm } from '../types';
 import { getReportTemplateNameById, getSurveyTemplateNameById } from '../src/services/templateNameStore';
 import { ReportResult } from './geminiService';
 import { getProductCapabilities, matchProductCapabilities, ProductCapabilityMatch } from '../src/services/productCapabilityStore';
+import { getAllReportTemplates, getAllSurveyTemplates } from '../src/services/templateStore';
 
 export type PreSalesContactInfo = {
   id?: string;
@@ -418,7 +417,8 @@ const buildFallbackTemplateReport = (
   aiReport?: ReportResult,
   capabilityMatches: ProductCapabilityMatch[] = [],
 ): TemplateReportResult => {
-  const surveyTemplate = SURVEY_TEMPLATES.find((item) => item.id === surveyForm.templateId) || SURVEY_TEMPLATES[0];
+  const surveyTemplates = getAllSurveyTemplates();
+  const surveyTemplate = surveyTemplates.find((item) => item.id === surveyForm.templateId) || surveyTemplates[0];
   const content = `模板输出报告（回退）
 
 项目名称：{{project_name}}
@@ -453,10 +453,12 @@ export const generateTemplateReport = (
   aiReport?: ReportResult,
   capabilityMatchesInput?: ProductCapabilityMatch[],
 ): TemplateReportResult => {
-  const surveyTemplate = SURVEY_TEMPLATES.find((item) => item.id === surveyForm.templateId) || SURVEY_TEMPLATES[0];
+  const surveyTemplates = getAllSurveyTemplates();
+  const reportTemplates = getAllReportTemplates();
+  const surveyTemplate = surveyTemplates.find((item) => item.id === surveyForm.templateId) || surveyTemplates[0];
   const reportTemplate = surveyTemplate?.reportTemplateId
-    ? REPORT_TEMPLATES.find((item) => item.id === surveyTemplate.reportTemplateId)
-    : REPORT_TEMPLATES.find((item) => item.surveyTemplateId === surveyTemplate?.id);
+    ? reportTemplates.find((item) => item.id === surveyTemplate.reportTemplateId)
+    : reportTemplates.find((item) => item.surveyTemplateId === surveyTemplate?.id);
   const capabilityMatches = capabilityMatchesInput || matchProductCapabilities(surveyForm, getProductCapabilities());
 
   if (!surveyTemplate || !reportTemplate) {

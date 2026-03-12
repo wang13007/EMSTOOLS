@@ -103,8 +103,6 @@ export interface User {
   last_login_time?: string;
   create_time?: string;
   createTime?: string;
-  creator?: string;
-  is_deleted?: boolean;
 }
 
 export interface Role {

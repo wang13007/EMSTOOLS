@@ -135,6 +135,8 @@ const ZH = {
   softwareSuggestion: '\u8f6f\u4ef6\u5efa\u8bae',
   hardwareSuggestion: '\u786c\u4ef6\u5efa\u8bae',
   consultingSuggestion: '\u54a8\u8be2\u5efa\u8bae',
+  moduleSuggestionDedup: '\u6a21\u5757\u5efa\u8bae\uff08\u53bb\u91cd\u540e\uff09',
+  supplementInsights: '\u8865\u5145\u5206\u6790\uff08\u53bb\u91cd\u540e\uff09',
   capabilityAdviceMatch: '\u5efa\u8bae\u4e0e\u80fd\u529b\u9010\u9879\u5339\u914d',
   mappingBasis: '\u5339\u914d\u4f9d\u636e',
   linkedSuggestion: '\u5173\u8054\u5efa\u8bae',
@@ -163,6 +165,40 @@ const toDisplayList = (value: unknown, fallback: string[]) => {
     }
   }
   return fallback;
+};
+
+const normalizeSemanticText = (value: unknown) => {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '');
+};
+
+const isSemanticallyDuplicate = (left: string, right: string) => {
+  const l = normalizeSemanticText(left);
+  const r = normalizeSemanticText(right);
+  if (!l || !r) return false;
+  if (l === r) return true;
+  const minLen = Math.min(l.length, r.length);
+  if (minLen < 6) return false;
+  return l.includes(r) || r.includes(l);
+};
+
+const dedupeBySemantic = (items: string[]) => {
+  const result: string[] = [];
+  (items || []).forEach((item) => {
+    const normalized = String(item || '').trim();
+    if (!normalized) return;
+    if (result.some((existing) => isSemanticallyDuplicate(existing, normalized))) return;
+    result.push(normalized);
+  });
+  return result;
+};
+
+const excludeSemanticallyDuplicateItems = (items: string[], references: string[]) => {
+  if (!items.length || !references.length) return items;
+  return items.filter((item) => !references.some((reference) => isSemanticallyDuplicate(item, reference)));
 };
 
 const toReportBundle = (survey: SurveyForm, rawStored: any): { bundle: ReportBundle; shouldPersist: boolean } => {
@@ -435,10 +471,13 @@ export const ReportDetail: React.FC = () => {
 
   const recommendationBarData = useMemo(() => {
     if (!data) return [];
+    const software = dedupeBySemantic(data.report.aiReport.softwareRecommendations || []);
+    const hardware = dedupeBySemantic(data.report.aiReport.hardwareRecommendations || []);
+    const consulting = dedupeBySemantic(data.report.aiReport.consultingRecommendations || []);
     return [
-      { name: ZH.software, value: data.report.aiReport.softwareRecommendations.length },
-      { name: ZH.hardware, value: data.report.aiReport.hardwareRecommendations.length },
-      { name: ZH.consulting, value: data.report.aiReport.consultingRecommendations.length },
+      { name: ZH.software, value: software.length },
+      { name: ZH.hardware, value: hardware.length },
+      { name: ZH.consulting, value: consulting.length },
       { name: ZH.capabilityMatch, value: matchedCount },
     ];
   }, [data, matchedCount]);
@@ -456,56 +495,98 @@ export const ReportDetail: React.FC = () => {
     const project = data?.survey?.projectName || '本项目';
     const customer = data?.survey?.customerName || '客户方';
 
-    return {
-      fullNarrative: String(
-        ai.fullNarrative
-          || `${ai.summary || ''}\n\n${ai.energyStructureAnalysis || ''}\n${ai.savingPotential || ''}\n${ai.roiAnalysis || ''}`,
-      ).trim(),
-      detailedFindings: toDisplayList(ai.detailedFindings, [
+    const keyGaps = dedupeBySemantic(toDisplayList(ai.keyGaps, []));
+    const nextSteps = dedupeBySemantic(toDisplayList(ai.nextSteps, []));
+    const softwareRecommendations = dedupeBySemantic(toDisplayList(ai.softwareRecommendations, []));
+    const hardwareRecommendations = dedupeBySemantic(toDisplayList(ai.hardwareRecommendations, []));
+    const consultingRecommendations = dedupeBySemantic(toDisplayList(ai.consultingRecommendations, []));
+    const recommendedModules = excludeSemanticallyDuplicateItems(
+      dedupeBySemantic(toDisplayList(ai.recommendedModules, [])),
+      [...softwareRecommendations, ...hardwareRecommendations, ...consultingRecommendations],
+    );
+    const detailedFindings = excludeSemanticallyDuplicateItems(
+      dedupeBySemantic(toDisplayList(ai.detailedFindings, [
         `${project} 当前缺少统一的数据口径与质量监控，存在统计偏差风险。`,
         `针对 ${customer} 的运营场景，能源异常发现与处置仍偏人工流程。`,
         '关键设备运行策略未形成可复制的标准化规则库。',
         '跨部门协同缺乏固定节奏，问题闭环与复盘机制有待强化。',
-      ]),
-      phasedRoadmap: toDisplayList(ai.phasedRoadmap, [
+      ])),
+      keyGaps,
+    );
+    const phasedRoadmap = excludeSemanticallyDuplicateItems(
+      dedupeBySemantic(toDisplayList(ai.phasedRoadmap, [
         '0-30天：完成点位复核、数据接入清单与试点范围确认。',
         '31-90天：完成看板、告警、分析模型上线并持续优化。',
         '91-180天：复制至更多系统/区域并固化经营协同机制。',
-      ]),
-      riskMitigations: toDisplayList(ai.riskMitigations, [
-        '建立数据质量稽核机制，降低统计口径不一致风险。',
-        '采用灰度发布与回滚预案，降低集成上线风险。',
-        '建立跨部门例会与升级路径，降低协同执行风险。',
-      ]),
-      kpiSuggestions: toDisplayList(ai.kpiSuggestions, [
-        '综合能耗强度同比下降 5%-10%',
-        '异常告警处置闭环时长下降 40%+',
-        '能源数据完整率保持在 98%+',
-      ]),
-      investmentBreakdown: toDisplayList(ai.investmentBreakdown, [
-        '计量采集层投入：仪表、传感器、网关与安装调试。',
-        '平台与集成投入：应用配置、接口开发与联调验收。',
-        '运营服务投入：培训赋能、持续优化与运维支持。',
-      ]),
-      expectedBenefits: toDisplayList(ai.expectedBenefits, [
-        '直接收益：能源成本下降与电费优化可量化兑现。',
-        '间接收益：设备稳定性提升并减少故障停机损失。',
-        '管理收益：提升经营决策时效与透明度。',
-      ]),
-      operationMechanism: toDisplayList(ai.operationMechanism, [
-        '建立“日监控、周复盘、月经营”三级运营节奏。',
-        '按角色绑定指标责任并纳入绩效考核。',
-        '形成问题清单、整改清单、复盘清单三清单机制。',
-      ]),
-      dataGovernancePlan: toDisplayList(ai.dataGovernancePlan, [
-        '统一主数据编码、计量口径、指标定义与时间粒度。',
-        '建设数据质量看板，持续监测完整性与准确性。',
-        '建立权限分级与审计日志，保障数据安全合规。',
-      ]),
-      recommendedModules: toDisplayList(ai.recommendedModules, []),
-      softwareRecommendations: toDisplayList(ai.softwareRecommendations, []),
-      hardwareRecommendations: toDisplayList(ai.hardwareRecommendations, []),
-      consultingRecommendations: toDisplayList(ai.consultingRecommendations, []),
+      ])),
+      nextSteps,
+    );
+    const riskMitigations = dedupeBySemantic(toDisplayList(ai.riskMitigations, [
+      '建立数据质量稽核机制，降低统计口径不一致风险。',
+      '采用灰度发布与回滚预案，降低集成上线风险。',
+      '建立跨部门例会与升级路径，降低协同执行风险。',
+    ]));
+    const kpiSuggestions = dedupeBySemantic(toDisplayList(ai.kpiSuggestions, [
+      '综合能耗强度同比下降 5%-10%',
+      '异常告警处置闭环时长下降 40%+',
+      '能源数据完整率保持在 98%+',
+    ]));
+    const investmentBreakdown = dedupeBySemantic(toDisplayList(ai.investmentBreakdown, [
+      '计量采集层投入：仪表、传感器、网关与安装调试。',
+      '平台与集成投入：应用配置、接口开发与联调验收。',
+      '运营服务投入：培训赋能、持续优化与运维支持。',
+    ]));
+    const expectedBenefits = dedupeBySemantic(toDisplayList(ai.expectedBenefits, [
+      '直接收益：能源成本下降与电费优化可量化兑现。',
+      '间接收益：设备稳定性提升并减少故障停机损失。',
+      '管理收益：提升经营决策时效与透明度。',
+    ]));
+    const operationMechanism = dedupeBySemantic(toDisplayList(ai.operationMechanism, [
+      '建立“日监控、周复盘、月经营”三级运营节奏。',
+      '按角色绑定指标责任并纳入绩效考核。',
+      '形成问题清单、整改清单、复盘清单三清单机制。',
+    ]));
+    const dataGovernancePlan = dedupeBySemantic(toDisplayList(ai.dataGovernancePlan, [
+      '统一主数据编码、计量口径、指标定义与时间粒度。',
+      '建设数据质量看板，持续监测完整性与准确性。',
+      '建立权限分级与审计日志，保障数据安全合规。',
+    ]));
+    const fullNarrative = String(
+      ai.fullNarrative
+        || `${ai.summary || ''}\n\n${ai.energyStructureAnalysis || ''}\n${ai.savingPotential || ''}\n${ai.roiAnalysis || ''}`,
+    ).trim();
+    const narrativeHighlights = excludeSemanticallyDuplicateItems(
+      dedupeBySemantic(splitParagraphs(fullNarrative)),
+      [
+        String(ai.summary || ''),
+        String(ai.energyStructureAnalysis || ''),
+        String(ai.savingPotential || ''),
+        String(ai.roiAnalysis || ''),
+        ...keyGaps,
+        ...nextSteps,
+        ...detailedFindings,
+        ...phasedRoadmap,
+        ...riskMitigations,
+      ],
+    ).slice(0, 8);
+
+    return {
+      fullNarrative,
+      narrativeHighlights,
+      keyGaps,
+      nextSteps,
+      detailedFindings,
+      phasedRoadmap,
+      riskMitigations,
+      kpiSuggestions,
+      investmentBreakdown,
+      expectedBenefits,
+      operationMechanism,
+      dataGovernancePlan,
+      recommendedModules,
+      softwareRecommendations,
+      hardwareRecommendations,
+      consultingRecommendations,
     };
   }, [data]);
 
@@ -778,7 +859,7 @@ export const ReportDetail: React.FC = () => {
                 <div>
                   <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.gaps}</p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    {data.report.aiReport.keyGaps.map((item, idx) => (
+                    {aiExtended.keyGaps.map((item, idx) => (
                       <li key={`${item}_${idx}`} className="rounded-lg bg-rose-50 px-3 py-2 text-rose-800">{item}</li>
                     ))}
                   </ul>
@@ -786,7 +867,7 @@ export const ReportDetail: React.FC = () => {
                 <div>
                   <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.nextSteps}</p>
                   <ol className="space-y-2 text-sm text-slate-700">
-                    {data.report.aiReport.nextSteps.map((step, idx) => (
+                    {aiExtended.nextSteps.map((step, idx) => (
                       <li key={`${step}_${idx}`} className="rounded-lg bg-slate-50 px-3 py-2">{idx + 1}. {step}</li>
                     ))}
                   </ol>
@@ -795,16 +876,18 @@ export const ReportDetail: React.FC = () => {
             </article>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-lg font-bold text-slate-900">{ZH.fullNarrative}</h3>
-            <div className="space-y-3 text-sm leading-8 text-slate-700">
-              {splitParagraphs(aiExtended.fullNarrative).map((line, idx) => (
-                <p key={`full_narrative_${idx}`} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                  {line}
-                </p>
-              ))}
-            </div>
-          </section>
+          {aiExtended.narrativeHighlights.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-lg font-bold text-slate-900">{ZH.supplementInsights}</h3>
+              <div className="space-y-3 text-sm leading-8 text-slate-700">
+                {aiExtended.narrativeHighlights.map((line, idx) => (
+                  <p key={`narrative_highlight_${idx}`} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-lg font-bold text-slate-900">{ZH.capabilityAdviceMatch}</h3>
@@ -854,33 +937,33 @@ export const ReportDetail: React.FC = () => {
                 <div>
                   <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.softwareSuggestion}</p>
                   <div className="flex flex-wrap gap-2">
-                    {aiExtended.softwareRecommendations.map((item, idx) => (
+                    {aiExtended.softwareRecommendations.length ? aiExtended.softwareRecommendations.map((item, idx) => (
                       <span key={`software_${idx}`} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{item}</span>
-                    ))}
+                    )) : <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{ZH.noDirectSuggestion}</span>}
                   </div>
                 </div>
                 <div>
                   <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.hardwareSuggestion}</p>
                   <div className="flex flex-wrap gap-2">
-                    {aiExtended.hardwareRecommendations.map((item, idx) => (
+                    {aiExtended.hardwareRecommendations.length ? aiExtended.hardwareRecommendations.map((item, idx) => (
                       <span key={`hardware_${idx}`} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{item}</span>
-                    ))}
+                    )) : <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{ZH.noDirectSuggestion}</span>}
                   </div>
                 </div>
                 <div>
                   <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.consultingSuggestion}</p>
                   <div className="flex flex-wrap gap-2">
-                    {aiExtended.consultingRecommendations.map((item, idx) => (
+                    {aiExtended.consultingRecommendations.length ? aiExtended.consultingRecommendations.map((item, idx) => (
                       <span key={`consulting_${idx}`} className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">{item}</span>
-                    ))}
+                    )) : <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{ZH.noDirectSuggestion}</span>}
                   </div>
                 </div>
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.capabilityMatch}</p>
+                  <p className="mb-2 text-sm font-semibold text-slate-800">{ZH.moduleSuggestionDedup}</p>
                   <ul className="space-y-2 text-sm text-slate-700">
-                    {aiExtended.recommendedModules.map((item, idx) => (
+                    {aiExtended.recommendedModules.length ? aiExtended.recommendedModules.map((item, idx) => (
                       <li key={`module_${idx}`} className="rounded-lg bg-slate-50 px-3 py-2">{idx + 1}. {item}</li>
-                    ))}
+                    )) : <li className="rounded-lg bg-slate-50 px-3 py-2">{ZH.noDirectSuggestion}</li>}
                   </ul>
                 </div>
               </div>
