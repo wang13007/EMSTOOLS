@@ -1,7 +1,12 @@
-import { SurveyForm } from '../types';
+import { ProductType, SurveyForm } from '../types';
 import { getReportTemplateNameById, getSurveyTemplateNameById } from '../src/services/templateNameStore';
+import {
+  buildCapabilityMatchPackage,
+  CapabilityMatchLevel,
+  CapabilityMatchResult,
+  CapabilityMatchingContext,
+} from '../src/services/capabilityMatchingService';
 import { ReportResult } from './geminiService';
-import { getProductCapabilities, matchProductCapabilities, ProductCapabilityMatch } from '../src/services/productCapabilityStore';
 import { getAllReportTemplates, getAllSurveyTemplates } from '../src/services/templateStore';
 
 export type PreSalesContactInfo = {
@@ -51,8 +56,10 @@ export type ReportBundle = {
   generatedAt: string;
   aiReport: ReportResult;
   templateReport: TemplateReportResult;
-  capabilityMatches: ProductCapabilityMatch[];
+  capabilityMatches: CapabilityMatchResult[];
+  capabilityMatchingContext: CapabilityMatchingContext;
   capabilityRecommendations: CapabilityRecommendationItem[];
+  solutionCatalog: CapabilitySolutionItem[];
   preSalesContact: PreSalesContactInfo;
 };
 
@@ -63,13 +70,29 @@ type RecommendationSource = 'software' | 'hardware' | 'consulting' | 'module';
 export type CapabilityRecommendationItem = {
   capabilityId: string;
   capabilityName: string;
-  capabilityType: ProductCapabilityMatch['type'];
+  capabilityType: CapabilityMatchResult['type'];
   matched: boolean;
   score: number;
   reasons: string[];
   recommendationSource: RecommendationSource;
   recommendations: string[];
   actionSuggestion: string;
+};
+
+export type CapabilitySolutionItem = {
+  capabilityId: string;
+  capabilityName: string;
+  capabilityType: CapabilityMatchResult['type'];
+  matched: boolean;
+  matchLevel: CapabilityMatchLevel;
+  score: number;
+  templateTagNames: string[];
+  specificFunctions: string[];
+  matchRules: string[];
+  matchEvidence: string[];
+  recommendations: string[];
+  actionSuggestion: string;
+  solutionSummary: string;
 };
 
 const toDisplayValue = (value: unknown): string => {
@@ -105,16 +128,16 @@ const dedupeStrings = (values: string[]) => {
 
 const normalizeText = (value: unknown) => String(value || '').trim().toLowerCase();
 
-const sanitizeToken = (value: string) => normalizeText(value).replace(/[，。；、,:：()（）[\]{}"'`~!@#$%^&*+\-_=<>?/\\\s]/g, '');
+const sanitizeToken = (value: string) => normalizeText(value).replace(/[，。；、：:（）()[\]{}"'`~!@#$%^&*+\-_=<>?/\\\s]/g, '');
 
 const splitDescriptionKeywords = (value: string) => {
   return value
-    .split(/[，。；、,:：()（）[\]{}"'`~!@#$%^&*+\-_=<>?/\\\s]+/)
+    .split(/[，。；、：:（）()[\]{}"'`~!@#$%^&*+\-_=<>?/\\\s]+/)
     .map((item) => sanitizeToken(item))
     .filter((item) => item.length >= 2);
 };
 
-const getCapabilityKeywords = (capability: ProductCapabilityMatch) => {
+const getCapabilityKeywords = (capability: CapabilityMatchResult) => {
   return dedupeStrings([
     sanitizeToken(capability.name),
     ...capability.scenarios.map((item) => sanitizeToken(item)),
@@ -123,26 +146,29 @@ const getCapabilityKeywords = (capability: ProductCapabilityMatch) => {
   ]).filter(Boolean);
 };
 
-const buildRecommendationPool = (aiReport: ReportResult, capability: ProductCapabilityMatch): Array<{ source: RecommendationSource; text: string }> => {
+const buildRecommendationPool = (
+  aiReport: ReportResult,
+  capability: CapabilityMatchResult,
+): Array<{ source: RecommendationSource; text: string }> => {
   const software = dedupeStrings([...(aiReport.softwareRecommendations || []), ...(aiReport.recommendedModules || [])]);
   const hardware = dedupeStrings(aiReport.hardwareRecommendations || []);
   const consulting = dedupeStrings(aiReport.consultingRecommendations || []);
   const moduleOnly = dedupeStrings(aiReport.recommendedModules || []);
 
-  if (capability.type === '软件') {
+  if (capability.type === ProductType.SOFTWARE) {
     return software.map((text) => ({ source: 'software' as const, text }));
   }
-  if (capability.type === '硬件') {
+  if (capability.type === ProductType.HARDWARE) {
     return hardware.map((text) => ({ source: 'hardware' as const, text }));
   }
-  if (capability.type === '咨询') {
+  if (capability.type === ProductType.CONSULTING) {
     return consulting.map((text) => ({ source: 'consulting' as const, text }));
   }
   return dedupeStrings([...consulting, ...hardware, ...moduleOnly]).map((text) => ({ source: 'module' as const, text }));
 };
 
 const scoreRecommendation = (
-  capability: ProductCapabilityMatch,
+  capability: CapabilityMatchResult,
   recommendation: string,
   keywords: string[],
 ) => {
@@ -167,8 +193,15 @@ const scoreRecommendation = (
   return score;
 };
 
+const formatMatchLevelLabel = (value: CapabilityMatchLevel) => {
+  if (value === 'high') return '高匹配';
+  if (value === 'medium') return '中匹配';
+  if (value === 'low') return '低匹配';
+  return '待确认';
+};
+
 export const buildCapabilityRecommendations = (
-  capabilityMatches: ProductCapabilityMatch[],
+  capabilityMatches: CapabilityMatchResult[],
   aiReport: ReportResult,
 ): CapabilityRecommendationItem[] => {
   return capabilityMatches.map((capability) => {
@@ -189,6 +222,14 @@ export const buildCapabilityRecommendations = (
     const recommendations = dedupeStrings([...positiveHits, ...fallback]).slice(0, 3);
     const recommendationSource = ranked.find((item) => item.score > 0)?.source || ranked[0]?.source || 'module';
 
+    const actionSuggestion = capability.matched
+      ? (recommendations.length
+        ? `建议优先落地：${recommendations[0]}`
+        : `建议围绕能力“${capability.name}”启动方案设计与实施排期。`)
+      : capability.templateTags.length
+        ? `模板已识别能力“${capability.name}”，但当前问卷证据不足，建议补充量化场景与边界后确认实施范围。`
+        : `当前与能力“${capability.name}”匹配度不足，建议补充行业、场景或模板字段信息后重新评估。`;
+
     return {
       capabilityId: capability.id,
       capabilityName: capability.name,
@@ -198,24 +239,70 @@ export const buildCapabilityRecommendations = (
       reasons: capability.reasons,
       recommendationSource,
       recommendations,
-      actionSuggestion: capability.matched
-        ? (recommendations.length
-          ? `建议优先落地：${recommendations[0]}`
-          : `建议优先推进能力“${capability.name}”建设。`)
-        : `当前与能力“${capability.name}”匹配度不足，建议补充业务场景后再定实施范围。`,
+      actionSuggestion,
     };
+  });
+};
+
+export const buildCapabilitySolutionCatalog = (
+  capabilityMatches: CapabilityMatchResult[],
+  capabilityRecommendations: CapabilityRecommendationItem[],
+  _capabilityMatchingContext: CapabilityMatchingContext,
+): CapabilitySolutionItem[] => {
+  const recommendationMap = new Map(capabilityRecommendations.map((item) => [item.capabilityId, item]));
+  const selected = capabilityMatches.filter((item) => item.matched || item.templateTags.length > 0);
+  const catalogSource = selected.length ? selected : capabilityMatches.slice(0, 3);
+
+  return catalogSource.map((item) => {
+    const recommendation = recommendationMap.get(item.id);
+    const templateTagNames = item.templateTags.length ? item.templateTags : [];
+    const matchRules = item.ruleDetails.map((rule) => `${rule.name} +${rule.score}`);
+    const matchEvidence = dedupeStrings([
+      ...item.matchedFunctions,
+      ...item.evidence,
+    ]).slice(0, 10);
+    const specificFunctions = item.matchedFunctions.length
+      ? item.matchedFunctions
+      : item.templateFieldHits.slice(0, 4);
+
+    let solutionSummary = `${item.name} 当前为候选能力，建议人工复核后再确定纳入方案。`;
+    if (item.matched) {
+      solutionSummary = `${item.name} 与当前项目达到${formatMatchLevelLabel(item.matchLevel)}，已匹配到 ${specificFunctions.length || matchEvidence.length} 项具体能力线索。`;
+    } else if (templateTagNames.length) {
+      solutionSummary = `${item.name} 已被模板自动识别为能力标签，但当前问卷侧证据不足，建议作为待确认方案纳入访谈或补充调研。`;
+    }
+
+    return {
+      capabilityId: item.id,
+      capabilityName: item.name,
+      capabilityType: item.type,
+      matched: item.matched,
+      matchLevel: item.matchLevel,
+      score: item.score,
+      templateTagNames,
+      specificFunctions,
+      matchRules,
+      matchEvidence,
+      recommendations: recommendation?.recommendations || [],
+      actionSuggestion: recommendation?.actionSuggestion || '建议补充业务目标与实施边界后再确认方案。',
+      solutionSummary,
+    };
+  }).sort((left, right) => {
+    if (left.matched !== right.matched) return left.matched ? -1 : 1;
+    if (left.score !== right.score) return right.score - left.score;
+    return left.capabilityName.localeCompare(right.capabilityName, 'zh-CN');
   });
 };
 
 const enrichAiReportWithCapabilities = (
   aiReport: ReportResult,
-  capabilityMatches: ProductCapabilityMatch[],
+  capabilityMatches: CapabilityMatchResult[],
 ): ReportResult => {
   const matched = capabilityMatches.filter((item) => item.matched);
-  const software = matched.filter((item) => item.type === '软件').map((item) => item.name);
-  const hardware = matched.filter((item) => item.type === '硬件').map((item) => item.name);
-  const consulting = matched.filter((item) => item.type === '咨询').map((item) => item.name);
-  const retrofit = matched.filter((item) => item.type === '改造施工').map((item) => item.name);
+  const software = matched.filter((item) => item.type === ProductType.SOFTWARE).map((item) => item.name);
+  const hardware = matched.filter((item) => item.type === ProductType.HARDWARE).map((item) => item.name);
+  const consulting = matched.filter((item) => item.type === ProductType.CONSULTING).map((item) => item.name);
+  const retrofit = matched.filter((item) => item.type === ProductType.RETROFIT).map((item) => item.name);
 
   return {
     ...aiReport,
@@ -255,7 +342,9 @@ const renderTemplateContent = (content: string, valueMap: Record<string, unknown
 const buildTemplateSections = (
   surveyForm: SurveyForm,
   aiReport?: ReportResult,
-  capabilityMatches: ProductCapabilityMatch[] = [],
+  capabilityMatches: CapabilityMatchResult[] = [],
+  capabilityMatchingContext?: CapabilityMatchingContext,
+  solutionCatalog: CapabilitySolutionItem[] = [],
 ): TemplateReportSection[] => {
   const capabilityRecommendations = aiReport
     ? buildCapabilityRecommendations(capabilityMatches, aiReport)
@@ -274,28 +363,68 @@ const buildTemplateSections = (
     ? aiReport.nextSteps.map((item, idx) => `步骤${idx + 1}：${item}`).join('\n')
     : '步骤1：完善基础数据采集\n步骤2：完成实施方案评审';
   const recommendations = [
-    `软件建议：${aiReport?.softwareRecommendations?.join('；') || '未提供'}`,
-    `硬件建议：${aiReport?.hardwareRecommendations?.join('；') || '未提供'}`,
-    `咨询建议：${aiReport?.consultingRecommendations?.join('；') || '未提供'}`,
+    `软件建议：${aiReport?.softwareRecommendations?.join('、') || '未提供'}`,
+    `硬件建议：${aiReport?.hardwareRecommendations?.join('、') || '未提供'}`,
+    `咨询建议：${aiReport?.consultingRecommendations?.join('、') || '未提供'}`,
   ].join('\n');
-  const capabilityMatchSummary = capabilityMatches.length
+
+  const highCount = capabilityMatches.filter((item) => item.matchLevel === 'high').length;
+  const mediumCount = capabilityMatches.filter((item) => item.matchLevel === 'medium').length;
+  const lowCount = capabilityMatches.filter((item) => item.matchLevel === 'low').length;
+  const pendingCount = capabilityMatches.filter((item) => item.matchLevel === 'none').length;
+  const capabilityOverview = capabilityMatches.length
     ? [
-        `匹配结果：${capabilityMatches.filter((item) => item.matched).length}/${capabilityMatches.length} 已匹配`,
-        ...capabilityMatches.map((item, idx) => {
-          const reasonText = item.reasons.length ? item.reasons.join('；') : '无补充说明';
-          return `第${idx + 1}项：${item.name}（${item.type}），状态：${item.matched ? '已匹配' : '待匹配'}。依据：${reasonText}`;
+        `匹配结果：已匹配 ${capabilityMatches.filter((item) => item.matched).length}/${capabilityMatches.length}`,
+        `高匹配 ${highCount} 项，中匹配 ${mediumCount} 项，低匹配 ${lowCount} 项，待确认 ${pendingCount} 项`,
+        ...capabilityMatches.slice(0, 5).map((item, idx) => {
+          const functions = item.matchedFunctions.length ? item.matchedFunctions.join('、') : '暂无明确功能线索';
+          return `第${idx + 1}项：${item.name}（${formatMatchLevelLabel(item.matchLevel)}，${item.score} 分），功能能力：${functions}`;
         }),
       ].join('\n')
-    : '暂无产品能力数据。';
-  const capabilityRecommendationSummary = capabilityRecommendations.length
+    : '暂无产品能力可匹配。';
+
+  const templateTagSummary = capabilityMatchingContext?.recognizedTemplateTags?.length
     ? [
-        '能力建议映射：',
-        ...capabilityRecommendations.map((item, idx) => {
-          const recommendations = item.recommendations.length ? item.recommendations.join('；') : '暂无直接建议';
-          return `第${idx + 1}项：${item.capabilityName}（${item.capabilityType}），建议：${recommendations}。行动：${item.actionSuggestion}`;
-        }),
+        `模板识别阈值：模板侧得分达到 ${capabilityMatchingContext.thresholds.templateTag} 分即识别为能力标签`,
+        `调研模板：${capabilityMatchingContext.surveyTemplateName}`,
+        `报告模板：${capabilityMatchingContext.reportTemplateName}`,
+        ...capabilityMatchingContext.recognizedTemplateTags.map((item, idx) => (
+          `标签${idx + 1}：${item.capabilityName}（模板得分 ${item.score}），证据：${item.evidence.join('、') || '无'}`
+        )),
       ].join('\n')
-    : '能力建议映射：暂无可映射建议。';
+    : '当前模板未识别到明确能力标签，后续可通过补充字段标题、章节说明或能力名称提升识别度。';
+
+  const matchingRuleSummary = capabilityMatchingContext
+    ? [
+        '计算规则：',
+        ...capabilityMatchingContext.matchingRules.map((rule, idx) => (
+          `R${idx + 1} ${rule.name} ${rule.scoreText}；${rule.description}`
+        )),
+        `判定阈值：高匹配 >= ${capabilityMatchingContext.thresholds.high}；中匹配 >= ${capabilityMatchingContext.thresholds.medium}；低匹配 >= ${capabilityMatchingContext.thresholds.minMatch}；低于 ${capabilityMatchingContext.thresholds.minMatch} 为待确认`,
+      ].join('\n')
+    : '暂无能力匹配规则。';
+
+  const solutionCatalogSummary = solutionCatalog.length
+    ? solutionCatalog.map((item, idx) => {
+      const functions = item.specificFunctions.length ? item.specificFunctions.join('、') : '暂无明确功能线索';
+      const rules = item.matchRules.length ? item.matchRules.join('；') : '暂无命中规则';
+      const suggestions = item.recommendations.length ? item.recommendations.join('、') : '暂无直接建议';
+      const templateTags = item.templateTagNames.length ? item.templateTagNames.join('、') : '无';
+      return [
+        `方案${idx + 1}：${item.capabilityName}（${formatMatchLevelLabel(item.matchLevel)}，${item.score} 分）`,
+        `模板标签：${templateTags}`,
+        `具体功能能力：${functions}`,
+        `命中规则：${rules}`,
+        `关联建议：${suggestions}`,
+        `行动建议：${item.actionSuggestion}`,
+      ].join('\n');
+    }).join('\n\n')
+    : (capabilityRecommendations.length
+      ? capabilityRecommendations.map((item, idx) => {
+        const suggestions = item.recommendations.length ? item.recommendations.join('、') : '暂无直接建议';
+        return `方案${idx + 1}：${item.capabilityName}（${item.score} 分）\n关联建议：${suggestions}\n行动建议：${item.actionSuggestion}`;
+      }).join('\n\n')
+      : '暂无综合解决方案。');
 
   return [
     {
@@ -315,8 +444,20 @@ const buildTemplateSections = (
       content: recommendations,
     },
     {
-      title: '产品能力匹配',
-      content: `${capabilityMatchSummary}\n${capabilityRecommendationSummary}`,
+      title: '模板识别能力标签',
+      content: templateTagSummary,
+    },
+    {
+      title: '产品能力匹配概览',
+      content: capabilityOverview,
+    },
+    {
+      title: '能力匹配计算规则',
+      content: matchingRuleSummary,
+    },
+    {
+      title: '综合解决方案清单',
+      content: solutionCatalogSummary,
     },
     {
       title: '实施路径',
@@ -328,7 +469,7 @@ const buildTemplateSections = (
 const buildTemplateCharts = (
   surveyForm: SurveyForm,
   aiReport?: ReportResult,
-  capabilityMatches: ProductCapabilityMatch[] = [],
+  capabilityMatches: CapabilityMatchResult[] = [],
 ): TemplateChartBlock[] => {
   const rawData = surveyForm?.data && typeof surveyForm.data === 'object' ? surveyForm.data : {};
   const efficiencyScore = aiReport?.efficiencyScore ?? 0;
@@ -367,10 +508,10 @@ const buildTemplateCharts = (
       title: '基线能耗/费用',
       type: 'bar',
       data: [
-        { name: '年总用电量（千瓦时）', value: annualPower },
-        { name: '年总电费(万元)', value: annualCost },
+        { name: '年总用电量（kWh）', value: annualPower },
+        { name: '年总电费（万元）', value: annualCost },
       ],
-      summary: annualPower || annualCost ? '图表展示当前项目基线能耗与费用规模' : '模板字段未提供能耗与费用数据，图表值为0',
+      summary: annualPower || annualCost ? '图表展示当前项目基线能耗与费用规模' : '模板字段未提供能耗与费用数据，图表值为 0',
     },
     {
       id: 'capability-match',
@@ -378,7 +519,7 @@ const buildTemplateCharts = (
       type: 'bar',
       data: [
         { name: '已匹配', value: matchedCount },
-        { name: '待匹配', value: unmatchedCount },
+        { name: '待确认', value: unmatchedCount },
       ],
       summary: capabilityMatches.length ? `已完成 ${matchedCount}/${capabilityMatches.length} 项能力匹配` : '暂无产品能力可匹配',
     },
@@ -415,25 +556,25 @@ const composeTemplateReportContent = (
 const buildFallbackTemplateReport = (
   surveyForm: SurveyForm,
   aiReport?: ReportResult,
-  capabilityMatches: ProductCapabilityMatch[] = [],
+  capabilityMatches: CapabilityMatchResult[] = [],
+  capabilityMatchingContext?: CapabilityMatchingContext,
+  solutionCatalog: CapabilitySolutionItem[] = [],
 ): TemplateReportResult => {
   const surveyTemplates = getAllSurveyTemplates();
   const surveyTemplate = surveyTemplates.find((item) => item.id === surveyForm.templateId) || surveyTemplates[0];
   const content = `模板输出报告（回退）
-
 项目名称：{{project_name}}
 客户名称：{{client_name}}
-行业：{{industry}}
-区域：{{region}}
+所属行业：{{industry}}
+所属区域：{{region}}
 
-调研原始数据：
-{{survey_data}}`;
+调研原始数据：{{survey_data}}`;
   const valueMap = {
     ...buildValueMap(surveyForm),
     survey_data: surveyForm.data,
   };
   const rendered = renderTemplateContent(content, valueMap);
-  const sections = buildTemplateSections(surveyForm, aiReport, capabilityMatches);
+  const sections = buildTemplateSections(surveyForm, aiReport, capabilityMatches, capabilityMatchingContext, solutionCatalog);
   const charts = buildTemplateCharts(surveyForm, aiReport, capabilityMatches);
 
   return {
@@ -451,7 +592,9 @@ const buildFallbackTemplateReport = (
 export const generateTemplateReport = (
   surveyForm: SurveyForm,
   aiReport?: ReportResult,
-  capabilityMatchesInput?: ProductCapabilityMatch[],
+  capabilityMatchesInput?: CapabilityMatchResult[],
+  capabilityMatchingContextInput?: CapabilityMatchingContext,
+  solutionCatalogInput?: CapabilitySolutionItem[],
 ): TemplateReportResult => {
   const surveyTemplates = getAllSurveyTemplates();
   const reportTemplates = getAllReportTemplates();
@@ -459,14 +602,35 @@ export const generateTemplateReport = (
   const reportTemplate = surveyTemplate?.reportTemplateId
     ? reportTemplates.find((item) => item.id === surveyTemplate.reportTemplateId)
     : reportTemplates.find((item) => item.surveyTemplateId === surveyTemplate?.id);
-  const capabilityMatches = capabilityMatchesInput || matchProductCapabilities(surveyForm, getProductCapabilities());
+
+  const capabilityPack = buildCapabilityMatchPackage(surveyForm);
+  const capabilityMatches = capabilityMatchesInput || capabilityPack.matches;
+  const capabilityMatchingContext = capabilityMatchingContextInput || capabilityPack.context;
+  const capabilityRecommendations = aiReport ? buildCapabilityRecommendations(capabilityMatches, aiReport) : [];
+  const solutionCatalog = solutionCatalogInput || buildCapabilitySolutionCatalog(
+    capabilityMatches,
+    capabilityRecommendations,
+    capabilityMatchingContext,
+  );
 
   if (!surveyTemplate || !reportTemplate) {
-    return buildFallbackTemplateReport(surveyForm, aiReport, capabilityMatches);
+    return buildFallbackTemplateReport(
+      surveyForm,
+      aiReport,
+      capabilityMatches,
+      capabilityMatchingContext,
+      solutionCatalog,
+    );
   }
 
   const rendered = renderTemplateContent(reportTemplate.content, buildValueMap(surveyForm));
-  const sections = buildTemplateSections(surveyForm, aiReport, capabilityMatches);
+  const sections = buildTemplateSections(
+    surveyForm,
+    aiReport,
+    capabilityMatches,
+    capabilityMatchingContext,
+    solutionCatalog,
+  );
   const charts = buildTemplateCharts(surveyForm, aiReport, capabilityMatches);
 
   return {
@@ -486,16 +650,32 @@ export const buildReportBundle = (
   aiReport: ReportResult,
   preSalesContact: PreSalesContactInfo,
 ): ReportBundle => {
-  const capabilityMatches = matchProductCapabilities(surveyForm, getProductCapabilities());
+  const capabilityPack = buildCapabilityMatchPackage(surveyForm);
+  const capabilityMatches = capabilityPack.matches;
+  const capabilityMatchingContext = capabilityPack.context;
   const enrichedAiReport = enrichAiReportWithCapabilities(aiReport, capabilityMatches);
   const capabilityRecommendations = buildCapabilityRecommendations(capabilityMatches, enrichedAiReport);
+  const solutionCatalog = buildCapabilitySolutionCatalog(
+    capabilityMatches,
+    capabilityRecommendations,
+    capabilityMatchingContext,
+  );
+
   return {
     surveyId: surveyForm.id,
     generatedAt: new Date().toISOString(),
     aiReport: enrichedAiReport,
-    templateReport: generateTemplateReport(surveyForm, enrichedAiReport, capabilityMatches),
+    templateReport: generateTemplateReport(
+      surveyForm,
+      enrichedAiReport,
+      capabilityMatches,
+      capabilityMatchingContext,
+      solutionCatalog,
+    ),
     capabilityMatches,
+    capabilityMatchingContext,
     capabilityRecommendations,
+    solutionCatalog,
     preSalesContact,
   };
 };

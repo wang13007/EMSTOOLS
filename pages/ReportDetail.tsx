@@ -18,12 +18,14 @@ import { SurveyForm } from '../types';
 import { generateEnergyReport, ReportResult } from '../services/geminiService';
 import {
   buildCapabilityRecommendations,
+  buildCapabilitySolutionCatalog,
   buildReportBundle,
   CapabilityRecommendationItem,
+  CapabilitySolutionItem,
   ReportBundle,
 } from '../services/reportService';
 import { roleService, surveyReportService, surveyService, userService } from '../src/services/supabaseService';
-import { getProductCapabilities, matchProductCapabilities } from '../src/services/productCapabilityStore';
+import { buildCapabilityMatchPackage } from '../src/services/capabilityMatchingService';
 import { usePermission } from '../src/auth/usePermission';
 
 type ActiveReportType = 'ai' | 'template';
@@ -152,6 +154,21 @@ const ZH = {
   moduleSuggestionDedup: '\u6a21\u5757\u5efa\u8bae\uff08\u53bb\u91cd\u540e\uff09',
   supplementInsights: '\u8865\u5145\u5206\u6790\uff08\u53bb\u91cd\u540e\uff09',
   capabilityAdviceMatch: '\u5efa\u8bae\u4e0e\u80fd\u529b\u9010\u9879\u5339\u914d',
+  templateCapabilityTags: '\u6a21\u677f\u8bc6\u522b\u80fd\u529b\u6807\u7b7e',
+  matchingRulesTitle: '\u80fd\u529b\u5339\u914d\u8ba1\u7b97\u89c4\u5219',
+  solutionCatalogTitle: '\u7efc\u5408\u89e3\u51b3\u65b9\u6848\u6e05\u5355',
+  templateTagThreshold: '\u6a21\u677f\u6807\u7b7e\u9608\u503c',
+  matchingThresholds: '\u5339\u914d\u9608\u503c',
+  highMatch: '\u9ad8\u5339\u914d',
+  mediumMatch: '\u4e2d\u5339\u914d',
+  lowMatch: '\u4f4e\u5339\u914d',
+  needConfirm: '\u5f85\u786e\u8ba4',
+  templateEvidence: '\u6a21\u677f\u8bc1\u636e',
+  specificFunctions: '\u5177\u4f53\u529f\u80fd\u80fd\u529b',
+  matchedRules: '\u547d\u4e2d\u89c4\u5219',
+  solutionSummary: '\u65b9\u6848\u6458\u8981',
+  templateLinkedTemplates: '\u5173\u8054\u6a21\u677f',
+  scoreSuffix: '\u5206',
   mappingBasis: '\u5339\u914d\u4f9d\u636e',
   linkedSuggestion: '\u5173\u8054\u5efa\u8bae',
   actionSuggestion: '\u884c\u52a8\u5efa\u8bae',
@@ -215,24 +232,34 @@ const excludeSemanticallyDuplicateItems = (items: string[], references: string[]
   return items.filter((item) => !references.some((reference) => isSemanticallyDuplicate(item, reference)));
 };
 
+const formatMatchLevelLabel = (level?: string) => {
+  if (level === 'high') return ZH.highMatch;
+  if (level === 'medium') return ZH.mediumMatch;
+  if (level === 'low') return ZH.lowMatch;
+  return ZH.needConfirm;
+};
+
+const getMatchLevelBadgeClass = (level?: string, matched?: boolean) => {
+  if (level === 'high') return 'bg-emerald-100 text-emerald-700';
+  if (level === 'medium') return 'bg-blue-100 text-blue-700';
+  if (level === 'low' || matched) return 'bg-amber-100 text-amber-700';
+  return 'bg-slate-100 text-slate-600';
+};
+
 const toReportBundle = (survey: SurveyForm, rawStored: any): { bundle: ReportBundle; shouldPersist: boolean } => {
   if (rawStored?.aiReport && rawStored?.templateReport) {
     const bundle = rawStored as ReportBundle;
     const hasTemplateStructure = Array.isArray(bundle.templateReport?.sections) && Array.isArray(bundle.templateReport?.charts);
     const hasCapabilities = Array.isArray(bundle.capabilityMatches);
     const hasCapabilityRecommendations = Array.isArray((bundle as any).capabilityRecommendations);
-    if (hasTemplateStructure && hasCapabilities && hasCapabilityRecommendations) {
+    const hasMatchingContext = Boolean(
+      (bundle as any).capabilityMatchingContext
+      && Array.isArray((bundle as any).capabilityMatchingContext?.matchingRules)
+      && Array.isArray((bundle as any).capabilityMatchingContext?.recognizedTemplateTags),
+    );
+    const hasSolutionCatalog = Array.isArray((bundle as any).solutionCatalog);
+    if (hasTemplateStructure && hasCapabilities && hasCapabilityRecommendations && hasMatchingContext && hasSolutionCatalog) {
       return { bundle, shouldPersist: false };
-    }
-
-    if (hasTemplateStructure && hasCapabilities && !hasCapabilityRecommendations) {
-      return {
-        bundle: {
-          ...bundle,
-          capabilityRecommendations: buildCapabilityRecommendations(bundle.capabilityMatches || [], bundle.aiReport),
-        },
-        shouldPersist: true,
-      };
     }
 
     const rebuilt = buildReportBundle(
@@ -539,11 +566,18 @@ export const ReportDetail: React.FC = () => {
     if (Array.isArray(data.report.capabilityMatches) && data.report.capabilityMatches.length) {
       return data.report.capabilityMatches;
     }
-    return matchProductCapabilities(data.survey, getProductCapabilities());
+    return buildCapabilityMatchPackage(data.survey).matches;
   }, [data]);
 
   const matchedCount = capabilityMatches.filter((item) => item.matched).length;
   const unmatchedCount = Math.max(0, capabilityMatches.length - matchedCount);
+  const capabilityMatchingContext = useMemo(() => {
+    if (!data) return null;
+    if ((data.report as any).capabilityMatchingContext?.matchingRules) {
+      return (data.report as any).capabilityMatchingContext;
+    }
+    return buildCapabilityMatchPackage(data.survey).context;
+  }, [data]);
   const capabilityRecommendations = useMemo<CapabilityRecommendationItem[]>(() => {
     if (!data) return [];
     if (Array.isArray((data.report as any).capabilityRecommendations) && (data.report as any).capabilityRecommendations.length) {
@@ -551,6 +585,15 @@ export const ReportDetail: React.FC = () => {
     }
     return buildCapabilityRecommendations(capabilityMatches, data.report.aiReport);
   }, [data, capabilityMatches]);
+  const solutionCatalog = useMemo<CapabilitySolutionItem[]>(() => {
+    if (!data || !capabilityMatchingContext) return [];
+    if (Array.isArray((data.report as any).solutionCatalog) && (data.report as any).solutionCatalog.length) {
+      return (data.report as any).solutionCatalog as CapabilitySolutionItem[];
+    }
+    return buildCapabilitySolutionCatalog(capabilityMatches, capabilityRecommendations, capabilityMatchingContext);
+  }, [data, capabilityMatches, capabilityRecommendations, capabilityMatchingContext]);
+  const recognizedTemplateTags = capabilityMatchingContext?.recognizedTemplateTags || [];
+  const matchingRules = capabilityMatchingContext?.matchingRules || [];
 
   const scoreChartData = useMemo(() => {
     if (!data) return [];
@@ -1073,6 +1116,184 @@ export const ReportDetail: React.FC = () => {
               </div>
             </section>
           )}
+
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-bold text-slate-900">{ZH.templateCapabilityTags}</h3>
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  {recognizedTemplateTags.length} items
+                </span>
+              </div>
+              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-600">
+                <p className="font-semibold text-slate-800">{ZH.templateLinkedTemplates}</p>
+                <p>
+                  {capabilityMatchingContext?.surveyTemplateName || ZH.surveyTemplate}
+                  {' / '}
+                  {capabilityMatchingContext?.reportTemplateName || ZH.reportTemplate}
+                </p>
+                <p className="mt-2">
+                  {ZH.templateTagThreshold}: {capabilityMatchingContext?.thresholds?.templateTag ?? '-'} {ZH.scoreSuffix}
+                </p>
+              </div>
+              <div className="mt-4 space-y-3">
+                {recognizedTemplateTags.length ? recognizedTemplateTags.map((item: any) => (
+                  <article key={`template_tag_${item.capabilityId}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{item.capabilityName}</p>
+                        <p className="mt-1 text-xs text-slate-500">{ZH.templateEvidence}</p>
+                      </div>
+                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                        {item.score} {ZH.scoreSuffix}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(item.evidence || []).length ? item.evidence.map((evidence: string, idx: number) => (
+                        <span key={`${item.capabilityId}_evidence_${idx}`} className="rounded-full bg-white px-3 py-1 text-xs text-slate-700 shadow-sm">
+                          {evidence}
+                        </span>
+                      )) : (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs text-slate-500">{ZH.noDirectSuggestion}</span>
+                      )}
+                    </div>
+                  </article>
+                )) : (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">{ZH.noDirectSuggestion}</div>
+                )}
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-bold text-slate-900">{ZH.matchingRulesTitle}</h3>
+              <div className="mt-4 space-y-3">
+                {matchingRules.map((rule: any, idx: number) => (
+                  <div key={`matching_rule_${rule.code}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-900">R{idx + 1} {rule.name}</p>
+                      <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">{rule.scoreText}</span>
+                    </div>
+                    <p className="mt-2 text-xs leading-6 text-slate-600">{rule.description}</p>
+                  </div>
+                ))}
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-800">
+                  <p className="font-semibold">{ZH.matchingThresholds}</p>
+                  <p>
+                    {ZH.highMatch} &gt;= {capabilityMatchingContext?.thresholds?.high ?? '-'} {ZH.scoreSuffix},{' '}
+                    {ZH.mediumMatch} &gt;= {capabilityMatchingContext?.thresholds?.medium ?? '-'} {ZH.scoreSuffix},{' '}
+                    {ZH.lowMatch} &gt;= {capabilityMatchingContext?.thresholds?.minMatch ?? '-'} {ZH.scoreSuffix},{' '}
+                    {ZH.needConfirm} &lt; {capabilityMatchingContext?.thresholds?.minMatch ?? '-'} {ZH.scoreSuffix}
+                  </p>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-lg font-bold text-slate-900">{ZH.solutionCatalogTitle}</h3>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                {solutionCatalog.length} items
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {solutionCatalog.length ? solutionCatalog.map((item) => (
+                <article key={`solution_catalog_${item.capabilityId}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-bold text-slate-900">{item.capabilityName}</p>
+                      <p className="text-xs text-slate-500">{item.capabilityType}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getMatchLevelBadgeClass(item.matchLevel, item.matched)}`}>
+                        {formatMatchLevelLabel(item.matchLevel)}
+                      </span>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        {item.score} {ZH.scoreSuffix}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-md bg-white px-3 py-2 text-xs leading-6 text-slate-700">
+                    <span className="font-semibold">{ZH.solutionSummary}: </span>
+                    {item.solutionSummary}
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-700">{ZH.templateCapabilityTags}</p>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {item.templateTagNames.length ? item.templateTagNames.map((tag, idx) => (
+                        <span key={`${item.capabilityId}_tag_${idx}`} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                          {tag}
+                        </span>
+                      )) : (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs text-slate-500">{ZH.noDirectSuggestion}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-700">{ZH.specificFunctions}</p>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      {item.specificFunctions.length ? item.specificFunctions.map((func, idx) => (
+                        <span key={`${item.capabilityId}_func_${idx}`} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                          {func}
+                        </span>
+                      )) : (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs text-slate-500">{ZH.noDirectSuggestion}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-700">{ZH.matchedRules}</p>
+                    <ul className="mt-1 space-y-1 text-xs leading-6 text-slate-700">
+                      {item.matchRules.length ? item.matchRules.map((rule, idx) => (
+                        <li key={`${item.capabilityId}_rule_${idx}`} className="rounded-md bg-white px-2.5 py-1.5">
+                          {rule}
+                        </li>
+                      )) : (
+                        <li className="rounded-md bg-white px-2.5 py-1.5">{ZH.noDirectSuggestion}</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-700">{ZH.mappingBasis}</p>
+                    <ul className="mt-1 space-y-1 text-xs leading-6 text-slate-700">
+                      {item.matchEvidence.length ? item.matchEvidence.map((evidence, idx) => (
+                        <li key={`${item.capabilityId}_basis_${idx}`} className="rounded-md bg-white px-2.5 py-1.5">
+                          {evidence}
+                        </li>
+                      )) : (
+                        <li className="rounded-md bg-white px-2.5 py-1.5">{ZH.noDirectSuggestion}</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold text-slate-700">{ZH.linkedSuggestion}</p>
+                    <ul className="mt-1 space-y-1 text-xs leading-6 text-slate-700">
+                      {item.recommendations.length ? item.recommendations.map((suggestion, idx) => (
+                        <li key={`${item.capabilityId}_suggest_${idx}`} className="rounded-md bg-white px-2.5 py-1.5">
+                          {idx + 1}. {suggestion}
+                        </li>
+                      )) : (
+                        <li className="rounded-md bg-white px-2.5 py-1.5">{ZH.noDirectSuggestion}</li>
+                      )}
+                    </ul>
+                  </div>
+
+                  <div className="mt-3 rounded-md bg-blue-50 px-2.5 py-2 text-xs leading-6 text-blue-700">
+                    <span className="font-semibold">{ZH.actionSuggestion}: </span>
+                    {item.actionSuggestion}
+                  </div>
+                </article>
+              )) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">{ZH.noDirectSuggestion}</div>
+              )}
+            </div>
+          </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-lg font-bold text-slate-900">{ZH.capabilityAdviceMatch}</h3>

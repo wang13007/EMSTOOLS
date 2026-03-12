@@ -150,9 +150,9 @@ export const PreSalesConfig: React.FC = () => {
           .map((item) => ({ id: item.itemId, label: normalizeLabel(item.itemLabel) })),
       );
 
-      const topRegions = cachedRegions.filter((item) => item.regionLevel === RegionLevel.REGION && isEnabledStatus(item.status));
-      const fallbackRegions = cachedRegions.filter((item) => item.regionLevel !== RegionLevel.COUNTRY && isEnabledStatus(item.status));
-      const selectableRegions = topRegions.length ? topRegions : fallbackRegions;
+      const selectableRegions = cachedRegions.filter(
+        (item) => item.regionLevel === RegionLevel.REGION && isEnabledStatus(item.status),
+      );
       const mappedRegions = dedupeOptions(
         selectableRegions.map((item) => ({ id: item.regionId, label: item.regionName })),
       );

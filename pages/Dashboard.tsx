@@ -19,6 +19,7 @@ import {
 import { ICONS } from '../constants';
 import { SurveyForm, SurveyStatus, ReportStatus } from '../types';
 import { surveyService } from '../src/services/supabaseService';
+import { buildCustomerDemandRanking } from '../src/services/customerDemandService';
 
 type TimeRange = 'month' | 'year' | 'all';
 
@@ -103,23 +104,9 @@ export const Dashboard: React.FC = () => {
       .filter((item) => item.value > 0);
   }, [filteredData]);
 
-  const demandRanking = useMemo(() => {
-    const baseDemands = [
-      { name: '能效分析需求', base: 12 },
-      { name: '数据报表需求', base: 10 },
-      { name: '运维管理需求', base: 8 },
-      { name: '碳管理需求', base: 6 },
-      { name: '可视化需求', base: 5 },
-    ];
-
-    const factor = filteredData.length / (rawData.length || 1);
-    return baseDemands
-      .map((item) => ({
-        name: item.name,
-        count: Math.max(1, Math.round(item.base * factor + Math.random() * 2)),
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [filteredData, rawData]);
+  const demandRankingResult = useMemo(() => buildCustomerDemandRanking(filteredData), [filteredData]);
+  const demandRanking = demandRankingResult.ranking;
+  const demandRules = demandRankingResult.rules;
 
   const customerValueData = useMemo(() => {
     const customers = Array.from(new Set(filteredData.map((item) => item.customerName))).filter(Boolean);
@@ -234,13 +221,27 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-          <span className="w-1.5 h-6 bg-amber-500 rounded-full" />
-          客户需求排行
-        </h3>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold flex items-center gap-2">
+              <span className="w-1.5 h-6 bg-amber-500 rounded-full" />
+              客户需求排行
+            </h3>
+            <p className="mt-2 text-sm text-slate-500">
+              统计口径：基于客户已填写表单自动识别需求，同一客户同一需求跨多张表单只计 1 次。
+            </p>
+          </div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-900">
+            排序规则：按“命中该需求的去重客户数”倒序排列。
+          </div>
+        </div>
         <div className="h-80 min-h-[320px] min-w-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart layout="vertical" data={demandRanking} margin={{ left: 40, right: 40 }}>
+            <BarChart
+              layout="vertical"
+              data={demandRanking.length ? demandRanking : [{ name: '暂无数据', count: 0 }]}
+              margin={{ left: 40, right: 40 }}
+            >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
               <XAxis type="number" hide />
               <YAxis
@@ -249,7 +250,7 @@ export const Dashboard: React.FC = () => {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                width={100}
+                width={140}
               />
               <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
               <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24}>
@@ -257,6 +258,27 @@ export const Dashboard: React.FC = () => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+        <div className="mt-6 grid grid-cols-1 gap-3 xl:grid-cols-2">
+          {demandRules.map((rule) => (
+            <article key={rule.code} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-slate-900">{rule.name}</p>
+                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                  关键词 {rule.valueKeywords.length}
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-6 text-slate-600">{rule.description}</p>
+              <p className="mt-2 text-xs font-semibold text-slate-700">识别关键词</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {rule.valueKeywords.slice(0, 6).map((keyword) => (
+                  <span key={`${rule.code}_${keyword}`} className="rounded-full bg-white px-3 py-1 text-xs text-slate-700">
+                    {keyword}
+                  </span>
+                ))}
+              </div>
+            </article>
+          ))}
         </div>
       </div>
 
