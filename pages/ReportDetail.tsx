@@ -22,11 +22,19 @@ import {
   CapabilityRecommendationItem,
   ReportBundle,
 } from '../services/reportService';
-import { surveyReportService, surveyService, userService } from '../src/services/supabaseService';
+import { roleService, surveyReportService, surveyService, userService } from '../src/services/supabaseService';
 import { getProductCapabilities, matchProductCapabilities } from '../src/services/productCapabilityStore';
 import { usePermission } from '../src/auth/usePermission';
 
 type ActiveReportType = 'ai' | 'template';
+type PreSalesUserOption = {
+  id: string;
+  label: string;
+  name: string;
+  username?: string;
+  phone?: string;
+  email?: string;
+};
 
 const PIE_COLORS = ['#2563eb', '#0ea5e9', '#14b8a6', '#64748b', '#94a3b8'];
 
@@ -91,6 +99,12 @@ const ZH = {
   phone: '\u8054\u7cfb\u7535\u8bdd',
   email: '\u90ae\u7bb1',
   notProvided: '\u672a\u63d0\u4f9b',
+  selectPreSalesOwner: '\u8bf7\u9009\u62e9\u552e\u524d\u8d1f\u8d23\u4eba',
+  savePreSalesOwner: '\u4fdd\u5b58\u552e\u524d\u8d1f\u8d23\u4eba',
+  savePreSalesOwnerSuccess: '\u552e\u524d\u8d1f\u8d23\u4eba\u5df2\u66f4\u65b0\u3002',
+  savePreSalesOwnerFail: '\u66f4\u65b0\u552e\u524d\u8d1f\u8d23\u4eba\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002',
+  noPreSalesUsers: '\u672a\u627e\u5230\u53ef\u9009\u552e\u524d\u7528\u6237',
+  editPreSalesOwner: '\u4fee\u6539\u552e\u524d\u8d1f\u8d23\u4eba',
   efficiencyMaturity: '\u80fd\u6548\u6210\u719f\u5ea6',
   efficiencyHint: '\u8bc4\u5206\u8d8a\u9ad8\u8868\u793a\u80fd\u6548\u7ba1\u7406\u4f53\u7cfb\u8d8a\u6210\u719f\u3002',
   capabilityMatch: '\u80fd\u529b\u5339\u914d',
@@ -349,6 +363,26 @@ const isGeneratedReportStatus = (survey: any) => {
   return raw === 'generated' || raw === '\u5df2\u751f\u6210';
 };
 
+const isPreSalesEngineerRole = (role: any) => {
+  const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
+  const keywords = ['售前工程师', 'presales engineer', 'pre-sales engineer', 'pre sales engineer', '售前'];
+  return keywords.some((keyword) => source.includes(keyword));
+};
+
+const toPreSalesUserOption = (user: any): PreSalesUserOption | null => {
+  const id = String(user?.id || user?.user_id || '').trim();
+  if (!id) return null;
+  const name = user?.user_name || user?.name || user?.username || id;
+  return {
+    id,
+    name,
+    username: user?.username,
+    phone: user?.phone,
+    email: user?.email,
+    label: `${name}${user?.username ? ` (${user.username})` : ''}`,
+  };
+};
+
 export const ReportDetail: React.FC = () => {
   const { hasPermission, guardPermission } = usePermission();
   const { id } = useParams<{ id: string }>();
@@ -356,6 +390,9 @@ export const ReportDetail: React.FC = () => {
   const navigate = useNavigate();
   const [activeType, setActiveType] = useState<ActiveReportType>(() => getInitialReportType(location.search));
   const [data, setData] = useState<{ survey: SurveyForm; report: ReportBundle } | null>(null);
+  const [preSalesUsers, setPreSalesUsers] = useState<PreSalesUserOption[]>([]);
+  const [selectedPreSalesResponsibleId, setSelectedPreSalesResponsibleId] = useState('');
+  const [savingPreSalesResponsible, setSavingPreSalesResponsible] = useState(false);
   const [exporting, setExporting] = useState(false);
   const exportRootRef = useRef<HTMLDivElement | null>(null);
 
@@ -441,6 +478,61 @@ export const ReportDetail: React.FC = () => {
 
     void loadReport();
   }, [id, navigate]);
+
+  useEffect(() => {
+    if (!data?.survey.preSalesResponsible) return;
+    setSelectedPreSalesResponsibleId(data.survey.preSalesResponsible);
+  }, [data?.survey.preSalesResponsible]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadPreSalesUsers = async () => {
+      try {
+        const [roles, users] = await Promise.all([roleService.getRoles(), userService.getUsers()]);
+        const preSalesRoleIds = new Set((roles || []).filter(isPreSalesEngineerRole).map((role: any) => role.id));
+
+        const filtered = (users || [])
+          .filter((user: any) => (user.status || 'enabled') === 'enabled')
+          .filter((user: any) => {
+            const roleIds = Array.isArray(user.role_ids) && user.role_ids.length ? user.role_ids : [user.role_id];
+            const byRoleId = roleIds.some((roleId: string) => preSalesRoleIds.has(roleId));
+            if (byRoleId) return true;
+            const roleText = `${user.role || ''}`.toLowerCase();
+            return roleText.includes('售前工程师') || roleText.includes('presales');
+          })
+          .map(toPreSalesUserOption)
+          .filter(Boolean) as PreSalesUserOption[];
+
+        const unique = new Map<string, PreSalesUserOption>();
+        filtered.forEach((item) => unique.set(item.id, item));
+
+        const currentId = String(data?.survey.preSalesResponsible || '').trim();
+        if (currentId && !unique.has(currentId)) {
+          const currentUser = (users || []).find(
+            (user: any) => user.id === currentId || user.user_id === currentId,
+          );
+          const fallback = currentUser ? toPreSalesUserOption(currentUser) : null;
+          if (fallback) unique.set(fallback.id, fallback);
+        }
+
+        if (active) {
+          setPreSalesUsers(Array.from(unique.values()));
+        }
+      } catch (error) {
+        console.error('加载售前负责人列表失败:', error);
+        if (active) {
+          setPreSalesUsers([]);
+        }
+      }
+    };
+
+    void loadPreSalesUsers();
+
+    return () => {
+      active = false;
+    };
+  }, [data?.survey.preSalesResponsible]);
 
   const capabilityMatches = useMemo(() => {
     if (!data) return [];
@@ -645,7 +737,15 @@ export const ReportDetail: React.FC = () => {
             root.style.opacity = '1';
             root.style.animation = 'none';
             root.style.transform = 'none';
+            root.style.maxWidth = '210mm';
+            root.style.width = '210mm';
+            root.style.margin = '0 auto';
+            root.style.background = '#ffffff';
+            root.style.boxShadow = 'none';
           }
+          doc.querySelectorAll<HTMLElement>('[data-export-hide="true"]').forEach((node) => {
+            node.style.display = 'none';
+          });
           doc.querySelectorAll<HTMLElement>('*').forEach((node) => {
             node.style.animation = 'none';
             node.style.transition = 'none';
@@ -711,13 +811,68 @@ export const ReportDetail: React.FC = () => {
     }
   };
 
+  const handleSavePreSalesResponsible = async () => {
+    if (!data) return;
+    if (!guardPermission('survey_form:edit', ZH.editPreSalesOwner)) return;
+
+    const nextId = String(selectedPreSalesResponsibleId || '').trim();
+    if (!nextId) {
+      window.alert(ZH.selectPreSalesOwner);
+      return;
+    }
+
+    if (nextId === data.survey.preSalesResponsible) {
+      return;
+    }
+
+    setSavingPreSalesResponsible(true);
+    try {
+      const updatedSurvey = await surveyService.updateSurvey(data.survey.id, {
+        status: data.survey.status,
+        report_status: data.survey.reportStatus,
+        pre_sales_responsible_id: nextId,
+      });
+
+      if (!updatedSurvey) {
+        throw new Error('update survey failed');
+      }
+
+      const mappedSurvey = mapSurveyRecordToForm(updatedSurvey);
+      const matchedUser = preSalesUsers.find((item) => item.id === nextId);
+      const nextBundle: ReportBundle = {
+        ...data.report,
+        preSalesContact: {
+          id: nextId,
+          name: matchedUser?.name || ZH.preSalesOwner,
+          username: matchedUser?.username,
+          phone: matchedUser?.phone,
+          email: matchedUser?.email,
+        },
+      };
+
+      setData({ survey: mappedSurvey, report: nextBundle });
+      await persistReportBundleToSurvey(updatedSurvey, nextBundle);
+      window.alert(ZH.savePreSalesOwnerSuccess);
+    } catch (error) {
+      console.error('更新售前负责人失败:', error);
+      window.alert(ZH.savePreSalesOwnerFail);
+    } finally {
+      setSavingPreSalesResponsible(false);
+    }
+  };
+
   const tooltipFormatter = (value: number | string | undefined, _name: string, payload?: any) => {
     const metricName = payload?.payload?.name || ZH.valueLabel;
     return [value ?? 0, metricName];
   };
 
   return (
-    <div ref={exportRootRef} data-export-root="report" className="space-y-6 pb-20">
+    <div className="bg-slate-100/70 pb-20">
+      <div
+        ref={exportRootRef}
+        data-export-root="report"
+        className="mx-auto w-full max-w-[210mm] space-y-6 px-3 pb-12 pt-4 md:px-6 md:pt-6"
+      >
       <section className="relative overflow-hidden rounded-3xl border border-blue-200/70 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 shadow-sm">
         <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-200/30" />
         <div className="absolute -bottom-12 left-1/3 h-32 w-32 rounded-full bg-cyan-200/30" />
@@ -734,7 +889,7 @@ export const ReportDetail: React.FC = () => {
             <p className="text-sm text-slate-500">{ZH.generatedAtPrefix}{formatDate(data.report.generatedAt)}</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div data-export-hide="true" className="flex items-center gap-3">
             {hasPermission('survey_form:share_report') && (
               <button
                 type="button"
@@ -766,6 +921,36 @@ export const ReportDetail: React.FC = () => {
           <p className="text-sm font-semibold text-slate-800">{contact.phone || ZH.notProvided}</p>
           <p className="mt-1 text-xs text-slate-500">{ZH.email}</p>
           <p className="text-sm font-semibold text-slate-800">{contact.email || ZH.notProvided}</p>
+          {hasPermission('survey_form:edit') && (
+            <div data-export-hide="true" className="mt-4 space-y-2 border-t border-slate-100 pt-4">
+              <p className="text-xs font-semibold text-slate-600">{ZH.editPreSalesOwner}</p>
+              <select
+                value={selectedPreSalesResponsibleId}
+                onChange={(event) => setSelectedPreSalesResponsibleId(event.target.value)}
+                disabled={savingPreSalesResponsible || preSalesUsers.length === 0}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+              >
+                <option value="">{preSalesUsers.length ? ZH.selectPreSalesOwner : ZH.noPreSalesUsers}</option>
+                {preSalesUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleSavePreSalesResponsible}
+                disabled={
+                  savingPreSalesResponsible
+                  || !selectedPreSalesResponsibleId
+                  || selectedPreSalesResponsibleId === data.survey.preSalesResponsible
+                }
+                className="w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {savingPreSalesResponsible ? '保存中...' : ZH.savePreSalesOwner}
+              </button>
+            </div>
+          )}
         </div>
         <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm">
           <p className="text-xs text-blue-600">{ZH.efficiencyMaturity}</p>
@@ -1164,6 +1349,7 @@ export const ReportDetail: React.FC = () => {
           </section>
         </div>
       )}
+      </div>
     </div>
   );
 };
