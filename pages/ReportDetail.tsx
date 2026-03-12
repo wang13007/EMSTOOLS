@@ -17,7 +17,7 @@ import jsPDF from 'jspdf';
 import { SurveyForm } from '../types';
 import { ReportResult } from '../services/geminiService';
 import { buildReportBundle, ReportBundle } from '../services/reportService';
-import { surveyService, userService } from '../src/services/supabaseService';
+import { surveyReportService, surveyService, userService } from '../src/services/supabaseService';
 import { getProductCapabilities, matchProductCapabilities } from '../src/services/productCapabilityStore';
 import { usePermission } from '../src/auth/usePermission';
 
@@ -233,13 +233,29 @@ const readReportBundleFromSurvey = (survey: any): any => {
   return rawData.report_bundle || rawData.reportBundle || null;
 };
 
+const readReportBundleFromSurveyReport = (reportRow: any): any => {
+  const content = reportRow?.content;
+  if (!content) return null;
+  if (typeof content === 'object') return content;
+  if (typeof content !== 'string') return null;
+  try {
+    const parsed = JSON.parse(content);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 const persistReportBundleToSurvey = async (survey: any, bundle: ReportBundle) => {
   if (!survey?.id) return;
   writeLocalReport(survey.id, bundle);
 
   const rawData = survey?.data && typeof survey.data === 'object' ? survey.data : {};
   const current = rawData.report_bundle;
-  if (current?.generatedAt === bundle.generatedAt) return;
+  if (current?.generatedAt === bundle.generatedAt) {
+    await surveyReportService.saveSurveyReportByFormId(survey.id, bundle);
+    return;
+  }
 
   const nextData = {
     ...rawData,
@@ -252,6 +268,7 @@ const persistReportBundleToSurvey = async (survey: any, bundle: ReportBundle) =>
     status: survey.status,
     report_status: survey.report_status || survey.reportStatus,
   });
+  await surveyReportService.saveSurveyReportByFormId(survey.id, bundle);
 };
 
 export const ReportDetail: React.FC = () => {
@@ -284,9 +301,12 @@ export const ReportDetail: React.FC = () => {
           return;
         }
 
+        const reportRow = await surveyReportService.getSurveyReportByFormId(id);
+        const reportFromSurveyReport = readReportBundleFromSurveyReport(reportRow);
         const survey = mapSurveyRecordToForm(surveyRecord);
         const localReports = readLocalReportMap();
-        const rawStored = readReportBundleFromSurvey(surveyRecord) || localReports[id];
+        const reportFromSurveyForm = readReportBundleFromSurvey(surveyRecord);
+        const rawStored = reportFromSurveyReport || reportFromSurveyForm || localReports[id];
         if (!rawStored) {
           window.alert(ZH.notFoundReport);
           navigate(`/surveys/fill/${id}`);
@@ -296,7 +316,7 @@ export const ReportDetail: React.FC = () => {
         const { bundle, shouldPersist } = toReportBundle(survey, rawStored);
         setData({ survey, report: bundle });
 
-        if (shouldPersist || !readReportBundleFromSurvey(surveyRecord)) {
+        if (shouldPersist || !reportFromSurveyReport || !reportFromSurveyForm) {
           await persistReportBundleToSurvey(surveyRecord, bundle);
           const refreshedSurvey = await surveyService.getSurveyById(id);
           if (refreshedSurvey) {

@@ -979,6 +979,48 @@ export const messageService = {
   },
 };
 
+export const surveyReportService = {
+  async getSurveyReportByFormId(formId: string) {
+    const targetId = String(formId || '').trim();
+    if (!targetId) return null;
+
+    const { data, error } = await supabase
+      .from('survey_reports')
+      .select('*')
+      .eq('form_id', targetId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('获取报告详情失败:', error);
+      return null;
+    }
+    return data || null;
+  },
+
+  async saveSurveyReportByFormId(formId: string, reportBundle: any) {
+    const targetId = String(formId || '').trim();
+    if (!targetId) return null;
+
+    const payload = {
+      form_id: targetId,
+      content: JSON.stringify(reportBundle || {}),
+      generate_time: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('survey_reports')
+      .upsert(payload, { onConflict: 'form_id' })
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('保存报告失败:', error);
+      return null;
+    }
+    return data || null;
+  },
+};
+
 const SYSTEM_PRESET_ROLE_NAMES = ['超级管理员', '售前工程师', '客户用户', '外部客户'];
 
 const isSystemPresetRoleName = (roleName: string | undefined | null) => {
@@ -1038,6 +1080,7 @@ export default {
   userService,
   roleService,
   surveyService,
+  surveyReportService,
   templateService,
   dictService,
   logService,

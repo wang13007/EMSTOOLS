@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ICONS } from '../constants';
 import { DictItem, DictType, PreSalesAssignment, RegionDict, RegionLevel, User } from '../types';
-import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
-import { INITIAL_REGIONS } from '../constants/regions';
 import Portal from '../src/components/Portal';
-import { roleService, userService } from '../src/services/supabaseService';
+import { dictService, roleService, userService } from '../src/services/supabaseService';
 
 type OptionItem = {
   id: string;
@@ -25,6 +23,7 @@ const LEGACY_LABEL_MAP: Record<string, string> = {
 };
 
 const normalizeText = (value?: string) => (value || '').trim().toLowerCase();
+const isUuid = (value?: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
 
 const readCachedJson = <T,>(key: string, fallback: T): T => {
   try {
@@ -84,27 +83,85 @@ export const PreSalesConfig: React.FC = () => {
   useEffect(() => {
     const savedAssignments = readCachedJson<PreSalesAssignment[]>(ASSIGNMENT_STORAGE_KEY, []);
 
-    const dictTypes = readCachedJson<DictType[]>(DICT_TYPES_STORAGE_KEY, INITIAL_DICT_TYPES);
-    const dictItems = readCachedJson<DictItem[]>(DICT_ITEMS_STORAGE_KEY, INITIAL_DICT_ITEMS);
-    const regions = readCachedJson<RegionDict[]>(REGION_STORAGE_KEY, INITIAL_REGIONS as RegionDict[]);
-
-    const industryTypeIds = dictTypes.filter(isIndustryType).map((item) => item.typeId);
-    const industries = dedupeOptions(
-      dictItems
-        .filter((item) => industryTypeIds.includes(item.typeId) && isEnabledStatus(item.status))
-        .map((item) => ({ id: item.itemId, label: normalizeLabel(item.itemLabel) })),
-    );
-
-    const topRegions = regions.filter((item) => item.regionLevel === RegionLevel.REGION && isEnabledStatus(item.status));
-    const fallbackRegions = regions.filter((item) => item.regionLevel !== RegionLevel.COUNTRY && isEnabledStatus(item.status));
-    const selectableRegions = topRegions.length ? topRegions : fallbackRegions;
-    const mappedRegions = dedupeOptions(
-      selectableRegions.map((item) => ({ id: item.regionId, label: item.regionName })),
-    );
-
     setAssignments(savedAssignments);
-    setIndustryOptions(industries);
-    setRegionOptions(mappedRegions);
+
+    const loadDictionaryOptions = async () => {
+      const cachedTypes = readCachedJson<DictType[]>(DICT_TYPES_STORAGE_KEY, []);
+      const cachedItems = readCachedJson<DictItem[]>(DICT_ITEMS_STORAGE_KEY, []);
+      const cachedRegions = readCachedJson<RegionDict[]>(REGION_STORAGE_KEY, []);
+
+      let dictTypes = cachedTypes;
+      try {
+        const remoteTypes = await dictService.getDictTypes();
+        if (Array.isArray(remoteTypes) && remoteTypes.length) {
+          dictTypes = remoteTypes.map((type: any) => ({
+            typeId: type.type_id || type.typeId || '',
+            typeName: type.type_name || type.typeName || '',
+            typeCode: type.type_code || type.typeCode || '',
+            description: type.description,
+            status: type.status,
+            sortOrder: type.sort_order ?? type.sortOrder,
+            creator: type.creator || '系统用户',
+            createTime: type.create_time || type.createTime || new Date().toISOString(),
+          }));
+        }
+      } catch (error) {
+        console.warn('加载字典类型失败，使用本地字典缓存回退', error);
+      }
+
+      const industryTypeIds = dictTypes.filter(isIndustryType).map((item) => item.typeId);
+
+      let industryItems = cachedItems.filter((item) => industryTypeIds.includes(item.typeId));
+      try {
+        const remoteIndustryItems = (
+          await Promise.all(
+            industryTypeIds.filter((typeId) => isUuid(typeId)).map((typeId) => dictService.getDictItems(typeId)),
+          )
+        )
+          .flat()
+          .map((item: any) => ({
+            itemId: item.item_id || item.itemId || `${item.type_id || item.typeId}-${item.item_value || item.itemValue}`,
+            typeId: item.type_id || item.typeId || '',
+            itemLabel: item.item_label || item.itemLabel || '',
+            itemValue: item.item_value || item.itemValue || '',
+            sortOrder: item.sort_order ?? item.sortOrder,
+            status: item.status,
+            ext1: item.ext1,
+            ext2: item.ext2,
+            creator: item.creator || '系统用户',
+            createTime: item.create_time || item.createTime || new Date().toISOString(),
+          }));
+
+        if (remoteIndustryItems.length) {
+          const merged = new Map<string, DictItem>();
+          [...industryItems, ...remoteIndustryItems].forEach((item) => {
+            const key = item.itemId || `${item.typeId}:${item.itemValue}`;
+            merged.set(key, item);
+          });
+          industryItems = Array.from(merged.values());
+        }
+      } catch (error) {
+        console.warn('加载行业字典项失败，使用本地字典缓存回退', error);
+      }
+
+      const industries = dedupeOptions(
+        industryItems
+          .filter((item) => isEnabledStatus(item.status))
+          .map((item) => ({ id: item.itemId, label: normalizeLabel(item.itemLabel) })),
+      );
+
+      const topRegions = cachedRegions.filter((item) => item.regionLevel === RegionLevel.REGION && isEnabledStatus(item.status));
+      const fallbackRegions = cachedRegions.filter((item) => item.regionLevel !== RegionLevel.COUNTRY && isEnabledStatus(item.status));
+      const selectableRegions = topRegions.length ? topRegions : fallbackRegions;
+      const mappedRegions = dedupeOptions(
+        selectableRegions.map((item) => ({ id: item.regionId, label: item.regionName })),
+      );
+
+      setIndustryOptions(industries);
+      setRegionOptions(mappedRegions);
+    };
+
+    void loadDictionaryOptions();
 
     const loadPreSalesUsers = async () => {
       try {

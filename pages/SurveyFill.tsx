@@ -4,7 +4,7 @@ import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { SURVEY_TEMPLATES } from '../constants/surveyTemplatePreset';
 import { generateEnergyReport } from '../services/geminiService';
 import { buildReportBundle, PreSalesContactInfo } from '../services/reportService';
-import { surveyService, userService } from '../src/services/supabaseService';
+import { surveyReportService, surveyService, userService } from '../src/services/supabaseService';
 import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 import { usePermission } from '../src/auth/usePermission';
 
@@ -435,6 +435,8 @@ export const SurveyFill: React.FC = () => {
       const reports = JSON.parse(localStorage.getItem('ems_reports') || '{}');
       reports[form.id] = reportBundle;
       localStorage.setItem('ems_reports', JSON.stringify(reports));
+
+      await surveyReportService.saveSurveyReportByFormId(form.id, reportBundle);
 
       navigate(`/reports/${form.id}`);
     } catch (error) {

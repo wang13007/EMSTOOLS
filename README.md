@@ -93,12 +93,11 @@ GEMINI_API_KEY="<optional>"
 
 | 文档 | 路径 | 说明 |
 | --- | --- | --- |
-| 产品需求 | [PRD.md](./PRD.md) | 功能需求与设计 |
+| 需求开发文档 | [需求开发文档.md](./需求开发文档.md) | 功能需求与设计 |
 | 服务接口 | [api-design.md](./api-design.md) | 前端 Service 接口 |
 | 数据库设计 | [database-design.md](./database-design.md) | 表结构、约束、RLS |
 | 技术方案 | [backend-tech-doc.md](./backend-tech-doc.md) | 技术实现说明 |
 | Supabase 配置 | [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Supabase 接入流程 |
-| Cloudflare 部署 | [CLOUDFLARE_DEPLOY.md](./CLOUDFLARE_DEPLOY.md) | 部署简版 |
 | Cloudflare 部署指南 | [CLOUDFLARE_DEPLOY_GUIDE.md](./CLOUDFLARE_DEPLOY_GUIDE.md) | 部署详版 |
-| 用户手册 | [用户手册.md](./用户手册.md) | 使用说明 |
+| 用户操作手册 | [用户操作手册.md](./用户操作手册.md) | 使用说明 |
 | 系统运维手册 | [系统运维手册.md](./系统运维手册.md) | 运维流程 |
