@@ -104,9 +104,7 @@ export const Dashboard: React.FC = () => {
       .filter((item) => item.value > 0);
   }, [filteredData]);
 
-  const demandRankingResult = useMemo(() => buildCustomerDemandRanking(filteredData), [filteredData]);
-  const demandRanking = demandRankingResult.ranking;
-  const demandRules = demandRankingResult.rules;
+  const demandRanking = useMemo(() => buildCustomerDemandRanking(filteredData).ranking, [filteredData]);
 
   const customerValueData = useMemo(() => {
     const customers = Array.from(new Set(filteredData.map((item) => item.customerName))).filter(Boolean);
@@ -227,12 +225,6 @@ export const Dashboard: React.FC = () => {
               <span className="w-1.5 h-6 bg-amber-500 rounded-full" />
               客户需求排行
             </h3>
-            <p className="mt-2 text-sm text-slate-500">
-              统计口径：基于客户已填写表单自动识别需求，同一客户同一需求跨多张表单只计 1 次。
-            </p>
-          </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-900">
-            排序规则：按“命中该需求的去重客户数”倒序排列。
           </div>
         </div>
         <div className="h-80 min-h-[320px] min-w-[300px]">
@@ -258,27 +250,6 @@ export const Dashboard: React.FC = () => {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
-        <div className="mt-6 grid grid-cols-1 gap-3 xl:grid-cols-2">
-          {demandRules.map((rule) => (
-            <article key={rule.code} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-bold text-slate-900">{rule.name}</p>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
-                  关键词 {rule.valueKeywords.length}
-                </span>
-              </div>
-              <p className="mt-2 text-xs leading-6 text-slate-600">{rule.description}</p>
-              <p className="mt-2 text-xs font-semibold text-slate-700">识别关键词</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {rule.valueKeywords.slice(0, 6).map((keyword) => (
-                  <span key={`${rule.code}_${keyword}`} className="rounded-full bg-white px-3 py-1 text-xs text-slate-700">
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-            </article>
-          ))}
         </div>
       </div>
 

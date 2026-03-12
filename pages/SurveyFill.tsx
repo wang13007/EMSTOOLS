@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { generateEnergyReport } from '../services/geminiService';
@@ -111,6 +111,7 @@ export const SurveyFill: React.FC = () => {
   const canEditSurvey = hasPermission('survey_form:edit');
   const canSubmitSurvey = hasPermission('survey_form:submit') && hasPermission('survey_form:generate_report');
   const canShareSurvey = hasPermission('survey_form:share_report');
+  const canViewReport = hasPermission('survey_form:view_report');
 
   const persistLockRef = useRef(false);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -472,17 +473,35 @@ export const SurveyFill: React.FC = () => {
 
   const isCompleted = form.status === SurveyStatus.COMPLETED;
   const isAuthorizedFill = location.pathname.includes('/authorized/surveys/fill/');
+  const hasGeneratedReport = form.reportStatus === ReportStatus.GENERATED;
 
   return (
     <div className="animate-fadeIn">
       <div className="sticky -top-8 z-30 -mx-8 px-8 bg-slate-50 border-b border-slate-200 shadow-sm">
         <div className="max-w-4xl mx-auto py-3">
-          <div className="flex justify-between items-center gap-4">
-            <div>
+          <div className="flex justify-between items-center gap-4">            <div>
               <h2 className="text-2xl font-bold text-slate-900">{form.name}</h2>
               <p className="text-slate-500">
-                {form.customerName} 路 {form.projectName}
+                {form.customerName} · {form.projectName}
               </p>
+              {hasGeneratedReport && (
+                <div className="mt-3 inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                  <button
+                    type="button"
+                    className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white"
+                  >
+                    表单
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/reports/${form.id}`)}
+                    disabled={!canViewReport}
+                    className="rounded-lg px-4 py-1.5 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                  >
+                    报告
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex gap-4 shrink-0">
               <button
@@ -679,4 +698,5 @@ export const SurveyFill: React.FC = () => {
     </div>
   );
 };
+
 

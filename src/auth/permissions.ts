@@ -44,6 +44,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
           { key: 'survey_form:submit', label: '\u63d0\u4ea4' },
           { key: 'survey_form:generate_report', label: '\u751f\u6210\u62a5\u544a' },
           { key: 'survey_form:view_report', label: '\u67e5\u770b\u62a5\u544a' },
+          { key: 'survey_form:edit_report_owner', label: '\u4fee\u6539\u62a5\u544a\u552e\u524d\u8d1f\u8d23\u4eba' },
           { key: 'survey_form:share_report', label: '\u5206\u4eab\u62a5\u544a' },
           { key: 'survey_form:export_report', label: '\u5bfc\u51fa\u62a5\u544a' },
         ],

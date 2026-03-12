@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   PieChart,
@@ -107,6 +107,11 @@ const ZH = {
   savePreSalesOwnerFail: '\u66f4\u65b0\u552e\u524d\u8d1f\u8d23\u4eba\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002',
   noPreSalesUsers: '\u672a\u627e\u5230\u53ef\u9009\u552e\u524d\u7528\u6237',
   editPreSalesOwner: '\u4fee\u6539\u552e\u524d\u8d1f\u8d23\u4eba',
+  backToList: '\u8fd4\u56de\u5217\u8868',
+  formTab: '\u8868\u5355',
+  reportTab: '\u62a5\u544a',
+  cancel: '\u53d6\u6d88',
+  change: '\u4fee\u6539',
   efficiencyMaturity: '\u80fd\u6548\u6210\u719f\u5ea6',
   efficiencyHint: '\u8bc4\u5206\u8d8a\u9ad8\u8868\u793a\u80fd\u6548\u7ba1\u7406\u4f53\u7cfb\u8d8a\u6210\u719f\u3002',
   capabilityMatch: '\u80fd\u529b\u5339\u914d',
@@ -419,6 +424,7 @@ export const ReportDetail: React.FC = () => {
   const [data, setData] = useState<{ survey: SurveyForm; report: ReportBundle } | null>(null);
   const [preSalesUsers, setPreSalesUsers] = useState<PreSalesUserOption[]>([]);
   const [selectedPreSalesResponsibleId, setSelectedPreSalesResponsibleId] = useState('');
+  const [editingPreSalesResponsible, setEditingPreSalesResponsible] = useState(false);
   const [savingPreSalesResponsible, setSavingPreSalesResponsible] = useState(false);
   const [exporting, setExporting] = useState(false);
   const exportRootRef = useRef<HTMLDivElement | null>(null);
@@ -570,7 +576,8 @@ export const ReportDetail: React.FC = () => {
   }, [data]);
 
   const matchedCount = capabilityMatches.filter((item) => item.matched).length;
-  const unmatchedCount = Math.max(0, capabilityMatches.length - matchedCount);
+  const canEditReportOwner = hasPermission('survey_form:edit_report_owner');
+  const canViewSurvey = hasPermission('survey_form:view');
   const capabilityMatchingContext = useMemo(() => {
     if (!data) return null;
     if ((data.report as any).capabilityMatchingContext?.matchingRules) {
@@ -593,7 +600,6 @@ export const ReportDetail: React.FC = () => {
     return buildCapabilitySolutionCatalog(capabilityMatches, capabilityRecommendations, capabilityMatchingContext);
   }, [data, capabilityMatches, capabilityRecommendations, capabilityMatchingContext]);
   const recognizedTemplateTags = capabilityMatchingContext?.recognizedTemplateTags || [];
-  const matchingRules = capabilityMatchingContext?.matchingRules || [];
 
   const scoreChartData = useMemo(() => {
     if (!data) return [];
@@ -624,6 +630,10 @@ export const ReportDetail: React.FC = () => {
       .map((block) => block.trim())
       .filter(Boolean);
   }, [data]);
+  const templateSections = useMemo(
+    () => (data?.report?.templateReport?.sections || []).filter((section) => section.title !== '能力匹配计算规则'),
+    [data],
+  );
 
   const aiExtended = useMemo(() => {
     const ai = (data?.report?.aiReport || {}) as any;
@@ -856,7 +866,7 @@ export const ReportDetail: React.FC = () => {
 
   const handleSavePreSalesResponsible = async () => {
     if (!data) return;
-    if (!guardPermission('survey_form:edit', ZH.editPreSalesOwner)) return;
+    if (!guardPermission('survey_form:edit_report_owner', ZH.editPreSalesOwner)) return;
 
     const nextId = String(selectedPreSalesResponsibleId || '').trim();
     if (!nextId) {
@@ -894,6 +904,7 @@ export const ReportDetail: React.FC = () => {
       };
 
       setData({ survey: mappedSurvey, report: nextBundle });
+      setEditingPreSalesResponsible(false);
       await persistReportBundleToSurvey(updatedSurvey, nextBundle);
       window.alert(ZH.savePreSalesOwnerSuccess);
     } catch (error) {
@@ -902,6 +913,11 @@ export const ReportDetail: React.FC = () => {
     } finally {
       setSavingPreSalesResponsible(false);
     }
+  };
+
+  const handleCancelPreSalesResponsibleEdit = () => {
+    setSelectedPreSalesResponsibleId(data?.survey.preSalesResponsible || '');
+    setEditingPreSalesResponsible(false);
   };
 
   const tooltipFormatter = (value: number | string | undefined, _name: string, payload?: any) => {
@@ -930,9 +946,32 @@ export const ReportDetail: React.FC = () => {
             <h2 className="text-3xl font-black tracking-tight text-slate-900">{data.survey.projectName}</h2>
             <p className="mt-2 text-sm text-slate-600">{ZH.customerPrefix}{data.survey.customerName || '-'}</p>
             <p className="text-sm text-slate-500">{ZH.generatedAtPrefix}{formatDate(data.report.generatedAt)}</p>
+            <div data-export-hide="true" className="mt-4 inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => canViewSurvey && navigate(`/surveys/fill/${data.survey.id}`)}
+                disabled={!canViewSurvey}
+                className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                {ZH.formTab}
+              </button>
+              <button
+                type="button"
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+              >
+                {ZH.reportTab}
+              </button>
+            </div>
           </div>
 
-          <div data-export-hide="true" className="flex items-center gap-3">
+          <div data-export-hide="true" className="flex flex-wrap items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/customer-survey/list')}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+            >
+              {ZH.backToList}
+            </button>
             {hasPermission('survey_form:share_report') && (
               <button
                 type="button"
@@ -956,22 +995,35 @@ export const ReportDetail: React.FC = () => {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <section className="grid grid-cols-1 gap-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs text-slate-500">{ZH.preSalesOwner}</p>
-          <p className="mt-1 text-lg font-bold text-slate-900">{contact.name || ZH.preSalesOwner}</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs text-slate-500">{ZH.preSalesOwner}</p>
+              <p className="mt-1 text-lg font-bold text-slate-900">{contact.name || ZH.preSalesOwner}</p>
+            </div>
+            {canEditReportOwner && (
+              <button
+                type="button"
+                data-export-hide="true"
+                onClick={() => setEditingPreSalesResponsible((prev) => !prev)}
+                className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                {editingPreSalesResponsible ? ZH.cancel : ZH.change}
+              </button>
+            )}
+          </div>
           <p className="mt-2 text-xs text-slate-500">{ZH.phone}</p>
           <p className="text-sm font-semibold text-slate-800">{contact.phone || ZH.notProvided}</p>
           <p className="mt-1 text-xs text-slate-500">{ZH.email}</p>
           <p className="text-sm font-semibold text-slate-800">{contact.email || ZH.notProvided}</p>
-          {hasPermission('survey_form:edit') && (
-            <div data-export-hide="true" className="mt-4 space-y-2 border-t border-slate-100 pt-4">
-              <p className="text-xs font-semibold text-slate-600">{ZH.editPreSalesOwner}</p>
+          {canEditReportOwner && editingPreSalesResponsible && (
+            <div data-export-hide="true" className="mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto border-t border-slate-100 pt-4">
               <select
                 value={selectedPreSalesResponsibleId}
                 onChange={(event) => setSelectedPreSalesResponsibleId(event.target.value)}
                 disabled={savingPreSalesResponsible || preSalesUsers.length === 0}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+                className="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
               >
                 <option value="">{preSalesUsers.length ? ZH.selectPreSalesOwner : ZH.noPreSalesUsers}</option>
                 {preSalesUsers.map((user) => (
@@ -988,9 +1040,17 @@ export const ReportDetail: React.FC = () => {
                   || !selectedPreSalesResponsibleId
                   || selectedPreSalesResponsibleId === data.survey.preSalesResponsible
                 }
-                className="w-full rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {savingPreSalesResponsible ? '保存中...' : ZH.savePreSalesOwner}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelPreSalesResponsibleEdit}
+                disabled={savingPreSalesResponsible}
+                className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                {ZH.cancel}
               </button>
             </div>
           )}
@@ -1037,7 +1097,7 @@ export const ReportDetail: React.FC = () => {
             <p className="leading-8 text-slate-700">{data.report.aiReport.summary}</p>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="mb-3 text-base font-bold text-slate-900">{ZH.scoreStructure}</h3>
               <div className="h-64">
@@ -1070,7 +1130,7 @@ export const ReportDetail: React.FC = () => {
             </article>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.diagnosis}</h3>
               <div className="space-y-3 text-sm leading-7 text-slate-700">
@@ -1117,7 +1177,7 @@ export const ReportDetail: React.FC = () => {
             </section>
           )}
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-bold text-slate-900">{ZH.templateCapabilityTags}</h3>
@@ -1131,9 +1191,6 @@ export const ReportDetail: React.FC = () => {
                   {capabilityMatchingContext?.surveyTemplateName || ZH.surveyTemplate}
                   {' / '}
                   {capabilityMatchingContext?.reportTemplateName || ZH.reportTemplate}
-                </p>
-                <p className="mt-2">
-                  {ZH.templateTagThreshold}: {capabilityMatchingContext?.thresholds?.templateTag ?? '-'} {ZH.scoreSuffix}
                 </p>
               </div>
               <div className="mt-4 space-y-3">
@@ -1163,30 +1220,6 @@ export const ReportDetail: React.FC = () => {
                 )}
               </div>
             </article>
-
-            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900">{ZH.matchingRulesTitle}</h3>
-              <div className="mt-4 space-y-3">
-                {matchingRules.map((rule: any, idx: number) => (
-                  <div key={`matching_rule_${rule.code}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-bold text-slate-900">R{idx + 1} {rule.name}</p>
-                      <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">{rule.scoreText}</span>
-                    </div>
-                    <p className="mt-2 text-xs leading-6 text-slate-600">{rule.description}</p>
-                  </div>
-                ))}
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-800">
-                  <p className="font-semibold">{ZH.matchingThresholds}</p>
-                  <p>
-                    {ZH.highMatch} &gt;= {capabilityMatchingContext?.thresholds?.high ?? '-'} {ZH.scoreSuffix},{' '}
-                    {ZH.mediumMatch} &gt;= {capabilityMatchingContext?.thresholds?.medium ?? '-'} {ZH.scoreSuffix},{' '}
-                    {ZH.lowMatch} &gt;= {capabilityMatchingContext?.thresholds?.minMatch ?? '-'} {ZH.scoreSuffix},{' '}
-                    {ZH.needConfirm} &lt; {capabilityMatchingContext?.thresholds?.minMatch ?? '-'} {ZH.scoreSuffix}
-                  </p>
-                </div>
-              </div>
-            </article>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1196,7 +1229,7 @@ export const ReportDetail: React.FC = () => {
                 {solutionCatalog.length} items
               </span>
             </div>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4">
               {solutionCatalog.length ? solutionCatalog.map((item) => (
                 <article key={`solution_catalog_${item.capabilityId}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1244,20 +1277,6 @@ export const ReportDetail: React.FC = () => {
                       )}
                     </div>
                   </div>
-
-                  <div className="mt-3">
-                    <p className="text-xs font-semibold text-slate-700">{ZH.matchedRules}</p>
-                    <ul className="mt-1 space-y-1 text-xs leading-6 text-slate-700">
-                      {item.matchRules.length ? item.matchRules.map((rule, idx) => (
-                        <li key={`${item.capabilityId}_rule_${idx}`} className="rounded-md bg-white px-2.5 py-1.5">
-                          {rule}
-                        </li>
-                      )) : (
-                        <li className="rounded-md bg-white px-2.5 py-1.5">{ZH.noDirectSuggestion}</li>
-                      )}
-                    </ul>
-                  </div>
-
                   <div className="mt-3">
                     <p className="text-xs font-semibold text-slate-700">{ZH.mappingBasis}</p>
                     <ul className="mt-1 space-y-1 text-xs leading-6 text-slate-700">
@@ -1297,7 +1316,7 @@ export const ReportDetail: React.FC = () => {
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-lg font-bold text-slate-900">{ZH.capabilityAdviceMatch}</h3>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4">
               {capabilityRecommendations.length ? capabilityRecommendations.map((item) => (
                 <article key={`capability_recommend_${item.capabilityId}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1336,7 +1355,7 @@ export const ReportDetail: React.FC = () => {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.moduleLibrary}</h3>
               <div className="space-y-4">
@@ -1385,7 +1404,7 @@ export const ReportDetail: React.FC = () => {
             </article>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.implementationRoadmap}</h3>
               <ol className="space-y-2 text-sm leading-7 text-slate-700">
@@ -1405,7 +1424,7 @@ export const ReportDetail: React.FC = () => {
             </article>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.kpiAndAcceptance}</h3>
               <ul className="space-y-2 text-sm leading-7 text-slate-700">
@@ -1431,7 +1450,7 @@ export const ReportDetail: React.FC = () => {
             </article>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
               <h3 className="mb-3 text-lg font-bold text-slate-900">{ZH.operationMechanism}</h3>
               <ul className="space-y-2 text-sm leading-7 text-slate-700">
@@ -1456,7 +1475,7 @@ export const ReportDetail: React.FC = () => {
           <section className="relative overflow-hidden rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-6 shadow-sm">
             <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-indigo-200/40" />
             <div className="absolute left-1/4 top-1/2 h-20 w-20 rounded-full bg-sky-200/30" />
-            <div className="relative grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="relative grid grid-cols-1 gap-4">
               <div className="rounded-2xl border border-indigo-100 bg-white/80 p-4 backdrop-blur">
                 <p className="text-xs font-semibold text-indigo-600">{ZH.reportTemplate}</p>
                 <p className="mt-1 text-lg font-bold text-slate-900">{data.report.templateReport.templateName}</p>
@@ -1470,15 +1489,15 @@ export const ReportDetail: React.FC = () => {
               <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 backdrop-blur">
                 <p className="text-xs font-semibold text-emerald-600">{ZH.sectionsCharts}</p>
                 <p className="mt-1 text-lg font-bold text-slate-900">
-                  {(data.report.templateReport.sections || []).length} / {(data.report.templateReport.charts || []).length}
+                  {templateSections.length} / {(data.report.templateReport.charts || []).length}
                 </p>
                 <p className="mt-2 text-xs text-slate-500">{ZH.bodyHint}</p>
               </div>
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {(data.report.templateReport.sections || []).map((section, idx) => {
+          <section className="grid grid-cols-1 gap-6">
+            {templateSections.map((section, idx) => {
               const tone = getSectionTone(idx);
               return (
                 <article key={section.title} className={`rounded-3xl border p-6 shadow-sm ${tone.shell}`}>
@@ -1500,7 +1519,7 @@ export const ReportDetail: React.FC = () => {
             })}
           </section>
 
-          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <section className="grid grid-cols-1 gap-6">
             {(data.report.templateReport.charts || []).map((chart, idx) => {
               const tone = getSectionTone(idx + 1);
               return (
@@ -1574,3 +1593,6 @@ export const ReportDetail: React.FC = () => {
     </div>
   );
 };
+
+
+

@@ -1,4 +1,4 @@
-import { ProductType, SurveyForm } from '../types';
+﻿import { ProductType, SurveyForm } from '../types';
 import { getReportTemplateNameById, getSurveyTemplateNameById } from '../src/services/templateNameStore';
 import {
   buildCapabilityMatchPackage,
@@ -394,27 +394,15 @@ const buildTemplateSections = (
       ].join('\n')
     : '当前模板未识别到明确能力标签，后续可通过补充字段标题、章节说明或能力名称提升识别度。';
 
-  const matchingRuleSummary = capabilityMatchingContext
-    ? [
-        '计算规则：',
-        ...capabilityMatchingContext.matchingRules.map((rule, idx) => (
-          `R${idx + 1} ${rule.name} ${rule.scoreText}；${rule.description}`
-        )),
-        `判定阈值：高匹配 >= ${capabilityMatchingContext.thresholds.high}；中匹配 >= ${capabilityMatchingContext.thresholds.medium}；低匹配 >= ${capabilityMatchingContext.thresholds.minMatch}；低于 ${capabilityMatchingContext.thresholds.minMatch} 为待确认`,
-      ].join('\n')
-    : '暂无能力匹配规则。';
-
   const solutionCatalogSummary = solutionCatalog.length
     ? solutionCatalog.map((item, idx) => {
       const functions = item.specificFunctions.length ? item.specificFunctions.join('、') : '暂无明确功能线索';
-      const rules = item.matchRules.length ? item.matchRules.join('；') : '暂无命中规则';
       const suggestions = item.recommendations.length ? item.recommendations.join('、') : '暂无直接建议';
       const templateTags = item.templateTagNames.length ? item.templateTagNames.join('、') : '无';
       return [
         `方案${idx + 1}：${item.capabilityName}（${formatMatchLevelLabel(item.matchLevel)}，${item.score} 分）`,
         `模板标签：${templateTags}`,
         `具体功能能力：${functions}`,
-        `命中规则：${rules}`,
         `关联建议：${suggestions}`,
         `行动建议：${item.actionSuggestion}`,
       ].join('\n');
@@ -451,10 +439,7 @@ const buildTemplateSections = (
       title: '产品能力匹配概览',
       content: capabilityOverview,
     },
-    {
-      title: '能力匹配计算规则',
-      content: matchingRuleSummary,
-    },
+
     {
       title: '综合解决方案清单',
       content: solutionCatalogSummary,
@@ -679,3 +664,4 @@ export const buildReportBundle = (
     preSalesContact,
   };
 };
+
