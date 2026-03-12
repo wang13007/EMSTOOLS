@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ReportStatus, SurveyForm, SurveyStatus } from '../types';
 import { generateEnergyReport } from '../services/geminiService';
@@ -6,7 +6,7 @@ import { buildReportBundle, PreSalesContactInfo } from '../services/reportServic
 import { surveyReportService, surveyService, userService } from '../src/services/supabaseService';
 import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 import { usePermission } from '../src/auth/usePermission';
-import { getAllSurveyTemplates } from '../src/services/templateStore';
+import { getAllSurveyTemplates, syncImportedTemplatesFromDatabase } from '../src/services/templateStore';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -103,7 +103,11 @@ export const SurveyFill: React.FC = () => {
   const [dirty, setDirty] = useState(false);
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState('');
-  const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(getAllSurveyTemplates()), []);
+  const [templateRefreshKey, setTemplateRefreshKey] = useState(0);
+  const surveyTemplates = useMemo(
+    () => applySurveyTemplateNameOverrides(getAllSurveyTemplates()),
+    [templateRefreshKey]
+  );
   const canEditSurvey = hasPermission('survey_form:edit');
   const canSubmitSurvey = hasPermission('survey_form:submit') && hasPermission('survey_form:generate_report');
   const canShareSurvey = hasPermission('survey_form:share_report');
@@ -114,6 +118,9 @@ export const SurveyFill: React.FC = () => {
 
   useEffect(() => {
     const loadSurvey = async () => {
+      await syncImportedTemplatesFromDatabase();
+      setTemplateRefreshKey((prev) => prev + 1);
+
       const routeId = id && id !== 'undefined' && id !== 'null' ? id : '';
       const fallbackId = localStorage.getItem('ems_last_created_survey_id') || '';
       const resolvedId = routeId || fallbackId;

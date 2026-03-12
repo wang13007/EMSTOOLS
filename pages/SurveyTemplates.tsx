@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { ICONS } from '../constants';
 import { SurveyField, SurveyTemplate } from '../types';
 import Portal from '../src/components/Portal';
@@ -7,11 +7,17 @@ import {
   applySurveyTemplateNameOverrides,
   setSurveyTemplateNameById,
 } from '../src/services/templateNameStore';
-import { getAllReportTemplates, getAllSurveyTemplates } from '../src/services/templateStore';
+import {
+  deleteImportedTemplatePairBySurveyId,
+  getAllReportTemplates,
+  getAllSurveyTemplates,
+  readImportedSurveyTemplates,
+  syncImportedTemplatesFromDatabase,
+} from '../src/services/templateStore';
 
 const FIELD_TYPE_LABELS: Record<string, string> = {
   text: '文本',
-  number: '数值',
+  number: '数字',
   select: '单选',
   multiselect: '多选',
   textarea: '长文本',
@@ -65,6 +71,10 @@ export const SurveyTemplates: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const templates = useMemo(() => applySurveyTemplateNameOverrides(getAllSurveyTemplates()), [refreshKey]);
+  const importedSurveyTemplateIds = useMemo(
+    () => new Set(readImportedSurveyTemplates().map((item) => item.id)),
+    [refreshKey]
+  );
   const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(getAllReportTemplates()), [refreshKey]);
   const reportTemplateMap = useMemo(() => new Map(reportTemplates.map((item) => [item.id, item])), [reportTemplates]);
 
@@ -78,16 +88,53 @@ export const SurveyTemplates: React.FC = () => {
     return getVisibleSectionsWithAllOptionsChecked(selectedTemplate);
   }, [selectedTemplate]);
 
+  useEffect(() => {
+    let active = true;
+
+    const syncTemplates = async () => {
+      await syncImportedTemplatesFromDatabase();
+      if (active) setRefreshKey((prev) => prev + 1);
+    };
+
+    void syncTemplates();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleRenameTemplate = (template: SurveyTemplate) => {
     const nextName = window.prompt('请输入新的调研模板名称', template.name);
     if (!nextName) return;
+
     const normalized = nextName.trim();
     if (!normalized) {
       alert('模板名称不能为空');
       return;
     }
+
     setSurveyTemplateNameById(template.id, normalized);
     setRefreshKey((prev) => prev + 1);
+  };
+
+  const handleDeleteTemplate = async (template: SurveyTemplate) => {
+    if (!importedSurveyTemplateIds.has(template.id)) {
+      alert('系统预置模板不可删除，仅支持删除用户导入模板。');
+      return;
+    }
+
+    const confirmed = window.confirm(`确定删除导入模板「${template.name}」吗？将同时删除其关联的报告模板。`);
+    if (!confirmed) return;
+
+    const deleted = await deleteImportedTemplatePairBySurveyId(template.id);
+    if (!deleted.deleted) {
+      alert('删除失败，未找到可删除模板或数据库操作失败。');
+      return;
+    }
+
+    setSelectedTemplateId(null);
+    setRefreshKey((prev) => prev + 1);
+    alert('导入模板已删除。');
   };
 
   return (
@@ -106,6 +153,7 @@ export const SurveyTemplates: React.FC = () => {
         {templates.map((tpl) => {
           const fieldCount = tpl.sections.reduce((acc, section) => acc + section.fields.length, 0);
           const relatedReportTemplate = tpl.reportTemplateId ? reportTemplateMap.get(tpl.reportTemplateId) : undefined;
+          const imported = importedSurveyTemplateIds.has(tpl.id);
 
           return (
             <button
@@ -119,8 +167,12 @@ export const SurveyTemplates: React.FC = () => {
                   <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
                     <ICONS.Template className="w-6 h-6" />
                   </div>
-                  <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded text-[10px] font-bold uppercase tracking-wider">
-                    只读
+                  <span
+                    className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      imported ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {imported ? '导入' : '预置'}
                   </span>
                 </div>
 
@@ -129,6 +181,7 @@ export const SurveyTemplates: React.FC = () => {
                 <p className="text-sm text-slate-500 mb-3">
                   包含 {tpl.sections.length} 个章节，共 {fieldCount} 个字段。
                 </p>
+                <p className="text-xs text-slate-500 mb-3 line-clamp-2">{tpl.description || '暂无描述'}</p>
 
                 <p className="text-xs text-blue-700 bg-blue-50 rounded-lg px-2 py-1 inline-block mb-4">
                   关联报告模板：{relatedReportTemplate?.name || '未关联'}
@@ -155,7 +208,12 @@ export const SurveyTemplates: React.FC = () => {
                   <p className="text-xs text-slate-500 mt-1">
                     已按“所有选项勾选”展开显示，共 {expandedSections.length} 个章节，
                     {expandedSections.reduce((acc, section) => acc + section.fields.length, 0)} 个字段；关联报告模板：
-                    {selectedTemplate.reportTemplateId ? reportTemplateMap.get(selectedTemplate.reportTemplateId)?.name || '未关联' : '未关联'}
+                    {selectedTemplate.reportTemplateId
+                      ? reportTemplateMap.get(selectedTemplate.reportTemplateId)?.name || '未关联'
+                      : '未关联'}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    模板类型：{importedSurveyTemplateIds.has(selectedTemplate.id) ? '用户导入模板（可删除）' : '系统预置模板（不可删除）'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -165,6 +223,18 @@ export const SurveyTemplates: React.FC = () => {
                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100"
                   >
                     修改名称
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!importedSurveyTemplateIds.has(selectedTemplate.id)}
+                    onClick={() => handleDeleteTemplate(selectedTemplate)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                      importedSurveyTemplateIds.has(selectedTemplate.id)
+                        ? 'text-rose-700 bg-rose-50 hover:bg-rose-100'
+                        : 'text-slate-400 bg-slate-100 cursor-not-allowed'
+                    }`}
+                  >
+                    删除模板
                   </button>
                   <button
                     onClick={() => setSelectedTemplateId(null)}
@@ -177,6 +247,11 @@ export const SurveyTemplates: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <h4 className="font-bold text-slate-900 mb-3">模板说明</h4>
+                  <p className="text-sm text-slate-600 leading-6">{selectedTemplate.description || '暂无描述'}</p>
+                </div>
+
                 {selectedTemplate.readonlyContent && (
                   <div className="bg-white rounded-2xl border border-blue-100 p-6">
                     <h4 className="font-bold text-slate-900 mb-3">模板只读内容</h4>

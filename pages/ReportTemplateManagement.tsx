@@ -1,6 +1,6 @@
-﻿import React, { useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ICONS } from '../constants';
-import { ReportTemplate } from '../types';
+import { ReportTemplate, SurveyField } from '../types';
 import Portal from '../src/components/Portal';
 import {
   applyReportTemplateNameOverrides,
@@ -9,8 +9,23 @@ import {
   setReportTemplateNameById,
 } from '../src/services/templateNameStore';
 import { generateTemplateDraftFromFile, ImportedTemplateDraft } from '../src/services/templateImportService';
-import { getAllReportTemplates, getAllSurveyTemplates, saveImportedTemplatePair } from '../src/services/templateStore';
+import {
+  deleteImportedTemplatePairByReportId,
+  getAllReportTemplates,
+  getAllSurveyTemplates,
+  readImportedReportTemplates,
+  saveImportedTemplatePair,
+  syncImportedTemplatesFromDatabase,
+} from '../src/services/templateStore';
 import { usePermission } from '../src/auth/usePermission';
+
+const FIELD_TYPE_LABELS: Record<SurveyField['type'], string> = {
+  text: '文本',
+  number: '数字',
+  select: '单选',
+  multiselect: '多选',
+  textarea: '长文本',
+};
 
 export const ReportTemplateManagement: React.FC = () => {
   const { guardPermission } = usePermission();
@@ -23,6 +38,10 @@ export const ReportTemplateManagement: React.FC = () => {
 
   const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(getAllReportTemplates()), [refreshKey]);
   const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(getAllSurveyTemplates()), [refreshKey]);
+  const importedReportTemplateIds = useMemo(
+    () => new Set(readImportedReportTemplates().map((item) => item.id)),
+    [refreshKey]
+  );
   const surveyTemplateMap = useMemo(() => new Map(surveyTemplates.map((item) => [item.id, item])), [surveyTemplates]);
 
   const selectedTemplate = useMemo(
@@ -44,27 +63,40 @@ export const ReportTemplateManagement: React.FC = () => {
     );
   }, [selectedTemplate, surveyTemplateMap]);
 
+  useEffect(() => {
+    let active = true;
+
+    const syncTemplates = async () => {
+      await syncImportedTemplatesFromDatabase();
+      if (active) setRefreshKey((prev) => prev + 1);
+    };
+
+    void syncTemplates();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleRenameTemplate = (template: ReportTemplate) => {
     const nextName = window.prompt('请输入新的报告模板名称', template.name);
     if (!nextName) return;
+
     const normalized = nextName.trim();
     if (!normalized) {
       alert('模板名称不能为空');
       return;
     }
+
     setReportTemplateNameById(template.id, normalized);
     setRefreshKey((prev) => prev + 1);
   };
 
   const handleEditDescription = (template: ReportTemplate) => {
-    const nextDescription = window.prompt('请输入新的模板描述', template.description || '');
+    const nextDescription = window.prompt('请输入新的模板描述（可留空）', template.description || '');
     if (nextDescription === null) return;
-    const normalized = nextDescription.trim();
-    if (!normalized) {
-      alert('模板描述不能为空');
-      return;
-    }
-    setReportTemplateDescriptionById(template.id, normalized);
+
+    setReportTemplateDescriptionById(template.id, nextDescription.trim());
     setRefreshKey((prev) => prev + 1);
   };
 
@@ -90,19 +122,72 @@ export const ReportTemplateManagement: React.FC = () => {
     }
   };
 
-  const handleSaveImportedTemplate = () => {
+  const handleSaveImportedTemplate = async () => {
     if (!importDraft) return;
     if (!guardPermission('report_template:rename', '保存导入模板')) return;
+
+    const reportName = importDraft.reportTemplate.name.trim();
+    const surveyName = importDraft.surveyTemplate.name.trim();
+    const reportDescription = (importDraft.reportTemplate.description || '').trim();
+    const surveyDescription = (importDraft.surveyTemplate.description || '').trim();
+
+    if (!reportName || !surveyName) {
+      alert('报告模板名称和调研模板名称为必填项。');
+      return;
+    }
+
     setSavingImportedTemplate(true);
     try {
-      const saved = saveImportedTemplatePair(importDraft.surveyTemplate, importDraft.reportTemplate);
+      const saved = await saveImportedTemplatePair(
+        {
+          ...importDraft.surveyTemplate,
+          name: surveyName,
+          description: surveyDescription || undefined,
+        },
+        {
+          ...importDraft.reportTemplate,
+          name: reportName,
+          description: reportDescription,
+        }
+      );
+
       setImportDraft(null);
       setRefreshKey((prev) => prev + 1);
       setSelectedTemplateId(saved.reportTemplate.id);
       alert(`导入成功：已新增报告模板「${saved.reportTemplate.name}」并关联调研模板「${saved.surveyTemplate.name}」。`);
+    } catch (error) {
+      console.error('保存导入模板失败:', error);
+      alert(error instanceof Error ? error.message : '保存导入模板失败，请重试。');
     } finally {
       setSavingImportedTemplate(false);
     }
+  };
+
+  const handleDeleteSelectedTemplate = async () => {
+    if (!selectedTemplate) return;
+
+    const imported = importedReportTemplateIds.has(selectedTemplate.id);
+    if (!imported) {
+      alert('系统预置模板不可删除，仅支持删除用户导入模板。');
+      return;
+    }
+
+    if (!guardPermission('report_template:rename', '删除导入模板')) return;
+
+    const confirmed = window.confirm(
+      `确定删除导入模板「${selectedTemplate.name}」吗？将同时删除其关联的调研模板。`
+    );
+    if (!confirmed) return;
+
+    const deleted = await deleteImportedTemplatePairByReportId(selectedTemplate.id);
+    if (!deleted.deleted) {
+      alert('删除失败，未找到可删除模板或数据库操作失败。');
+      return;
+    }
+
+    setSelectedTemplateId(null);
+    setRefreshKey((prev) => prev + 1);
+    alert('导入模板已删除。');
   };
 
   return (
@@ -114,6 +199,7 @@ export const ReportTemplateManagement: React.FC = () => {
         accept=".doc,.docx,.pdf,.md,.markdown,.ppt,.pptx,.html,.htm,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/markdown,text/html,text/plain"
         onChange={handleImportFile}
       />
+
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">报告模板管理</h2>
@@ -137,6 +223,8 @@ export const ReportTemplateManagement: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {reportTemplates.map((tpl) => {
           const linkedSurveyName = surveyTemplateMap.get(tpl.surveyTemplateId)?.name || '未关联';
+          const imported = importedReportTemplateIds.has(tpl.id);
+
           return (
             <button
               key={tpl.id}
@@ -149,15 +237,19 @@ export const ReportTemplateManagement: React.FC = () => {
                   <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
                     <ICONS.Report className="w-6 h-6" />
                   </div>
-                  <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded text-[10px] font-bold uppercase tracking-wider">
-                    只读
+                  <span
+                    className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      imported ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {imported ? '导入' : '预置'}
                   </span>
                 </div>
 
                 <h3 className="text-lg font-bold text-slate-900 mb-1">{tpl.name}</h3>
                 <p className="text-xs text-slate-400 mb-2">模板ID：{tpl.id}</p>
                 <p className="text-xs text-slate-400 mb-2">版本 {tpl.version}</p>
-                <p className="text-sm text-slate-500 mb-2">{tpl.description}</p>
+                <p className="text-sm text-slate-500 mb-2">{tpl.description || '暂无描述'}</p>
                 <p className="text-xs text-blue-700 bg-blue-50 rounded-lg px-2 py-1 inline-block">
                   关联调研模板：{linkedSurveyName}
                 </p>
@@ -184,6 +276,9 @@ export const ReportTemplateManagement: React.FC = () => {
                     版本 {selectedTemplate.version}，共 {selectedTemplate.sections.length} 个章节，关联调研模板：
                     {surveyTemplateMap.get(selectedTemplate.surveyTemplateId)?.name || '未关联'}
                   </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    模板类型：{importedReportTemplateIds.has(selectedTemplate.id) ? '用户导入模板（可删除）' : '系统预置模板（不可删除）'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -201,6 +296,18 @@ export const ReportTemplateManagement: React.FC = () => {
                     修改描述
                   </button>
                   <button
+                    type="button"
+                    disabled={!importedReportTemplateIds.has(selectedTemplate.id)}
+                    onClick={handleDeleteSelectedTemplate}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                      importedReportTemplateIds.has(selectedTemplate.id)
+                        ? 'text-rose-700 bg-rose-50 hover:bg-rose-100'
+                        : 'text-slate-400 bg-slate-100 cursor-not-allowed'
+                    }`}
+                  >
+                    删除模板
+                  </button>
+                  <button
                     onClick={() => setSelectedTemplateId(null)}
                     className="p-2 hover:bg-slate-200 rounded-full transition-colors"
                     aria-label="关闭模板详情"
@@ -213,7 +320,7 @@ export const ReportTemplateManagement: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
                 <div className="bg-white rounded-2xl border border-slate-200 p-6">
                   <h4 className="font-bold text-slate-900 mb-3">模板说明</h4>
-                  <p className="text-sm text-slate-600 leading-6">{selectedTemplate.description}</p>
+                  <p className="text-sm text-slate-600 leading-6">{selectedTemplate.description || '暂无描述'}</p>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -274,9 +381,7 @@ export const ReportTemplateManagement: React.FC = () => {
               <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">导入模板预览</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    请确认自动拆解结果，保存后可在调研模板与报告模板页面直接使用。
-                  </p>
+                  <p className="text-xs text-slate-500 mt-1">请确认名称、描述和字段结构后再保存。名称必填，描述可选。</p>
                 </div>
                 <button
                   type="button"
@@ -291,10 +396,12 @@ export const ReportTemplateManagement: React.FC = () => {
               <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
                 {importDraft.warnings.length > 0 && (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-800 mb-2">解析提示</p>
+                    <p className="text-sm font-semibold text-amber-800 mb-2">导入提示</p>
                     <ul className="space-y-1 text-xs text-amber-700">
                       {importDraft.warnings.map((item, idx) => (
-                        <li key={`import_warning_${idx}`}>{idx + 1}. {item}</li>
+                        <li key={`import_warning_${idx}`}>
+                          {idx + 1}. {item}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -303,19 +410,61 @@ export const ReportTemplateManagement: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <article className="rounded-2xl border border-slate-200 bg-white p-5">
                     <h4 className="text-base font-bold text-slate-900 mb-2">报告模板</h4>
-                    <p className="text-sm text-slate-600">{importDraft.reportTemplate.name}</p>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-600">报告模板名称（必填）</label>
+                      <input
+                        value={importDraft.reportTemplate.name}
+                        onChange={(event) =>
+                          setImportDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  reportTemplate: { ...prev.reportTemplate, name: event.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="请输入报告模板名称"
+                        required
+                      />
+                    </div>
+
                     <p className="text-xs text-slate-500 mt-1">版本：{importDraft.reportTemplate.version}</p>
-                    <p className="text-xs text-slate-500 mt-1">{importDraft.reportTemplate.description}</p>
+
+                    <div className="space-y-2 mt-2">
+                      <label className="text-xs font-semibold text-slate-600">报告模板描述（可选）</label>
+                      <textarea
+                        rows={3}
+                        value={importDraft.reportTemplate.description}
+                        onChange={(event) =>
+                          setImportDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  reportTemplate: { ...prev.reportTemplate, description: event.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="可不填写"
+                      />
+                    </div>
+
                     <div className="mt-4">
                       <p className="text-xs font-semibold text-slate-700 mb-2">章节结构</p>
                       <div className="flex flex-wrap gap-2">
                         {importDraft.reportTemplate.sections.map((section) => (
-                          <span key={section} className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs">{section}</span>
+                          <span key={section} className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs">
+                            {section}
+                          </span>
                         ))}
                       </div>
                     </div>
+
                     <div className="mt-4">
-                      <p className="text-xs font-semibold text-slate-700 mb-2">模板正文预览</p>
+                      <p className="text-xs font-semibold text-slate-700 mb-2">报告正文预览</p>
                       <pre className="max-h-56 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-6 whitespace-pre-wrap text-slate-700">
                         {importDraft.reportTemplate.content}
                       </pre>
@@ -324,22 +473,69 @@ export const ReportTemplateManagement: React.FC = () => {
 
                   <article className="rounded-2xl border border-slate-200 bg-white p-5">
                     <h4 className="text-base font-bold text-slate-900 mb-2">调研模板</h4>
-                    <p className="text-sm text-slate-600">{importDraft.surveyTemplate.name}</p>
-                    <p className="text-xs text-slate-500 mt-1">行业：{importDraft.surveyTemplate.industry}</p>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-600">调研模板名称（必填）</label>
+                      <input
+                        value={importDraft.surveyTemplate.name}
+                        onChange={(event) =>
+                          setImportDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  surveyTemplate: { ...prev.surveyTemplate, name: event.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="请输入调研模板名称"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2 mt-2">
+                      <label className="text-xs font-semibold text-slate-600">调研模板描述（可选）</label>
+                      <textarea
+                        rows={3}
+                        value={importDraft.surveyTemplate.description || ''}
+                        onChange={(event) =>
+                          setImportDraft((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  surveyTemplate: { ...prev.surveyTemplate, description: event.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="可不填写"
+                      />
+                    </div>
+
+                    <p className="text-xs text-slate-500 mt-1">行业：{importDraft.surveyTemplate.industry || '通用'}</p>
                     <p className="text-xs text-slate-500 mt-1">
-                      章节数：{importDraft.surveyTemplate.sections.length}，字段数：
-                      {importDraft.surveyTemplate.sections.reduce((sum, section) => sum + section.fields.length, 0)}
+                      共 {importDraft.surveyTemplate.sections.length} 个章节，
+                      {importDraft.surveyTemplate.sections.reduce((sum, section) => sum + section.fields.length, 0)} 个字段
                     </p>
+
                     <div className="mt-4 space-y-3 max-h-[420px] overflow-auto">
                       {importDraft.surveyTemplate.sections.map((section) => (
                         <div key={section.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                           <p className="text-sm font-semibold text-slate-800">{section.title}</p>
                           <ul className="mt-2 space-y-1 text-xs text-slate-600">
                             {section.fields.map((field) => (
-                              <li key={field.id} className="rounded-md bg-white px-2 py-1">
-                                {field.label}
-                                <span className="ml-2 text-slate-400">[{field.type}]</span>
-                                <span className="ml-2 font-mono text-blue-700">{`{{${field.id}}}`}</span>
+                              <li key={field.id} className="rounded-md bg-white px-2 py-2 space-y-1">
+                                <div>
+                                  <span className="font-medium text-slate-900">{field.label}</span>
+                                  <span className="ml-2 text-slate-500">[{FIELD_TYPE_LABELS[field.type]}]</span>
+                                  <span className="ml-2 font-mono text-blue-700">{`{{${field.id}}}`}</span>
+                                  {field.required && <span className="ml-2 text-red-500">*</span>}
+                                </div>
+                                {field.options && field.options.length > 0 && (
+                                  <div className="text-[11px] text-slate-500">选项: {field.options.join(' / ')}</div>
+                                )}
+                                {field.placeholder && <div className="text-[11px] text-slate-400">示例: {field.placeholder}</div>}
                               </li>
                             ))}
                           </ul>
@@ -350,9 +546,9 @@ export const ReportTemplateManagement: React.FC = () => {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                  <p className="text-xs font-semibold text-slate-700 mb-2">源文档提取文本预览</p>
+                  <p className="text-xs font-semibold text-slate-700 mb-2">源文档文本预览</p>
                   <pre className="max-h-56 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-6 whitespace-pre-wrap text-slate-700">
-                    {importDraft.sourceTextPreview || '未提取到文本预览'}
+                    {importDraft.sourceTextPreview || '无可预览文本'}
                   </pre>
                 </div>
               </div>

@@ -1,10 +1,10 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReportStatus, SurveyStatus } from '../types';
 import { INDUSTRIES, REGIONS } from '../constants';
 import { roleService, surveyService, userService } from '../src/services/supabaseService';
 import { applyReportTemplateNameOverrides, applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
-import { getAllReportTemplates, getAllSurveyTemplates } from '../src/services/templateStore';
+import { getAllReportTemplates, getAllSurveyTemplates, syncImportedTemplatesFromDatabase } from '../src/services/templateStore';
 
 type UserOption = {
   id: string;
@@ -54,8 +54,9 @@ export const SurveyCreate: React.FC = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generatedLink, setGeneratedLink] = useState('');
-  const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(getAllSurveyTemplates()), []);
-  const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(getAllReportTemplates()), []);
+  const [templateRefreshKey, setTemplateRefreshKey] = useState(0);
+  const surveyTemplates = useMemo(() => applySurveyTemplateNameOverrides(getAllSurveyTemplates()), [templateRefreshKey]);
+  const reportTemplates = useMemo(() => applyReportTemplateNameOverrides(getAllReportTemplates()), [templateRefreshKey]);
   const reportTemplateNameMap = useMemo(
     () => new Map(reportTemplates.map((item) => [item.id, item.name])),
     [reportTemplates]
@@ -72,6 +73,25 @@ export const SurveyCreate: React.FC = () => {
     if (loading || loadingUsers || !isUuid(formData.preSalesResponsibleId)) return false;
     return true;
   }, [formData.preSalesResponsibleId, loading, loadingUsers]);
+
+  useEffect(() => {
+    let active = true;
+    const syncTemplates = async () => {
+      await syncImportedTemplatesFromDatabase();
+      if (active) setTemplateRefreshKey((prev) => prev + 1);
+    };
+    void syncTemplates();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!surveyTemplates.length) return;
+    if (!selectedTemplateId || !surveyTemplates.some((item) => item.id === selectedTemplateId)) {
+      setSelectedTemplateId(surveyTemplates[0].id);
+    }
+  }, [selectedTemplateId, surveyTemplates]);
 
   useEffect(() => {
     if (hasLoadedUsersRef.current) return;

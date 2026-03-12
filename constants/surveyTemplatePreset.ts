@@ -1,10 +1,11 @@
-﻿import { SurveyTemplate } from '../types';
+import { SurveyTemplate } from '../types';
 
 const EMS_ENERGY_FIELD_ID = 'field_014_14';
 
 export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
   id: 'tpl-ems-presales-001',
   name: '千丁EMS能源诊断标准模板',
+  description: '用于常规售前调研，覆盖企业基础、用能现状、系统能力与节能改造诉求。',
   industry: '通用',
   reportTemplateId: 'report-template-standard',
   createTime: '2026-02-26',
@@ -168,6 +169,7 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
 export const SGS_PRESET_TEMPLATE: SurveyTemplate = {
   id: 'tpl-sgs-diagnosis-001',
   name: 'SGS节能诊断模板',
+  description: '用于重点客户深度诊断，覆盖诊断目的、范围、能耗核算、系统评估与节能措施。',
   industry: '通用',
   reportTemplateId: 'report-template-advanced',
   createTime: '2026-03-10',

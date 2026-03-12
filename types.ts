@@ -1,4 +1,4 @@
-﻿export enum UserType {
+export enum UserType {
   INTERNAL = 'internal',
   EXTERNAL = 'external',
 }
@@ -145,6 +145,7 @@ export interface SurveyForm {
 export interface SurveyTemplate {
   id: string;
   name: string;
+  description?: string;
   industry: string;
   reportTemplateId?: string;
   sections: SurveySection[];

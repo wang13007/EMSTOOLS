@@ -1,4 +1,4 @@
-﻿import supabase from '../config/supabase';
+import supabase from '../config/supabase';
 import { ReportStatus, SurveyForm, SurveyStatus, SurveyTemplate, SystemLog } from '../../types';
 
 const isMissingColumn = (error: any, column: string) => {
@@ -802,6 +802,69 @@ export const templateService = {
       return null;
     }
     return data;
+  },
+
+  async upsertTemplateRowByName(params: { name: string; industry: string; sections: any }) {
+    const name = String(params?.name || '').trim();
+    if (!name) {
+      throw new Error('模板数据库行名称不能为空');
+    }
+
+    const { data: existingRows, error: findError } = await supabase
+      .from('survey_templates')
+      .select('*')
+      .eq('name', name)
+      .limit(1);
+    if (findError) {
+      console.error('查询模板行失败:', findError);
+      throw findError;
+    }
+
+    if (existingRows && existingRows.length > 0) {
+      const { data, error } = await supabase
+        .from('survey_templates')
+        .update({
+          industry: String(params.industry || '通用'),
+          sections: params.sections,
+          update_time: new Date().toISOString(),
+        })
+        .eq('id', existingRows[0].id)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error('更新模板行失败:', error);
+        throw error;
+      }
+      return data || null;
+    }
+
+    const { data, error } = await supabase
+      .from('survey_templates')
+      .insert({
+        name,
+        industry: String(params.industry || '通用'),
+        sections: params.sections,
+      })
+      .select()
+      .maybeSingle();
+    if (error) {
+      console.error('新增模板行失败:', error);
+      throw error;
+    }
+    return data || null;
+  },
+
+  async deleteTemplateRowByName(nameInput: string) {
+    const name = String(nameInput || '').trim();
+    if (!name) return false;
+
+    const { error } = await supabase.from('survey_templates').delete().eq('name', name);
+    if (error) {
+      console.error('删除模板行失败:', error);
+      return false;
+    }
+    return true;
   },
 };
 
