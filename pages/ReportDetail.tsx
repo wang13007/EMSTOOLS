@@ -15,7 +15,7 @@ import {
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { SurveyForm } from '../types';
-import { ReportResult } from '../services/geminiService';
+import { generateEnergyReport, ReportResult } from '../services/geminiService';
 import { buildReportBundle, ReportBundle } from '../services/reportService';
 import { surveyReportService, surveyService, userService } from '../src/services/supabaseService';
 import { getProductCapabilities, matchProductCapabilities } from '../src/services/productCapabilityStore';
@@ -208,8 +208,22 @@ const writeLocalReport = (surveyId: string, bundle: ReportBundle) => {
   localStorage.setItem(REPORT_STORAGE_KEY, JSON.stringify(reportMap));
 };
 
+const getSurveyDataObject = (survey: any): Record<string, any> => {
+  const rawData = survey?.data;
+  if (rawData && typeof rawData === 'object') return rawData;
+  if (typeof rawData === 'string') {
+    try {
+      const parsed = JSON.parse(rawData);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
 const mapSurveyRecordToForm = (survey: any): SurveyForm => {
-  const rawData = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  const rawData = getSurveyDataObject(survey);
   return {
     id: survey?.id || '',
     name: survey?.name || '',
@@ -229,7 +243,7 @@ const mapSurveyRecordToForm = (survey: any): SurveyForm => {
 };
 
 const readReportBundleFromSurvey = (survey: any): any => {
-  const rawData = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  const rawData = getSurveyDataObject(survey);
   return rawData.report_bundle || rawData.reportBundle || null;
 };
 
@@ -250,7 +264,7 @@ const persistReportBundleToSurvey = async (survey: any, bundle: ReportBundle) =>
   if (!survey?.id) return;
   writeLocalReport(survey.id, bundle);
 
-  const rawData = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  const rawData = getSurveyDataObject(survey);
   const current = rawData.report_bundle;
   if (current?.generatedAt === bundle.generatedAt) {
     await surveyReportService.saveSurveyReportByFormId(survey.id, bundle);
@@ -269,6 +283,11 @@ const persistReportBundleToSurvey = async (survey: any, bundle: ReportBundle) =>
     report_status: survey.report_status || survey.reportStatus,
   });
   await surveyReportService.saveSurveyReportByFormId(survey.id, bundle);
+};
+
+const isGeneratedReportStatus = (survey: any) => {
+  const raw = String(survey?.report_status || survey?.reportStatus || '').trim().toLowerCase();
+  return raw === 'generated' || raw === '\u5df2\u751f\u6210';
 };
 
 export const ReportDetail: React.FC = () => {
@@ -306,7 +325,16 @@ export const ReportDetail: React.FC = () => {
         const survey = mapSurveyRecordToForm(surveyRecord);
         const localReports = readLocalReportMap();
         const reportFromSurveyForm = readReportBundleFromSurvey(surveyRecord);
-        const rawStored = reportFromSurveyReport || reportFromSurveyForm || localReports[id];
+        let rawStored = reportFromSurveyReport || reportFromSurveyForm || localReports[id];
+        if (!rawStored && isGeneratedReportStatus(surveyRecord)) {
+          const aiReport = await generateEnergyReport(survey);
+          const rebuilt = buildReportBundle(survey, aiReport, {
+            id: survey.preSalesResponsible,
+            name: ZH.preSalesOwner,
+          });
+          await persistReportBundleToSurvey(surveyRecord, rebuilt);
+          rawStored = rebuilt;
+        }
         if (!rawStored) {
           window.alert(ZH.notFoundReport);
           navigate(`/surveys/fill/${id}`);

@@ -988,13 +988,14 @@ export const surveyReportService = {
       .from('survey_reports')
       .select('*')
       .eq('form_id', targetId)
-      .maybeSingle();
+      .order('generate_time', { ascending: false })
+      .limit(1);
 
     if (error) {
       console.error('获取报告详情失败:', error);
       return null;
     }
-    return data || null;
+    return data?.[0] || null;
   },
 
   async saveSurveyReportByFormId(formId: string, reportBundle: any) {
@@ -1013,11 +1014,39 @@ export const surveyReportService = {
       .select()
       .maybeSingle();
 
-    if (error) {
+    if (!error) {
+      return data || null;
+    }
+
+    const conflictConstraintMissing =
+      String(error?.code || '') === '42P10'
+      || String(error?.message || '').toLowerCase().includes('no unique')
+      || String(error?.message || '').toLowerCase().includes('on conflict');
+
+    if (!conflictConstraintMissing) {
       console.error('保存报告失败:', error);
       return null;
     }
-    return data || null;
+
+    const updated = await supabase
+      .from('survey_reports')
+      .update({
+        content: payload.content,
+        generate_time: payload.generate_time,
+      })
+      .eq('form_id', targetId)
+      .select()
+      .maybeSingle();
+    if (!updated.error && updated.data) {
+      return updated.data;
+    }
+
+    const inserted = await supabase.from('survey_reports').insert(payload).select().maybeSingle();
+    if (inserted.error) {
+      console.error('保存报告失败(兼容路径):', inserted.error);
+      return null;
+    }
+    return inserted.data || null;
   },
 };
 
