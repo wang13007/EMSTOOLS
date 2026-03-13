@@ -8,6 +8,7 @@ import { applySurveyTemplateNameOverrides } from '../src/services/templateNameSt
 import { usePermission } from '../src/auth/usePermission';
 import { getAllSurveyTemplates, syncImportedTemplatesFromDatabase } from '../src/services/templateStore';
 import { DetailPageHeader } from '../components/DetailPageHeader';
+import { ReportDetailContent } from './ReportDetail';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -92,6 +93,11 @@ const formatTime = (iso?: string) => {
   }
 };
 
+const getWorkspaceView = (search: string) => {
+  const params = new URLSearchParams(search);
+  return params.get('view') === 'report' ? 'report' : 'form';
+};
+
 export const SurveyFill: React.FC = () => {
   const { hasPermission, guardPermission } = usePermission();
   const { id } = useParams<{ id: string }>();
@@ -113,10 +119,28 @@ export const SurveyFill: React.FC = () => {
   const canSubmitSurvey = hasPermission('survey_form:submit') && hasPermission('survey_form:generate_report');
   const canShareSurvey = hasPermission('survey_form:share_report');
   const canViewReport = hasPermission('survey_form:view_report');
+  const workspaceView = getWorkspaceView(location.search);
 
   const persistLockRef = useRef(false);
   const autoSaveTimerRef = useRef<number | null>(null);
   const autoSaveStateResetTimerRef = useRef<number | null>(null);
+
+  const setWorkspaceView = useCallback((nextView: 'form' | 'report') => {
+    const params = new URLSearchParams(location.search);
+    params.set('view', nextView);
+    if (nextView === 'form') {
+      params.delete('type');
+    } else if (!params.get('type')) {
+      params.set('type', 'ai');
+    }
+    navigate(
+      {
+        pathname: location.pathname,
+        search: `?${params.toString()}`,
+      },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, navigate]);
 
   useEffect(() => {
     const loadSurvey = async () => {
@@ -449,7 +473,16 @@ export const SurveyFill: React.FC = () => {
 
       await surveyReportService.saveSurveyReportByFormId(form.id, reportBundle);
 
-      navigate(`/reports/${form.id}`);
+      const params = new URLSearchParams(location.search);
+      params.set('view', 'report');
+      params.set('type', 'ai');
+      navigate(
+        {
+          pathname: location.pathname,
+          search: `?${params.toString()}`,
+        },
+        { replace: true },
+      );
     } catch (error) {
       console.error('提交并生成报告失败:', error);
       alert(error instanceof Error ? error.message : '生成报告失败，请检查网络或 API 配置');
@@ -475,46 +508,56 @@ export const SurveyFill: React.FC = () => {
   const isCompleted = form.status === SurveyStatus.COMPLETED;
   const isAuthorizedFill = location.pathname.includes('/authorized/surveys/fill/');
   const hasGeneratedReport = form.reportStatus === ReportStatus.GENERATED;
+  const workspaceTitle = form.projectName || form.name || '调研工作区';
+  const formStatusLabel = isCompleted ? '已完成' : form.status === SurveyStatus.FILLING ? '填写中' : '草稿';
+  const reportStatusLabel = hasGeneratedReport ? '已生成报告' : '未生成报告';
 
   return (
     <div className="animate-fadeIn bg-slate-100/70 pb-20">
       <div className="sticky top-3 z-30 px-1 pt-3 md:top-4 md:px-0 md:pt-4">
         <div className="mx-auto max-w-4xl">
           <DetailPageHeader
-            title={form.name}
+            title={workspaceTitle}
             eyebrow={(
               <>
                 <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
-                  {isCompleted ? '已完成' : '调研表单'}
+                  {workspaceView === 'report' ? '项目报告' : '调研表单'}
                 </span>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                   客户 {form.customerName || '未填写'}
                 </span>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  项目 {form.projectName || '未填写'}
+                  行业 {form.industry || '未填写'}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                  区域 {form.region || '未填写'}
                 </span>
               </>
             )}
             subtitle={(
               <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                  {isCompleted ? '当前为只读查看模式' : '支持自动保存与继续编辑'}
+                  表单状态 {formStatusLabel}
                 </span>
-                {form.region ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">区域 {form.region}</span> : null}
-                {form.industry ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">行业 {form.industry}</span> : null}
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                  报告状态 {reportStatusLabel}
+                </span>
+                {lastSavedAt ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">最近保存 {formatTime(lastSavedAt)}</span> : null}
               </div>
             )}
             tabs={hasGeneratedReport ? [
               {
                 key: 'form',
                 label: '表单',
-                active: true,
+                active: workspaceView === 'form',
+                onClick: () => setWorkspaceView('form'),
               },
               {
                 key: 'report',
                 label: '报告',
-                onClick: () => navigate(`/reports/${form.id}`),
-                disabled: !canViewReport,
+                onClick: () => setWorkspaceView('report'),
+                disabled: !canViewReport || !hasGeneratedReport,
+                active: workspaceView === 'report',
               },
             ] : []}
             actions={(
@@ -526,7 +569,7 @@ export const SurveyFill: React.FC = () => {
                 >
                   返回列表
                 </button>
-                {!isCompleted && !isAuthorizedFill && canShareSurvey && (
+                {workspaceView === 'form' && !isCompleted && !isAuthorizedFill && canShareSurvey && (
                   <button
                     onClick={handleCopyExternalLink}
                     disabled={submitting}
@@ -538,7 +581,7 @@ export const SurveyFill: React.FC = () => {
                     外链填写
                   </button>
                 )}
-                {!isCompleted && canEditSurvey && (
+                {workspaceView === 'form' && !isCompleted && canEditSurvey && (
                   <>
                     <button
                       onClick={saveDraft}
@@ -575,7 +618,9 @@ export const SurveyFill: React.FC = () => {
             footer={(
               <div
                 className={`rounded-2xl border px-4 py-3 text-sm ${
-                  autoSaveState === 'error'
+                  workspaceView === 'report'
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : autoSaveState === 'error'
                     ? 'border-rose-200 bg-rose-50 text-rose-700'
                     : autoSaveState === 'saving'
                     ? 'border-amber-200 bg-amber-50 text-amber-700'
@@ -583,8 +628,14 @@ export const SurveyFill: React.FC = () => {
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span>{autoSaveMessage}</span>
-                  {!isCompleted ? <span className="text-xs font-semibold">离开页面前会自动尝试保存</span> : null}
+                  <span>{workspaceView === 'report' ? '报告与表单在同一工作区内切换，无需整页跳转。' : autoSaveMessage}</span>
+                  <span className="text-xs font-semibold">
+                    {workspaceView === 'report'
+                      ? '顶部信息保持一致，内容区按标签切换'
+                      : !isCompleted
+                      ? '离开页面前会自动尝试保存'
+                      : '当前为只读查看模式'}
+                  </span>
                 </div>
               </div>
             )}
@@ -593,42 +644,51 @@ export const SurveyFill: React.FC = () => {
       </div>
 
       <div className="max-w-4xl mx-auto pt-6 space-y-8">
-        {template.sections.map((section) => {
-          if (!shouldShowSection(section)) return null;
+        {workspaceView === 'report' ? (
+          hasGeneratedReport && canViewReport ? (
+            <ReportDetailContent embedded />
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
+              当前暂无可查看报告，请先完成提交并生成报告。
+            </div>
+          )
+        ) : (
+          template.sections.map((section) => {
+            if (!shouldShowSection(section)) return null;
 
-          return (
-            <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
-                <h3 className="font-bold text-slate-800">{section.title}</h3>
-              </div>
-              <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                {section.fields.map((field) => {
-                  if (!shouldShowField(field)) return null;
+            return (
+              <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
+                  <h3 className="font-bold text-slate-800">{section.title}</h3>
+                </div>
+                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {section.fields.map((field) => {
+                    if (!shouldShowField(field)) return null;
 
-                  const readOnly = isFieldReadOnly(field.id);
-                  const disabled = readOnly || isCompleted || !canEditSurvey;
+                    const readOnly = isFieldReadOnly(field.id);
+                    const disabled = readOnly || isCompleted || !canEditSurvey;
 
-                  return (
-                    <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
-                      <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                        {field.label}
-                        {field.required && <span className="text-red-500">*</span>}
-                        {readOnly && <span className="text-xs text-slate-400 ml-2">(已预填，不可修改)</span>}
-                      </label>
+                    return (
+                      <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
+                        <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                          {field.label}
+                          {field.required && <span className="text-red-500">*</span>}
+                          {readOnly && <span className="text-xs text-slate-400 ml-2">(已预填，不可修改)</span>}
+                        </label>
 
-                      {field.type === 'text' && (
-                        <input
-                          readOnly={disabled}
-                          placeholder={field.placeholder}
-                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            disabled
-                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
-                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
-                          }`}
-                          value={form.data[field.id] || ''}
-                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                        />
-                      )}
+                        {field.type === 'text' && (
+                          <input
+                            readOnly={disabled}
+                            placeholder={field.placeholder}
+                            className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                              disabled
+                                ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                                : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                            }`}
+                            value={form.data[field.id] || ''}
+                            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                          />
+                        )}
 
                       {field.type === 'number' && (
                         <input
@@ -707,13 +767,14 @@ export const SurveyFill: React.FC = () => {
                           onChange={(e) => handleFieldChange(field.id, e.target.value)}
                         />
                       )}
-                    </div>
-                  );
-                })}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );

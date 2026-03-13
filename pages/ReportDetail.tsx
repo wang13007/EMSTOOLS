@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   PieChart,
   Pie,
@@ -38,6 +38,10 @@ type PreSalesUserOption = {
   phone?: string;
   email?: string;
 };
+
+interface ReportDetailContentProps {
+  embedded?: boolean;
+}
 
 const PIE_COLORS = ['#2563eb', '#0ea5e9', '#14b8a6', '#64748b', '#94a3b8'];
 
@@ -416,7 +420,7 @@ const toPreSalesUserOption = (user: any): PreSalesUserOption | null => {
   };
 };
 
-export const ReportDetail: React.FC = () => {
+export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedded = false }) => {
   const { hasPermission, guardPermission } = usePermission();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -927,98 +931,33 @@ export const ReportDetail: React.FC = () => {
   };
 
   return (
-    <div className="bg-slate-100/70 pb-20">
+    <div className={embedded ? '' : 'bg-slate-100/70 pb-20'}>
       <div
         ref={exportRootRef}
         data-export-root="report"
-        className="mx-auto w-full max-w-[210mm] space-y-6 px-3 pb-12 pt-4 md:px-6 md:pt-6"
+        className={
+          embedded
+            ? 'w-full space-y-6'
+            : 'mx-auto w-full max-w-[210mm] space-y-6 px-3 pb-12 pt-4 md:px-6 md:pt-6'
+        }
       >
-        <div className="sticky top-3 z-30 md:top-4">
-          <DetailPageHeader
-            title={data.survey.projectName}
-            eyebrow={(
-              <>
-                <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
-                  {data.survey.industry || ZH.unknownIndustry}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  客户 {data.survey.customerName || '-'}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  区域 {data.survey.region || ZH.unknownRegion}
-                </span>
-              </>
-            )}
-            subtitle={(
-              <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+        {embedded ? (
+          <section data-export-hide="true" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
                   {ZH.generatedAtPrefix}{formatDate(data.report.generatedAt)}
                 </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                  当前查看 {reportTypeLabel}
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
+                  {ZH.efficiencyMaturity} {data.report.aiReport.efficiencyScore}%
+                </span>
+                <span className="rounded-full bg-cyan-50 px-2.5 py-1 font-semibold text-cyan-700">
+                  {ZH.capabilityMatch} {matchedCount}/{capabilityMatches.length}
                 </span>
               </div>
-            )}
-            tabs={[
-              {
-                key: 'form',
-                label: ZH.formTab,
-                onClick: () => canViewSurvey && navigate(`/surveys/fill/${data.survey.id}`),
-                disabled: !canViewSurvey,
-              },
-              {
-                key: 'report',
-                label: ZH.reportTab,
-                active: true,
-              },
-            ]}
-            tabsHiddenOnExport
-            actions={(
-              <>
-                <button
-                  type="button"
-                  onClick={() => navigate('/customer-survey/list')}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-                >
-                  {ZH.backToList}
-                </button>
-                {hasPermission('survey_form:share_report') && (
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-                  >
-                    {ZH.shareLink}
-                  </button>
-                )}
-                {hasPermission('survey_form:export_report') && (
-                  <button
-                    type="button"
-                    onClick={handleExport}
-                    disabled={exporting}
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
-                  >
-                    {exporting ? ZH.exporting : `${ZH.exportPrefix}${reportTypeLabel}PDF`}
-                  </button>
-                )}
-              </>
-            )}
-            actionsHiddenOnExport
-            footer={(
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
-                    {ZH.efficiencyMaturity} {data.report.aiReport.efficiencyScore}%
-                  </span>
-                  <span className="rounded-full bg-cyan-50 px-2.5 py-1 font-semibold text-cyan-700">
-                    {ZH.capabilityMatch} {matchedCount}/{capabilityMatches.length}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
-                    {ZH.preSalesOwner} {contact.name || ZH.notProvided}
-                  </span>
-                </div>
 
-                <div data-export-hide="true" className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
                   <button
                     type="button"
                     onClick={() => setActiveType('ai')}
@@ -1038,10 +977,139 @@ export const ReportDetail: React.FC = () => {
                     {templateReportLabel}
                   </button>
                 </div>
+                {hasPermission('survey_form:share_report') && (
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                  >
+                    {ZH.shareLink}
+                  </button>
+                )}
+                {hasPermission('survey_form:export_report') && (
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
+                  >
+                    {exporting ? ZH.exporting : `${ZH.exportPrefix}${reportTypeLabel}PDF`}
+                  </button>
+                )}
               </div>
-            )}
-          />
-        </div>
+            </div>
+          </section>
+        ) : (
+          <div className="sticky top-3 z-30 md:top-4">
+            <DetailPageHeader
+              title={data.survey.projectName}
+              eyebrow={(
+                <>
+                  <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
+                    {data.survey.industry || ZH.unknownIndustry}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    客户 {data.survey.customerName || '-'}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    区域 {data.survey.region || ZH.unknownRegion}
+                  </span>
+                </>
+              )}
+              subtitle={(
+                <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                    {ZH.generatedAtPrefix}{formatDate(data.report.generatedAt)}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                    当前查看 {reportTypeLabel}
+                  </span>
+                </div>
+              )}
+              tabs={[
+                {
+                  key: 'form',
+                  label: ZH.formTab,
+                  onClick: () => canViewSurvey && navigate(`/surveys/fill/${data.survey.id}?view=form`),
+                  disabled: !canViewSurvey,
+                },
+                {
+                  key: 'report',
+                  label: ZH.reportTab,
+                  active: true,
+                },
+              ]}
+              tabsHiddenOnExport
+              actions={(
+                <>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/customer-survey/list')}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                  >
+                    {ZH.backToList}
+                  </button>
+                  {hasPermission('survey_form:share_report') && (
+                    <button
+                      type="button"
+                      onClick={handleShare}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                    >
+                      {ZH.shareLink}
+                    </button>
+                  )}
+                  {hasPermission('survey_form:export_report') && (
+                    <button
+                      type="button"
+                      onClick={handleExport}
+                      disabled={exporting}
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
+                    >
+                      {exporting ? ZH.exporting : `${ZH.exportPrefix}${reportTypeLabel}PDF`}
+                    </button>
+                  )}
+                </>
+              )}
+              actionsHiddenOnExport
+              footer={(
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded-full bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
+                      {ZH.efficiencyMaturity} {data.report.aiReport.efficiencyScore}%
+                    </span>
+                    <span className="rounded-full bg-cyan-50 px-2.5 py-1 font-semibold text-cyan-700">
+                      {ZH.capabilityMatch} {matchedCount}/{capabilityMatches.length}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
+                      {ZH.preSalesOwner} {contact.name || ZH.notProvided}
+                    </span>
+                  </div>
+
+                  <div data-export-hide="true" className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setActiveType('ai')}
+                      className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+                        activeType === 'ai' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white'
+                      }`}
+                    >
+                      {ZH.aiReport}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveType('template')}
+                      className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+                        activeType === 'template' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white'
+                      }`}
+                    >
+                      {templateReportLabel}
+                    </button>
+                  </div>
+                </div>
+              )}
+            />
+          </div>
+        )}
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-4">
@@ -1611,6 +1679,21 @@ export const ReportDetail: React.FC = () => {
       </div>
     </div>
   );
+};
+
+export const ReportDetail: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+
+  if (!id) {
+    return <Navigate to="/customer-survey/list" replace />;
+  }
+
+  const params = new URLSearchParams(location.search);
+  params.set('view', 'report');
+  const nextSearch = params.toString();
+
+  return <Navigate to={`/surveys/fill/${id}${nextSearch ? `?${nextSearch}` : ''}`} replace />;
 };
 
 
