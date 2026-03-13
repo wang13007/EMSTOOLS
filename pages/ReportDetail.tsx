@@ -188,6 +188,7 @@ const ZH = {
   exportPrefix: '\u5bfc\u51fa',
   defaultReportName: '\u62a5\u544a',
   valueLabel: '\u6570\u503c',
+  templateTabShort: '\u6a21\u677f\u62a5\u544a',
 };
 
 const splitParagraphs = (content?: string) => {
@@ -973,8 +974,9 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                     className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition-colors ${
                       activeType === 'template' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white'
                     }`}
+                    title={templateReportLabel}
                   >
-                    {templateReportLabel}
+                    {ZH.templateTabShort}
                   </button>
                 </div>
                 {hasPermission('survey_form:share_report') && (
@@ -1101,8 +1103,9 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                       className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
                         activeType === 'template' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white'
                       }`}
+                      title={templateReportLabel}
                     >
-                      {templateReportLabel}
+                      {ZH.templateTabShort}
                     </button>
                   </div>
                 </div>
