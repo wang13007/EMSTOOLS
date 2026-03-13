@@ -478,26 +478,30 @@ export const SurveyFill: React.FC = () => {
 
   return (
     <div className="animate-fadeIn bg-slate-100/70 pb-20">
-      <div className="sticky top-4 z-30 px-1 pt-4 md:px-0">
+      <div className="sticky top-3 z-30 px-1 pt-3 md:top-4 md:px-0 md:pt-4">
         <div className="mx-auto max-w-4xl">
           <DetailPageHeader
             title={form.name}
             eyebrow={(
               <>
-                <span className="rounded-lg bg-blue-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-white">
+                <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
                   {isCompleted ? '已完成' : '调研表单'}
                 </span>
-                <span className="rounded-lg bg-white/80 px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
-                  {form.customerName || '未填写客户'}
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                  客户 {form.customerName || '未填写'}
                 </span>
-                <span className="text-xs text-slate-500">{form.projectName || '未填写项目'}</span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                  项目 {form.projectName || '未填写'}
+                </span>
               </>
             )}
             subtitle={(
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span>{isCompleted ? '当前为只读查看模式' : '支持自动保存草稿与继续编辑'}</span>
-                {form.region ? <span>区域：{form.region}</span> : null}
-                {form.industry ? <span>行业：{form.industry}</span> : null}
+              <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                  {isCompleted ? '当前为只读查看模式' : '支持自动保存与继续编辑'}
+                </span>
+                {form.region ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">区域 {form.region}</span> : null}
+                {form.industry ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">行业 {form.industry}</span> : null}
               </div>
             )}
             tabs={hasGeneratedReport ? [
@@ -518,7 +522,7 @@ export const SurveyFill: React.FC = () => {
                 <button
                   onClick={handleBackToList}
                   disabled={submitting}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                 >
                   返回列表
                 </button>
@@ -526,12 +530,12 @@ export const SurveyFill: React.FC = () => {
                   <button
                     onClick={handleCopyExternalLink}
                     disabled={submitting}
-                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm font-bold text-blue-600 shadow-sm transition-all hover:bg-blue-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-bold text-blue-600 transition-all hover:bg-blue-50"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14a5 5 0 007.07 0l1.41-1.41a5 5 0 00-7.07-7.07l-1.41 1.41M14 10a5 5 0 00-7.07 0L5.52 11.41a5 5 0 007.07 7.07l1.41-1.41" />
                     </svg>
-                    复制外链填写地址
+                    外链填写
                   </button>
                 )}
                 {!isCompleted && canEditSurvey && (
@@ -539,14 +543,14 @@ export const SurveyFill: React.FC = () => {
                     <button
                       onClick={saveDraft}
                       disabled={saving || submitting}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                     >
-                      {saving ? '正在保存...' : '保存草稿'}
+                      {saving ? '保存中...' : '保存'}
                     </button>
                     <button
                       onClick={handleSubmit}
                       disabled={submitting || autoSaveState === 'saving' || !canSubmitSurvey}
-                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-xl transition-all hover:bg-slate-800 disabled:opacity-70"
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
                     >
                       {submitting ? (
                         <>
@@ -578,7 +582,10 @@ export const SurveyFill: React.FC = () => {
                     : 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 }`}
               >
-                {autoSaveMessage}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{autoSaveMessage}</span>
+                  {!isCompleted ? <span className="text-xs font-semibold">离开页面前会自动尝试保存</span> : null}
+                </div>
               </div>
             )}
           />
