@@ -121,7 +121,7 @@ const ZH = {
   efficiencyHint: '\u8bc4\u5206\u8d8a\u9ad8\u8868\u793a\u80fd\u6548\u7ba1\u7406\u4f53\u7cfb\u8d8a\u6210\u719f\u3002',
   capabilityMatch: '\u80fd\u529b\u5339\u914d',
   capabilityHint: '\u5df2\u5339\u914d\u80fd\u529b / \u603b\u80fd\u529b',
-  aiReport: '\u667a\u80fd\u8bca\u65ad\u62a5\u544a',
+  aiReport: 'AI诊断报告',
   execSummary: '\u6267\u884c\u6458\u8981',
   scoreStructure: '\u80fd\u6548\u8bc4\u5206\u7ed3\u6784',
   statRecommend: '\u5efa\u8bae\u4e0e\u5339\u914d\u7edf\u8ba1',
@@ -1002,7 +1002,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
             </div>
           </section>
         ) : (
-          <div className="sticky top-3 z-30 md:top-4">
+          <div className="sticky top-0 z-40 bg-slate-100 pb-3 pt-3 md:pt-4">
             <DetailPageHeader
               title={data.survey.projectName}
               eyebrow={(
