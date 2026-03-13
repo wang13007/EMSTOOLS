@@ -615,12 +615,10 @@ export const SurveyFill: React.FC = () => {
                 )}
               </>
             )}
-            footer={(
+            footer={workspaceView === 'report' ? undefined : (
               <div
                 className={`rounded-2xl border px-4 py-3 text-sm ${
-                  workspaceView === 'report'
-                    ? 'border-blue-200 bg-blue-50 text-blue-700'
-                    : autoSaveState === 'error'
+                  autoSaveState === 'error'
                     ? 'border-rose-200 bg-rose-50 text-rose-700'
                     : autoSaveState === 'saving'
                     ? 'border-amber-200 bg-amber-50 text-amber-700'
@@ -628,14 +626,8 @@ export const SurveyFill: React.FC = () => {
                 }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span>{workspaceView === 'report' ? '报告与表单在同一工作区内切换，无需整页跳转。' : autoSaveMessage}</span>
-                  <span className="text-xs font-semibold">
-                    {workspaceView === 'report'
-                      ? '顶部信息保持一致，内容区按标签切换'
-                      : !isCompleted
-                      ? '离开页面前会自动尝试保存'
-                      : '当前为只读查看模式'}
-                  </span>
+                  <span>{autoSaveMessage}</span>
+                  {!isCompleted ? <span className="text-xs font-semibold">离开页面前会自动尝试保存</span> : <span className="text-xs font-semibold">当前为只读查看模式</span>}
                 </div>
               </div>
             )}

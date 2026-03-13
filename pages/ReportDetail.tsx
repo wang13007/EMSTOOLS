@@ -943,7 +943,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
       >
         {embedded ? (
           <section data-export-hide="true" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-700">
                   {ZH.generatedAtPrefix}{formatDate(data.report.generatedAt)}
@@ -956,12 +956,12 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 xl:justify-end">
+                <div className="inline-flex shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-1">
                   <button
                     type="button"
                     onClick={() => setActiveType('ai')}
-                    className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+                    className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition-colors ${
                       activeType === 'ai' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white'
                     }`}
                   >
@@ -970,7 +970,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                   <button
                     type="button"
                     onClick={() => setActiveType('template')}
-                    className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+                    className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-bold transition-colors ${
                       activeType === 'template' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white'
                     }`}
                   >
@@ -981,7 +981,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                   <button
                     type="button"
                     onClick={handleShare}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                    className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                   >
                     {ZH.shareLink}
                   </button>
@@ -991,7 +991,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                     type="button"
                     onClick={handleExport}
                     disabled={exporting}
-                    className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
+                    className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
                   >
                     {exporting ? ZH.exporting : '导出PDF'}
                   </button>
