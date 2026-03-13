@@ -514,7 +514,7 @@ export const SurveyFill: React.FC = () => {
 
   return (
     <div className="animate-fadeIn bg-slate-100/70 pb-20">
-      <div className="sticky top-3 z-30 px-1 pt-3 md:top-4 md:px-0 md:pt-4">
+      <div className="sticky top-3 z-30 bg-slate-100 pb-3 px-1 pt-3 md:top-4 md:px-0 md:pt-4">
         <div className="mx-auto max-w-4xl">
           <DetailPageHeader
             title={workspaceTitle}

@@ -993,7 +993,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                     disabled={exporting}
                     className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
                   >
-                    {exporting ? ZH.exporting : `${ZH.exportPrefix}${reportTypeLabel}PDF`}
+                    {exporting ? ZH.exporting : '导出PDF'}
                   </button>
                 )}
               </div>
@@ -1065,7 +1065,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
                       disabled={exporting}
                       className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
                     >
-                      {exporting ? ZH.exporting : `${ZH.exportPrefix}${reportTypeLabel}PDF`}
+                      {exporting ? ZH.exporting : '导出PDF'}
                     </button>
                   )}
                 </>

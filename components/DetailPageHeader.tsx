@@ -38,7 +38,7 @@ export const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   return (
     <section
       className={joinClassNames(
-        'rounded-2xl border border-slate-200/80 bg-white/85 p-4 shadow-lg shadow-slate-200/50 backdrop-blur md:p-5',
+        'rounded-2xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-200/50 md:p-5',
         className,
       )}
     >
