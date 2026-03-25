@@ -1,6 +1,7 @@
 import { SurveyTemplate } from '../types';
 
 const EMS_ENERGY_FIELD_ID = 'field_014_14';
+const EMS_SYSTEM_FIELD_ID = 'field_015_15';
 
 export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
   id: 'tpl-ems-presales-001',
@@ -78,7 +79,7 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
           options: ['电力', '天然气', '蒸汽', '供水', '光伏', '储能', '压缩空气', '其他'],
         },
         {
-          id: 'field_015_15',
+          id: EMS_SYSTEM_FIELD_ID,
           label: '重点用能系统/设备',
           type: 'multiselect',
           required: true,
@@ -111,6 +112,294 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
     },
     {
       id: 'ems_section_05',
+      title: '天然气系统补充信息',
+      visibleWhen: { fieldId: EMS_ENERGY_FIELD_ID, values: ['天然气'] },
+      fields: [
+        { id: 'field_020_20', label: '年总天然气用量(Nm3)', type: 'number', required: true },
+        { id: 'field_021_21', label: '年总天然气费用(万元)', type: 'number', required: true },
+        {
+          id: 'field_022_22',
+          label: '天然气供应方式',
+          type: 'select',
+          required: true,
+          options: ['市政管网', 'LNG/LPG', '站内储罐', '其他'],
+        },
+        {
+          id: 'field_023_23',
+          label: '天然气系统关注点',
+          type: 'multiselect',
+          required: true,
+          options: ['用气峰值波动', '燃烧效率', '泄漏风险', '计量分散', '缺少联动控制'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_06',
+      title: '蒸汽系统补充信息',
+      visibleWhen: { fieldId: EMS_ENERGY_FIELD_ID, values: ['蒸汽'] },
+      fields: [
+        { id: 'field_024_24', label: '年总蒸汽用量(t)', type: 'number', required: true },
+        { id: 'field_025_25', label: '年总蒸汽费用(万元)', type: 'number', required: true },
+        {
+          id: 'field_026_26',
+          label: '蒸汽来源',
+          type: 'select',
+          required: true,
+          options: ['自备锅炉', '园区集中供汽', '外部采购蒸汽', '其他'],
+        },
+        {
+          id: 'field_027_27',
+          label: '蒸汽系统关注点',
+          type: 'multiselect',
+          required: true,
+          options: ['压力波动', '冷凝水回收不足', '跑冒滴漏', '管网保温薄弱', '缺少监测'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_07',
+      title: '供水系统补充信息',
+      visibleWhen: { fieldId: EMS_ENERGY_FIELD_ID, values: ['供水'] },
+      fields: [
+        { id: 'field_028_28', label: '年总用水量(t)', type: 'number', required: true },
+        { id: 'field_029_29', label: '年总水费(万元)', type: 'number', required: true },
+        {
+          id: 'field_030_30',
+          label: '供水方式',
+          type: 'select',
+          required: true,
+          options: ['市政供水', '自备水源', '回用水系统', '其他'],
+        },
+        {
+          id: 'field_031_31',
+          label: '供水系统关注点',
+          type: 'multiselect',
+          required: true,
+          options: ['漏损偏高', '计量分散', '回用率低', '压力波动', '人工抄表'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_08',
+      title: '光伏系统补充信息',
+      visibleWhen: { fieldId: EMS_ENERGY_FIELD_ID, values: ['光伏'] },
+      fields: [
+        { id: 'field_032_32', label: '光伏装机容量(kWp)', type: 'number', required: true },
+        { id: 'field_033_33', label: '年发电量(kWh)', type: 'number', required: true },
+        {
+          id: 'field_034_34',
+          label: '并网模式',
+          type: 'select',
+          required: true,
+          options: ['全部自发自用', '自发自用余电上网', '全额上网', '离网/微网'],
+        },
+        {
+          id: 'field_035_35',
+          label: '光伏运行关注点',
+          type: 'multiselect',
+          required: true,
+          options: ['发电波动', '逆变器告警', '消纳率不足', '缺少清洗运维', '缺少收益分析'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_09',
+      title: '储能系统补充信息',
+      visibleWhen: { fieldId: EMS_ENERGY_FIELD_ID, values: ['储能'] },
+      fields: [
+        { id: 'field_036_36', label: '储能装机容量(kWh)', type: 'number', required: true },
+        { id: 'field_037_37', label: '储能充放电功率(kW)', type: 'number', required: true },
+        {
+          id: 'field_038_38',
+          label: '储能应用场景',
+          type: 'multiselect',
+          required: true,
+          options: ['削峰填谷', '需量控制', '光储协同', '备电保障', '需求响应'],
+        },
+        {
+          id: 'field_039_39',
+          label: '储能运行关注点',
+          type: 'multiselect',
+          required: true,
+          options: ['峰谷策略不清晰', '充放调度粗放', '收益测算不足', '缺少告警', '系统未联动'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_10',
+      title: '压缩空气能源补充信息',
+      visibleWhen: { fieldId: EMS_ENERGY_FIELD_ID, values: ['压缩空气'] },
+      fields: [
+        { id: 'field_040_40', label: '年压缩空气用量(万Nm3)', type: 'number', required: true },
+        { id: 'field_041_41', label: '压缩空气折算费用(万元)', type: 'number', required: true },
+        {
+          id: 'field_042_42',
+          label: '供气模式',
+          type: 'select',
+          required: true,
+          options: ['集中空压站', '分散供气', '外购气源', '其他'],
+        },
+        {
+          id: 'field_043_43',
+          label: '压缩空气关注点',
+          type: 'multiselect',
+          required: true,
+          options: ['泄漏损失', '压力波动', '设备卸载', '缺少监测', '热回收不足'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_11',
+      title: '变配电系统补充信息',
+      visibleWhen: { fieldId: EMS_SYSTEM_FIELD_ID, values: ['变配电系统'] },
+      fields: [
+        { id: 'field_044_44', label: '变压器总容量(kVA)', type: 'number', required: true },
+        { id: 'field_045_45', label: '最大需量(kW)', type: 'number', required: true },
+        {
+          id: 'field_046_46',
+          label: '电能质量问题',
+          type: 'multiselect',
+          required: true,
+          options: ['功率因数偏低', '谐波超标', '三相不平衡', '峰值过高', '暂无明显问题'],
+        },
+        {
+          id: 'field_047_47',
+          label: '分项计量覆盖率',
+          type: 'select',
+          required: true,
+          options: ['>90%', '70%-90%', '30%-70%', '<30%'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_12',
+      title: '压缩空气系统补充信息',
+      visibleWhen: { fieldId: EMS_SYSTEM_FIELD_ID, values: ['压缩空气系统'] },
+      fields: [
+        { id: 'field_048_48', label: '空压机配置说明', type: 'textarea', required: true },
+        { id: 'field_049_49', label: '供气压力(bar)', type: 'number', required: true },
+        {
+          id: 'field_050_50',
+          label: '是否存在泄漏/卸载问题',
+          type: 'select',
+          required: true,
+          options: ['存在且严重', '存在但可控', '暂未发现'],
+        },
+        {
+          id: 'field_051_51',
+          label: '控制方式',
+          type: 'select',
+          required: true,
+          options: ['工频定速', '变频联控', '人工启停', '不清楚'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_13',
+      title: '照明系统补充信息',
+      visibleWhen: { fieldId: EMS_SYSTEM_FIELD_ID, values: ['照明系统'] },
+      fields: [
+        { id: 'field_052_52', label: '主要照明区域', type: 'textarea', required: true },
+        {
+          id: 'field_053_53',
+          label: '灯具类型',
+          type: 'multiselect',
+          required: true,
+          options: ['荧光灯', '高压钠灯', 'LED', '金卤灯', '其他'],
+        },
+        {
+          id: 'field_054_54',
+          label: '照明控制方式',
+          type: 'select',
+          required: true,
+          options: ['手动开关', '时控', '感应控制', '智能照明系统'],
+        },
+        {
+          id: 'field_055_55',
+          label: '照明系统痛点',
+          type: 'multiselect',
+          required: true,
+          options: ['长明灯', '照度不均', '分区控制粗放', '缺少节能改造', '运维更换频繁'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_14',
+      title: '暖通空调系统补充信息',
+      visibleWhen: { fieldId: EMS_SYSTEM_FIELD_ID, values: ['暖通空调系统'] },
+      fields: [
+        {
+          id: 'field_056_56',
+          label: '冷热源形式',
+          type: 'multiselect',
+          required: true,
+          options: ['冷水机组', '多联机', '锅炉', '热泵', '冷却塔', '新风机组', '其他'],
+        },
+        {
+          id: 'field_057_57',
+          label: '末端形式',
+          type: 'multiselect',
+          required: true,
+          options: ['AHU', 'FCU', '风柜', '地暖', '工艺空调', '其他'],
+        },
+        { id: 'field_058_58', label: '运行时段说明', type: 'text', required: true },
+        {
+          id: 'field_059_59',
+          label: '暖通系统痛点',
+          type: 'multiselect',
+          required: true,
+          options: ['冷热不均', '主机效率低', '控制策略粗放', '新风/排风未联动', '缺少分项计量'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_15',
+      title: '生产系统补充信息',
+      visibleWhen: { fieldId: EMS_SYSTEM_FIELD_ID, values: ['生产系统'] },
+      fields: [
+        { id: 'field_060_60', label: '重点生产设备/产线', type: 'textarea', required: true },
+        { id: 'field_061_61', label: '生产班次与开机时长', type: 'text', required: true },
+        {
+          id: 'field_062_62',
+          label: '是否统计单位产量能耗',
+          type: 'select',
+          required: true,
+          options: ['系统化统计', '人工统计', '未统计'],
+        },
+        {
+          id: 'field_063_63',
+          label: '生产系统痛点',
+          type: 'multiselect',
+          required: true,
+          options: ['空转待机多', '节拍波动大', '工艺参数缺少监测', '设备老旧', '缺少能耗对标'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_16',
+      title: '锅炉/蒸汽系统补充信息',
+      visibleWhen: { fieldId: EMS_SYSTEM_FIELD_ID, values: ['锅炉/蒸汽系统'] },
+      fields: [
+        { id: 'field_064_64', label: '锅炉类型与台数', type: 'textarea', required: true },
+        { id: 'field_065_65', label: '蒸汽参数说明', type: 'text', required: true },
+        {
+          id: 'field_068_73',
+          label: '冷凝水回收情况',
+          type: 'select',
+          required: true,
+          options: ['已回收且稳定', '部分回收', '未回收'],
+        },
+        {
+          id: 'field_069_74',
+          label: '锅炉/蒸汽系统痛点',
+          type: 'multiselect',
+          required: true,
+          options: ['排烟温度高', '跑冒滴漏', '蒸汽压力波动', '冷凝水回收不足', '燃烧控制粗放'],
+        },
+      ],
+    },
+    {
+      id: 'ems_section_17',
       title: '运行与管理现状',
       fields: [
         {
@@ -137,7 +426,7 @@ export const EMS_PRESET_TEMPLATE: SurveyTemplate = {
       ],
     },
     {
-      id: 'ems_section_06',
+      id: 'ems_section_18',
       title: '碳管理与IT建设',
       fields: [
         {

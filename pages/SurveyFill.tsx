@@ -305,28 +305,36 @@ export const SurveyFill: React.FC = () => {
     return surveyTemplates.find((item) => item.id === form.templateId) || surveyTemplates[0];
   }, [form, surveyTemplates]);
 
-  const shouldShowSection = (section: any): boolean => {
-    if (!section.visibleWhen) return true;
-    const { fieldId, values } = section.visibleWhen;
-    const fieldValue = form.data[fieldId];
-
+  const matchesVisibleWhen = (visibleWhen?: { fieldId: string; values: string[] }): boolean => {
+    if (!visibleWhen) return true;
+    const fieldValue = form?.data?.[visibleWhen.fieldId];
     if (!fieldValue) return false;
 
-    const selectedEnergyTypes = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
-
-    return selectedEnergyTypes.some((selected: string) => values.includes(selected));
+    const selectedValues = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+    return selectedValues.some((selected: string) => visibleWhen.values.includes(selected));
   };
 
-  const shouldShowField = (field: any): boolean => {
-    if (!field.visibleWhen) return true;
-    const { fieldId, values } = field.visibleWhen;
-    const fieldValue = form.data[fieldId];
+  const shouldShowSection = (section: any): boolean => matchesVisibleWhen(section.visibleWhen);
 
-    if (!fieldValue) return false;
+  const shouldShowField = (field: any): boolean => matchesVisibleWhen(field.visibleWhen);
 
-    const selectedEnergyTypes = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+  const isFieldEmpty = (field: any, value: any) => {
+    if (Array.isArray(value)) return value.length === 0;
+    if (field.type === 'number') return value === '' || value === null || typeof value === 'undefined';
+    return String(value ?? '').trim().length === 0;
+  };
 
-    return selectedEnergyTypes.some((selected: string) => values.includes(selected));
+  const getMissingVisibleRequiredFields = () => {
+    if (!template || !form) return [];
+
+    return template.sections
+      .filter((section) => shouldShowSection(section))
+      .flatMap((section) =>
+        section.fields
+          .filter((field) => shouldShowField(field) && field.required)
+          .filter((field) => isFieldEmpty(field, form.data?.[field.id]))
+          .map((field) => `${section.title} / ${field.label}`)
+      );
   };
 
   const isFieldReadOnly = (fieldId: string): boolean => {
@@ -421,6 +429,13 @@ export const SurveyFill: React.FC = () => {
     if (!form) return;
     setSubmitting(true);
     try {
+      const missingFields = getMissingVisibleRequiredFields();
+      if (missingFields.length) {
+        const preview = missingFields.slice(0, 8).map((item) => `- ${item}`).join('\n');
+        const suffix = missingFields.length > 8 ? `\n- 其余 ${missingFields.length - 8} 项请在表单中继续补全` : '';
+        throw new Error(`请先补全当前联动显示的必填项：\n${preview}${suffix}`);
+      }
+
       if (dirty) {
         const saved = await persistDraft({ silent: true, alertOnError: false });
         if (!saved && dirty) {
@@ -501,6 +516,17 @@ export const SurveyFill: React.FC = () => {
     return '实时保存已开启';
   }, [autoSaveState, dirty, lastSavedAt]);
 
+  const visibleSections = useMemo(() => {
+    if (!template) return [];
+    return template.sections
+      .filter((section) => shouldShowSection(section))
+      .map((section) => ({
+        ...section,
+        fields: section.fields.filter((field) => shouldShowField(field)),
+      }))
+      .filter((section) => section.fields.length > 0);
+  }, [template, form]);
+
   if (initializing || !form || !template) {
     return <div className="p-20 text-center">加载中...</div>;
   }
@@ -513,11 +539,14 @@ export const SurveyFill: React.FC = () => {
   const reportStatusLabel = hasGeneratedReport ? '已生成报告' : '未生成报告';
 
   return (
-    <div className="animate-fadeIn bg-slate-100/70 pb-20">
-      <div className="sticky top-0 z-40 bg-slate-100 px-1 pb-3 pt-3 md:px-0 md:pt-4">
-        <div className="mx-auto max-w-4xl">
-          <DetailPageHeader
-            title={workspaceTitle}
+    <div className="animate-fadeIn bg-slate-100 pb-20">
+      <div className="sticky top-0 z-40">
+        <div className="pointer-events-none absolute inset-0 bg-slate-100/95 backdrop-blur-sm" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-slate-100/0 via-slate-100/90 to-slate-100" />
+        <div className="relative px-1 pb-4 pt-3 md:px-0 md:pt-4">
+          <div className="mx-auto max-w-4xl">
+            <DetailPageHeader
+              title={workspaceTitle}
             eyebrow={(
               <>
                 <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
@@ -631,11 +660,12 @@ export const SurveyFill: React.FC = () => {
                 </div>
               </div>
             )}
-          />
+            />
+          </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto pt-6 space-y-8">
+      <div className="mx-auto max-w-4xl space-y-8 px-1 pt-5 md:px-0 md:pt-6">
         {workspaceView === 'report' ? (
           hasGeneratedReport && canViewReport ? (
             <ReportDetailContent embedded />
@@ -645,9 +675,7 @@ export const SurveyFill: React.FC = () => {
             </div>
           )
         ) : (
-          template.sections.map((section) => {
-            if (!shouldShowSection(section)) return null;
-
+          visibleSections.map((section) => {
             return (
               <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
@@ -655,8 +683,6 @@ export const SurveyFill: React.FC = () => {
                 </div>
                 <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {section.fields.map((field) => {
-                    if (!shouldShowField(field)) return null;
-
                     const readOnly = isFieldReadOnly(field.id);
                     const disabled = readOnly || isCompleted || !canEditSurvey;
 
