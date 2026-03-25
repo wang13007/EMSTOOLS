@@ -536,6 +536,7 @@ export const SurveyFill: React.FC = () => {
   const hasGeneratedReport = form.reportStatus === ReportStatus.GENERATED;
   const isFormWorkspace = workspaceView === 'form';
   const workspaceTitle = form.projectName || form.name || '调研工作区';
+  const workspaceContainerClass = isFormWorkspace ? 'max-w-[1280px]' : 'max-w-4xl';
   const formStatusLabel = isCompleted ? '已完成' : form.status === SurveyStatus.FILLING ? '填写中' : '草稿';
   const reportStatusLabel = hasGeneratedReport ? '已生成报告' : '未生成报告';
   const headerMetaItems = [
@@ -557,7 +558,7 @@ export const SurveyFill: React.FC = () => {
         style={{ isolation: 'isolate', contain: 'paint' }}
       >
         <div className={`px-4 lg:px-6 ${isFormWorkspace ? 'pb-3 pt-3 lg:pb-4 lg:pt-4' : 'pb-4 pt-4 lg:pb-5 lg:pt-6'}`}>
-          <div className="mx-auto max-w-4xl">
+          <div className={`mx-auto ${workspaceContainerClass}`}>
             <DetailPageHeader
               compact={isFormWorkspace}
               className="z-10"
@@ -699,7 +700,7 @@ export const SurveyFill: React.FC = () => {
       </div>
 
       <div className="px-4 pt-5 lg:px-6 lg:pt-6">
-        <div className="mx-auto max-w-4xl space-y-8">
+        <div className={`mx-auto space-y-8 ${workspaceContainerClass}`}>
           {workspaceView === 'report' ? (
             hasGeneratedReport && canViewReport ? (
               <ReportDetailContent embedded />
