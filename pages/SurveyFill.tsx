@@ -7,7 +7,6 @@ import { surveyReportService, surveyService, userService } from '../src/services
 import { applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 import { usePermission } from '../src/auth/usePermission';
 import { getAllSurveyTemplates, syncImportedTemplatesFromDatabase } from '../src/services/templateStore';
-import { DetailPageHeader } from '../components/DetailPageHeader';
 import { ReportDetailContent } from './ReportDetail';
 
 const AUTO_SAVE_DELAY_MS = 1200;
@@ -551,6 +550,9 @@ export const SurveyFill: React.FC = () => {
       ? 'animate-pulse bg-amber-500'
       : 'bg-emerald-500';
   const reportViewStatusText = hasGeneratedReport ? '已切换到报告视图' : '当前暂无报告内容';
+  const workspaceStatusSummary = `表单 ${formStatusLabel} · 报告 ${reportStatusLabel}${
+    lastSavedAt ? ` · 最近保存 ${formatTime(lastSavedAt)}` : ''
+  }`;
 
   return (
     <div className="min-h-full animate-fadeIn bg-slate-100 pb-20">
@@ -560,75 +562,65 @@ export const SurveyFill: React.FC = () => {
       >
         <div className="px-4 pb-3 pt-3 lg:px-6 lg:pb-4 lg:pt-4">
           <div className={`mx-auto ${workspaceContainerClass}`}>
-            <DetailPageHeader
-              compact
-              className="z-10"
-              title={workspaceTitle}
-              eyebrow={(
-                <span className="rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold tracking-[0.08em] text-white">
-                  {workspaceView === 'report' ? '项目报告' : '调研表单'}
-                </span>
-              )}
-              subtitle={(
-                <div className="space-y-2.5">
-                  <div className="flex flex-wrap gap-2">
-                    {headerMetaItems.map((item) => (
-                      <div key={item.label} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-1.5 ring-1 ring-slate-200">
-                        <span className="text-[11px] font-medium text-slate-500">{item.label}</span>
-                        <span className={`text-xs font-semibold ${item.value === '未填写' ? 'text-slate-400' : 'text-slate-800'}`}>
-                          {item.value}
-                        </span>
-                      </div>
-                    ))}
+            <section className="relative isolate overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-lg shadow-slate-200/50 md:px-5 md:py-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div className="min-w-0 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold tracking-[0.08em] text-blue-700 ring-1 ring-blue-100">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600"></span>
+                      {workspaceView === 'report' ? '项目报告' : '调研表单'}
+                    </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
-                      <span className={`h-2 w-2 rounded-full ${isFormWorkspace ? autoSaveIndicatorClass : 'bg-blue-500'}`}></span>
-                      {isFormWorkspace ? autoSaveMessage : reportViewStatusText}
-                    </span>
-                    <span className="rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
-                      表单 {formStatusLabel}
-                    </span>
-                    <span className="rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
-                      报告 {reportStatusLabel}
-                    </span>
-                    {lastSavedAt ? (
-                      <span className="rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
-                        最近保存 {formatTime(lastSavedAt)}
-                      </span>
-                    ) : null}
+
+                  <div className="min-w-0">
+                    <h2 className="truncate text-lg font-black tracking-tight text-slate-900 md:text-[1.5rem]">
+                      {workspaceTitle}
+                    </h2>
                   </div>
                 </div>
-              )}
-              tabs={hasGeneratedReport ? [
-                {
-                  key: 'form',
-                  label: '表单',
-                  active: workspaceView === 'form',
-                  onClick: () => setWorkspaceView('form'),
-                },
-                {
-                  key: 'report',
-                  label: '报告',
-                  onClick: () => setWorkspaceView('report'),
-                  disabled: !canViewReport || !hasGeneratedReport,
-                  active: workspaceView === 'report',
-                },
-              ] : []}
-              actions={(
-                <>
+
+                <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                  {hasGeneratedReport && (
+                    <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceView('form')}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors ${
+                          workspaceView === 'form'
+                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                            : 'text-slate-600 hover:bg-white'
+                        }`}
+                      >
+                        表单
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWorkspaceView('report')}
+                        disabled={!canViewReport || !hasGeneratedReport}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:text-slate-400 ${
+                          workspaceView === 'report'
+                            ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200'
+                            : 'text-slate-600 hover:bg-white'
+                        }`}
+                      >
+                        报告
+                      </button>
+                    </div>
+                  )}
+
                   <button
                     onClick={handleBackToList}
                     disabled={submitting}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                   >
                     返回列表
                   </button>
+
                   {workspaceView === 'form' && !isCompleted && !isAuthorizedFill && canShareSurvey && (
                     <button
                       onClick={handleCopyExternalLink}
                       disabled={submitting}
-                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-bold text-blue-600 transition-all hover:bg-blue-50"
+                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3.5 py-2 text-sm font-bold text-blue-600 transition-all hover:bg-blue-50"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14a5 5 0 007.07 0l1.41-1.41a5 5 0 00-7.07-7.07l-1.41 1.41M14 10a5 5 0 00-7.07 0L5.52 11.41a5 5 0 007.07 7.07l1.41-1.41" />
@@ -636,19 +628,20 @@ export const SurveyFill: React.FC = () => {
                       外链填写
                     </button>
                   )}
+
                   {workspaceView === 'form' && !isCompleted && canEditSurvey && (
                     <>
                       <button
                         onClick={saveDraft}
                         disabled={saving || submitting}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
                       >
                         {saving ? '保存中...' : '保存'}
                       </button>
                       <button
                         onClick={handleSubmit}
                         disabled={submitting || autoSaveState === 'saving' || !canSubmitSurvey}
-                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
+                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
                       >
                         {submitting ? (
                           <>
@@ -668,10 +661,30 @@ export const SurveyFill: React.FC = () => {
                       </button>
                     </>
                   )}
-                </>
-              )}
-              footer={undefined}
-            />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2 border-t border-slate-200/80 pt-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+                  {headerMetaItems.map((item) => (
+                    <div key={item.label} className="flex min-w-0 items-center gap-1.5">
+                      <span className="shrink-0 text-xs font-medium text-slate-500">{item.label}</span>
+                      <span className={`max-w-[18rem] truncate font-semibold ${item.value === '未填写' ? 'text-slate-400' : 'text-slate-800'}`}>
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
+                    <span className={`h-2 w-2 rounded-full ${isFormWorkspace ? autoSaveIndicatorClass : 'bg-blue-500'}`}></span>
+                    {isFormWorkspace ? autoSaveMessage : reportViewStatusText}
+                  </span>
+                  <span className="text-slate-500">{workspaceStatusSummary}</span>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
