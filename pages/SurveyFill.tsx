@@ -540,11 +540,8 @@ export const SurveyFill: React.FC = () => {
 
   return (
     <div className="animate-fadeIn bg-slate-100 pb-20">
-      <div className="sticky top-0 z-40">
-        <div className="pointer-events-none absolute inset-0 bg-slate-100/95 backdrop-blur-sm" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-slate-100/0 via-slate-100/90 to-slate-100" />
-        <div className="relative px-1 pb-4 pt-3 md:px-0 md:pt-4">
-          <div className="mx-auto max-w-4xl">
+      <div className="sticky top-0 z-[60] overflow-hidden border-b border-slate-200/70 bg-slate-100 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)]">
+        <div className="mx-auto max-w-4xl px-1 pb-4 pt-3 md:px-0 md:pt-4">
             <DetailPageHeader
               title={workspaceTitle}
             eyebrow={(
@@ -661,7 +658,6 @@ export const SurveyFill: React.FC = () => {
               </div>
             )}
             />
-          </div>
         </div>
       </div>
 
