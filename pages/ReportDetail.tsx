@@ -1002,8 +1002,12 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
             </div>
           </section>
         ) : (
-          <div className="sticky top-0 z-40 bg-slate-100 pb-3 pt-3 md:pt-4">
+          <div
+            className="sticky top-0 z-[60] overflow-hidden border-b border-slate-200/70 bg-slate-100 pb-3 pt-3 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)] [transform:translateZ(0)] md:pt-4"
+            style={{ isolation: 'isolate', contain: 'paint' }}
+          >
             <DetailPageHeader
+              className="z-10"
               title={data.survey.projectName}
               eyebrow={(
                 <>
