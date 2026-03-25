@@ -534,6 +534,7 @@ export const SurveyFill: React.FC = () => {
   const isCompleted = form.status === SurveyStatus.COMPLETED;
   const isAuthorizedFill = location.pathname.includes('/authorized/surveys/fill/');
   const hasGeneratedReport = form.reportStatus === ReportStatus.GENERATED;
+  const isFormWorkspace = workspaceView === 'form';
   const workspaceTitle = form.projectName || form.name || '调研工作区';
   const formStatusLabel = isCompleted ? '已完成' : form.status === SurveyStatus.FILLING ? '填写中' : '草稿';
   const reportStatusLabel = hasGeneratedReport ? '已生成报告' : '未生成报告';
@@ -555,9 +556,10 @@ export const SurveyFill: React.FC = () => {
         className="sticky top-0 z-30 overflow-hidden border-b border-slate-200/70 bg-slate-100 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)] [transform:translateZ(0)]"
         style={{ isolation: 'isolate', contain: 'paint' }}
       >
-        <div className="px-4 pb-4 pt-4 lg:px-6 lg:pb-5 lg:pt-6">
+        <div className={`px-4 lg:px-6 ${isFormWorkspace ? 'pb-3 pt-3 lg:pb-4 lg:pt-4' : 'pb-4 pt-4 lg:pb-5 lg:pt-6'}`}>
           <div className="mx-auto max-w-4xl">
             <DetailPageHeader
+              compact={isFormWorkspace}
               className="z-10"
               title={workspaceTitle}
               eyebrow={(
@@ -566,26 +568,58 @@ export const SurveyFill: React.FC = () => {
                 </span>
               )}
               subtitle={(
-                <div className="space-y-4">
-                  <p className="text-sm leading-6 text-slate-600">
-                    {workspaceView === 'report'
-                      ? '在同一工作区中查看报告与表单内容，关键信息会保持同步。'
-                      : '填写客户基础信息与用能情况后，系统会自动保存草稿，并在提交后生成项目报告。'}
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {headerMetaItems.map((item) => (
-                      <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <div className="text-xs font-medium text-slate-500">{item.label}</div>
-                        <div
-                          className={`mt-1 text-sm font-semibold ${
-                            item.value === '未填写' ? 'text-slate-400' : 'text-slate-800'
-                          }`}
-                        >
-                          {item.value}
+                <div className={isFormWorkspace ? 'space-y-2.5' : 'space-y-4'}>
+                  {isFormWorkspace ? (
+                    <div className="flex flex-wrap gap-2">
+                      {headerMetaItems.map((item) => (
+                        <div key={item.label} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-1.5 ring-1 ring-slate-200">
+                          <span className="text-[11px] font-medium text-slate-500">{item.label}</span>
+                          <span className={`text-xs font-semibold ${item.value === '未填写' ? 'text-slate-400' : 'text-slate-800'}`}>
+                            {item.value}
+                          </span>
                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm leading-6 text-slate-600">
+                        在同一工作区中查看报告与表单内容，关键信息会保持同步。
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {headerMetaItems.map((item) => (
+                          <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div className="text-xs font-medium text-slate-500">{item.label}</div>
+                            <div
+                              className={`mt-1 text-sm font-semibold ${
+                                item.value === '未填写' ? 'text-slate-400' : 'text-slate-800'
+                              }`}
+                            >
+                              {item.value}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </>
+                  )}
+                  {isFormWorkspace && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
+                        <span className={`h-2 w-2 rounded-full ${autoSaveIndicatorClass}`}></span>
+                        {autoSaveMessage}
+                      </span>
+                      <span className="rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
+                        表单 {formStatusLabel}
+                      </span>
+                      <span className="rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
+                        报告 {reportStatusLabel}
+                      </span>
+                      {lastSavedAt ? (
+                        <span className="rounded-full bg-slate-50 px-3 py-1.5 font-semibold text-slate-700 ring-1 ring-slate-200">
+                          最近保存 {formatTime(lastSavedAt)}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               )}
               tabs={hasGeneratedReport ? [
@@ -658,34 +692,7 @@ export const SurveyFill: React.FC = () => {
                   )}
                 </>
               )}
-              footer={workspaceView === 'report' ? undefined : (
-                <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                  <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
-                        <span className={`h-2 w-2 rounded-full ${autoSaveIndicatorClass}`}></span>
-                        {autoSaveMessage}
-                      </span>
-                      <span className="text-slate-500">
-                        {!isCompleted ? '内容修改后会自动保存草稿' : '当前为只读查看模式'}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
-                        表单 {formStatusLabel}
-                      </span>
-                      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
-                        报告 {reportStatusLabel}
-                      </span>
-                      {lastSavedAt ? (
-                        <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
-                          最近保存 {formatTime(lastSavedAt)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              )}
+              footer={undefined}
             />
           </div>
         </div>
