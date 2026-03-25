@@ -932,14 +932,14 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
   };
 
   return (
-    <div className={embedded ? '' : 'bg-slate-100/70 pb-20'}>
+    <div className={embedded ? '' : 'bg-slate-100 pb-20'}>
       <div
         ref={exportRootRef}
         data-export-root="report"
         className={
           embedded
             ? 'w-full space-y-6'
-            : 'mx-auto w-full max-w-[210mm] space-y-6 px-3 pb-12 pt-4 md:px-6 md:pt-6'
+            : 'mx-auto w-full max-w-[210mm] space-y-6 px-3 pb-12 md:px-6'
         }
       >
         {embedded ? (
@@ -1003,7 +1003,7 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
           </section>
         ) : (
           <div
-            className="sticky top-0 z-[60] overflow-hidden border-b border-slate-200/70 bg-slate-100 pb-3 pt-3 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)] [transform:translateZ(0)] md:pt-4"
+            className="sticky top-0 z-30 overflow-hidden border-b border-slate-200/70 bg-slate-100 pb-3 pt-3 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)] [transform:translateZ(0)] md:pt-4"
             style={{ isolation: 'isolate', contain: 'paint' }}
           >
             <DetailPageHeader

@@ -539,260 +539,264 @@ export const SurveyFill: React.FC = () => {
   const reportStatusLabel = hasGeneratedReport ? '已生成报告' : '未生成报告';
 
   return (
-    <div className="animate-fadeIn bg-slate-100 pb-20">
+    <div className="min-h-full animate-fadeIn bg-slate-100 pb-20">
       <div
-        className="sticky top-0 z-[60] overflow-hidden border-b border-slate-200/70 bg-slate-100 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)] [transform:translateZ(0)]"
+        className="sticky top-0 z-30 overflow-hidden border-b border-slate-200/70 bg-slate-100 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.35)] [transform:translateZ(0)]"
         style={{ isolation: 'isolate', contain: 'paint' }}
       >
-        <div className="mx-auto max-w-4xl px-1 pb-4 pt-3 md:px-0 md:pt-4">
+        <div className="px-4 pb-4 pt-4 lg:px-6 lg:pb-5 lg:pt-6">
+          <div className="mx-auto max-w-4xl">
             <DetailPageHeader
               className="z-10"
               title={workspaceTitle}
-            eyebrow={(
-              <>
-                <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
-                  {workspaceView === 'report' ? '项目报告' : '调研表单'}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  客户 {form.customerName || '未填写'}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  行业 {form.industry || '未填写'}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                  区域 {form.region || '未填写'}
-                </span>
-              </>
-            )}
-            subtitle={(
-              <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                  表单状态 {formStatusLabel}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                  报告状态 {reportStatusLabel}
-                </span>
-                {lastSavedAt ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">最近保存 {formatTime(lastSavedAt)}</span> : null}
-              </div>
-            )}
-            tabs={hasGeneratedReport ? [
-              {
-                key: 'form',
-                label: '表单',
-                active: workspaceView === 'form',
-                onClick: () => setWorkspaceView('form'),
-              },
-              {
-                key: 'report',
-                label: '报告',
-                onClick: () => setWorkspaceView('report'),
-                disabled: !canViewReport || !hasGeneratedReport,
-                active: workspaceView === 'report',
-              },
-            ] : []}
-            actions={(
-              <>
-                <button
-                  onClick={handleBackToList}
-                  disabled={submitting}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-                >
-                  返回列表
-                </button>
-                {workspaceView === 'form' && !isCompleted && !isAuthorizedFill && canShareSurvey && (
-                  <button
-                    onClick={handleCopyExternalLink}
-                    disabled={submitting}
-                    className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-bold text-blue-600 transition-all hover:bg-blue-50"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14a5 5 0 007.07 0l1.41-1.41a5 5 0 00-7.07-7.07l-1.41 1.41M14 10a5 5 0 00-7.07 0L5.52 11.41a5 5 0 007.07 7.07l1.41-1.41" />
-                    </svg>
-                    外链填写
-                  </button>
-                )}
-                {workspaceView === 'form' && !isCompleted && canEditSurvey && (
-                  <>
-                    <button
-                      onClick={saveDraft}
-                      disabled={saving || submitting}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-                    >
-                      {saving ? '保存中...' : '保存'}
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={submitting || autoSaveState === 'saving' || !canSubmitSurvey}
-                      className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
-                    >
-                      {submitting ? (
-                        <>
-                          <svg className="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            ></path>
-                          </svg>
-                          AI 分析中...
-                        </>
-                      ) : (
-                        '提交并生成报告'
-                      )}
-                    </button>
-                  </>
-                )}
-              </>
-            )}
-            footer={workspaceView === 'report' ? undefined : (
-              <div
-                className={`rounded-2xl border px-4 py-3 text-sm ${
-                  autoSaveState === 'error'
-                    ? 'border-rose-200 bg-rose-50 text-rose-700'
-                    : autoSaveState === 'saving'
-                    ? 'border-amber-200 bg-amber-50 text-amber-700'
-                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                }`}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span>{autoSaveMessage}</span>
-                  {!isCompleted ? <span className="text-xs font-semibold">离开页面前会自动尝试保存</span> : <span className="text-xs font-semibold">当前为只读查看模式</span>}
+              eyebrow={(
+                <>
+                  <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
+                    {workspaceView === 'report' ? '项目报告' : '调研表单'}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    客户 {form.customerName || '未填写'}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    行业 {form.industry || '未填写'}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                    区域 {form.region || '未填写'}
+                  </span>
+                </>
+              )}
+              subtitle={(
+                <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                    表单状态 {formStatusLabel}
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                    报告状态 {reportStatusLabel}
+                  </span>
+                  {lastSavedAt ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">最近保存 {formatTime(lastSavedAt)}</span> : null}
                 </div>
-              </div>
-            )}
+              )}
+              tabs={hasGeneratedReport ? [
+                {
+                  key: 'form',
+                  label: '表单',
+                  active: workspaceView === 'form',
+                  onClick: () => setWorkspaceView('form'),
+                },
+                {
+                  key: 'report',
+                  label: '报告',
+                  onClick: () => setWorkspaceView('report'),
+                  disabled: !canViewReport || !hasGeneratedReport,
+                  active: workspaceView === 'report',
+                },
+              ] : []}
+              actions={(
+                <>
+                  <button
+                    onClick={handleBackToList}
+                    disabled={submitting}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                  >
+                    返回列表
+                  </button>
+                  {workspaceView === 'form' && !isCompleted && !isAuthorizedFill && canShareSurvey && (
+                    <button
+                      onClick={handleCopyExternalLink}
+                      disabled={submitting}
+                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-bold text-blue-600 transition-all hover:bg-blue-50"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14a5 5 0 007.07 0l1.41-1.41a5 5 0 00-7.07-7.07l-1.41 1.41M14 10a5 5 0 00-7.07 0L5.52 11.41a5 5 0 007.07 7.07l1.41-1.41" />
+                      </svg>
+                      外链填写
+                    </button>
+                  )}
+                  {workspaceView === 'form' && !isCompleted && canEditSurvey && (
+                    <>
+                      <button
+                        onClick={saveDraft}
+                        disabled={saving || submitting}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
+                      >
+                        {saving ? '保存中...' : '保存'}
+                      </button>
+                      <button
+                        onClick={handleSubmit}
+                        disabled={submitting || autoSaveState === 'saving' || !canSubmitSurvey}
+                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 disabled:opacity-70"
+                      >
+                        {submitting ? (
+                          <>
+                            <svg className="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                            AI 分析中...
+                          </>
+                        ) : (
+                          '提交并生成报告'
+                        )}
+                      </button>
+                    </>
+                  )}
+                </>
+              )}
+              footer={workspaceView === 'report' ? undefined : (
+                <div
+                  className={`rounded-2xl border px-4 py-3 text-sm ${
+                    autoSaveState === 'error'
+                      ? 'border-rose-200 bg-rose-50 text-rose-700'
+                      : autoSaveState === 'saving'
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{autoSaveMessage}</span>
+                    {!isCompleted ? <span className="text-xs font-semibold">离开页面前会自动尝试保存</span> : <span className="text-xs font-semibold">当前为只读查看模式</span>}
+                  </div>
+                </div>
+              )}
             />
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-4xl space-y-8 px-1 pt-5 md:px-0 md:pt-6">
-        {workspaceView === 'report' ? (
-          hasGeneratedReport && canViewReport ? (
-            <ReportDetailContent embedded />
-          ) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
-              当前暂无可查看报告，请先完成提交并生成报告。
-            </div>
-          )
-        ) : (
-          visibleSections.map((section) => {
-            return (
-              <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
-                  <h3 className="font-bold text-slate-800">{section.title}</h3>
-                </div>
-                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {section.fields.map((field) => {
-                    const readOnly = isFieldReadOnly(field.id);
-                    const disabled = readOnly || isCompleted || !canEditSurvey;
-
-                    return (
-                      <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
-                        <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                          {field.label}
-                          {field.required && <span className="text-red-500">*</span>}
-                          {readOnly && <span className="text-xs text-slate-400 ml-2">(已预填，不可修改)</span>}
-                        </label>
-
-                        {field.type === 'text' && (
-                          <input
-                            readOnly={disabled}
-                            placeholder={field.placeholder}
-                            className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                              disabled
-                                ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
-                                : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
-                            }`}
-                            value={form.data[field.id] || ''}
-                            onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                          />
-                        )}
-
-                      {field.type === 'number' && (
-                        <input
-                          type="number"
-                          readOnly={disabled}
-                          placeholder={field.placeholder}
-                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            disabled
-                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
-                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
-                          }`}
-                          value={form.data[field.id] || ''}
-                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                        />
-                      )}
-
-                      {field.type === 'select' && (
-                        <select
-                          disabled={disabled}
-                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            disabled
-                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
-                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
-                          }`}
-                          value={form.data[field.id] || ''}
-                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                        >
-                          <option value="">请选择</option>
-                          {field.options?.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      {field.type === 'multiselect' && (
-                        <div className="flex flex-wrap gap-2">
-                          {field.options?.map((opt) => {
-                            const current = Array.isArray(form.data[field.id]) ? form.data[field.id] : [];
-                            const isSelected = current.includes(opt);
-                            return (
-                              <button
-                                type="button"
-                                key={opt}
-                                disabled={disabled}
-                                onClick={() => {
-                                  if (disabled) return;
-                                  const next = isSelected ? current.filter((item: string) => item !== opt) : [...current, opt];
-                                  handleFieldChange(field.id, next);
-                                }}
-                                className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
-                                  isSelected
-                                    ? 'bg-blue-600 border-blue-600 text-white'
-                                    : 'bg-white border-slate-200 text-slate-600'
-                                } ${disabled ? 'cursor-not-allowed opacity-70' : 'hover:border-blue-300'}`}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {field.type === 'textarea' && (
-                        <textarea
-                          readOnly={disabled}
-                          rows={4}
-                          placeholder={field.placeholder}
-                          className={`w-full px-4 py-2 border rounded-lg outline-none ${
-                            disabled
-                              ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
-                              : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
-                          }`}
-                          value={form.data[field.id] || ''}
-                          onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                        />
-                      )}
-                      </div>
-                    );
-                  })}
-                </div>
+      <div className="px-4 pt-5 lg:px-6 lg:pt-6">
+        <div className="mx-auto max-w-4xl space-y-8">
+          {workspaceView === 'report' ? (
+            hasGeneratedReport && canViewReport ? (
+              <ReportDetailContent embedded />
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
+                当前暂无可查看报告，请先完成提交并生成报告。
               </div>
-            );
-          })
-        )}
+            )
+          ) : (
+            visibleSections.map((section) => {
+              return (
+                <div key={section.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="bg-slate-50 px-8 py-4 border-b border-slate-200">
+                    <h3 className="font-bold text-slate-800">{section.title}</h3>
+                  </div>
+                  <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {section.fields.map((field) => {
+                      const readOnly = isFieldReadOnly(field.id);
+                      const disabled = readOnly || isCompleted || !canEditSurvey;
+
+                      return (
+                        <div key={field.id} className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}>
+                          <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+                            {field.label}
+                            {field.required && <span className="text-red-500">*</span>}
+                            {readOnly && <span className="text-xs text-slate-400 ml-2">(已预填，不可修改)</span>}
+                          </label>
+
+                          {field.type === 'text' && (
+                            <input
+                              readOnly={disabled}
+                              placeholder={field.placeholder}
+                              className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                                disabled
+                                  ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                                  : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                              }`}
+                              value={form.data[field.id] || ''}
+                              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                            />
+                          )}
+
+                          {field.type === 'number' && (
+                            <input
+                              type="number"
+                              readOnly={disabled}
+                              placeholder={field.placeholder}
+                              className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                                disabled
+                                  ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                                  : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                              }`}
+                              value={form.data[field.id] || ''}
+                              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                            />
+                          )}
+
+                          {field.type === 'select' && (
+                            <select
+                              disabled={disabled}
+                              className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                                disabled
+                                  ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                                  : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                              }`}
+                              value={form.data[field.id] || ''}
+                              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                            >
+                              <option value="">请选择</option>
+                              {field.options?.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
+                          {field.type === 'multiselect' && (
+                            <div className="flex flex-wrap gap-2">
+                              {field.options?.map((opt) => {
+                                const current = Array.isArray(form.data[field.id]) ? form.data[field.id] : [];
+                                const isSelected = current.includes(opt);
+                                return (
+                                  <button
+                                    type="button"
+                                    key={opt}
+                                    disabled={disabled}
+                                    onClick={() => {
+                                      if (disabled) return;
+                                      const next = isSelected ? current.filter((item: string) => item !== opt) : [...current, opt];
+                                      handleFieldChange(field.id, next);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
+                                      isSelected
+                                        ? 'bg-blue-600 border-blue-600 text-white'
+                                        : 'bg-white border-slate-200 text-slate-600'
+                                    } ${disabled ? 'cursor-not-allowed opacity-70' : 'hover:border-blue-300'}`}
+                                  >
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {field.type === 'textarea' && (
+                            <textarea
+                              readOnly={disabled}
+                              rows={4}
+                              placeholder={field.placeholder}
+                              className={`w-full px-4 py-2 border rounded-lg outline-none ${
+                                disabled
+                                  ? 'bg-slate-100 border-slate-300 text-slate-600 cursor-not-allowed'
+                                  : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                              }`}
+                              value={form.data[field.id] || ''}
+                              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );

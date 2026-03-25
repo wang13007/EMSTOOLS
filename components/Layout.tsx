@@ -267,6 +267,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
   const canDictionaryView = hasPermission('dictionary:view', permissionSet);
   const canMessageView = hasPermission('message:view', permissionSet);
   const canLogsView = hasPermission('logs:view', permissionSet);
+  const usesWorkspaceScrollLayout =
+    location.pathname.includes('/surveys/fill/') || location.pathname.startsWith('/reports/');
 
   const roleText = currentUser?.role || getDefaultRoleLabel(currentUser?.type || currentUser?.user_type);
 
@@ -418,8 +420,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 lg:p-6 scroll-smooth">
-          <div className="w-full">{children}</div>
+        <div
+          className={`relative isolate flex-1 overflow-y-auto overflow-x-hidden scroll-smooth ${
+            usesWorkspaceScrollLayout ? 'bg-slate-100' : 'p-4 lg:p-6'
+          }`}
+        >
+          <div className={`w-full ${usesWorkspaceScrollLayout ? 'min-h-full' : ''}`}>{children}</div>
         </div>
       </main>
     </div>
