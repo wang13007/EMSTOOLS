@@ -537,6 +537,17 @@ export const SurveyFill: React.FC = () => {
   const workspaceTitle = form.projectName || form.name || '调研工作区';
   const formStatusLabel = isCompleted ? '已完成' : form.status === SurveyStatus.FILLING ? '填写中' : '草稿';
   const reportStatusLabel = hasGeneratedReport ? '已生成报告' : '未生成报告';
+  const headerMetaItems = [
+    { label: '客户', value: form.customerName || '未填写' },
+    { label: '行业', value: form.industry || '未填写' },
+    { label: '区域', value: form.region || '未填写' },
+  ];
+  const autoSaveIndicatorClass =
+    autoSaveState === 'error'
+      ? 'bg-rose-500'
+      : autoSaveState === 'saving'
+      ? 'animate-pulse bg-amber-500'
+      : 'bg-emerald-500';
 
   return (
     <div className="min-h-full animate-fadeIn bg-slate-100 pb-20">
@@ -550,30 +561,31 @@ export const SurveyFill: React.FC = () => {
               className="z-10"
               title={workspaceTitle}
               eyebrow={(
-                <>
-                  <span className="rounded-full bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white">
-                    {workspaceView === 'report' ? '项目报告' : '调研表单'}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                    客户 {form.customerName || '未填写'}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                    行业 {form.industry || '未填写'}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                    区域 {form.region || '未填写'}
-                  </span>
-                </>
+                <span className="rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold tracking-[0.08em] text-white">
+                  {workspaceView === 'report' ? '项目报告' : '调研表单'}
+                </span>
               )}
               subtitle={(
-                <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                    表单状态 {formStatusLabel}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                    报告状态 {reportStatusLabel}
-                  </span>
-                  {lastSavedAt ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">最近保存 {formatTime(lastSavedAt)}</span> : null}
+                <div className="space-y-4">
+                  <p className="text-sm leading-6 text-slate-600">
+                    {workspaceView === 'report'
+                      ? '在同一工作区中查看报告与表单内容，关键信息会保持同步。'
+                      : '填写客户基础信息与用能情况后，系统会自动保存草稿，并在提交后生成项目报告。'}
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {headerMetaItems.map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="text-xs font-medium text-slate-500">{item.label}</div>
+                        <div
+                          className={`mt-1 text-sm font-semibold ${
+                            item.value === '未填写' ? 'text-slate-400' : 'text-slate-800'
+                          }`}
+                        >
+                          {item.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               tabs={hasGeneratedReport ? [
@@ -647,18 +659,30 @@ export const SurveyFill: React.FC = () => {
                 </>
               )}
               footer={workspaceView === 'report' ? undefined : (
-                <div
-                  className={`rounded-2xl border px-4 py-3 text-sm ${
-                    autoSaveState === 'error'
-                      ? 'border-rose-200 bg-rose-50 text-rose-700'
-                      : autoSaveState === 'saving'
-                      ? 'border-amber-200 bg-amber-50 text-amber-700'
-                      : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span>{autoSaveMessage}</span>
-                    {!isCompleted ? <span className="text-xs font-semibold">离开页面前会自动尝试保存</span> : <span className="text-xs font-semibold">当前为只读查看模式</span>}
+                <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                  <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
+                        <span className={`h-2 w-2 rounded-full ${autoSaveIndicatorClass}`}></span>
+                        {autoSaveMessage}
+                      </span>
+                      <span className="text-slate-500">
+                        {!isCompleted ? '内容修改后会自动保存草稿' : '当前为只读查看模式'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
+                        表单 {formStatusLabel}
+                      </span>
+                      <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
+                        报告 {reportStatusLabel}
+                      </span>
+                      {lastSavedAt ? (
+                        <span className="rounded-full bg-white px-3 py-1 font-semibold text-slate-700 ring-1 ring-slate-200">
+                          最近保存 {formatTime(lastSavedAt)}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               )}
