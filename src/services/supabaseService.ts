@@ -296,6 +296,34 @@ const normalizeUser = (user: any) => {
   };
 };
 
+const resolveUserRowIdentifiers = async (id: string) => {
+  const targetId = String(id || '').trim();
+  if (!targetId || !isUuid(targetId)) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id,user_id')
+    .or(`id.eq.${targetId},user_id.eq.${targetId}`)
+    .limit(1);
+
+  if (error) {
+    console.error('鏌ユ壘鐢ㄦ埛鏇存柊鐩爣澶辫触:', { targetId, error });
+    return null;
+  }
+
+  const row = data?.[0];
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id || row.user_id,
+    user_id: row.user_id || row.id,
+  };
+};
+
 export const userService = {
   async getUsers() {
     try {
@@ -433,6 +461,18 @@ export const userService = {
 
   async updateUser(id: string, user: any) {
     try {
+      const targetId = String(id || '').trim();
+      if (!targetId) {
+        console.error('鏇存柊鐢ㄦ埛澶辫触: 鐢ㄦ埛ID涓虹┖');
+        return null;
+      }
+
+      const targetRow = await resolveUserRowIdentifiers(targetId);
+      if (!targetRow?.id) {
+        console.error('鏇存柊鐢ㄦ埛澶辫触: 鏈壘鍒板尮閰嶇殑鐢ㄦ埛', { targetId });
+        return null;
+      }
+
       const baseUser: any = { status: user.status || 'enabled' };
       const roleIds = dedupeStringArray([...(user.role_ids || []), user.role_id]);
 
@@ -461,7 +501,7 @@ export const userService = {
 
       const userType = user.user_type || user.type;
       if (userType && roleIds.length) {
-        const roleValidationPassed = await userService.validateUserRoles(id, userType, roleIds);
+        const roleValidationPassed = await userService.validateUserRoles(targetRow.id, userType, roleIds);
         if (!roleValidationPassed) {
           throw new Error(userType === 'internal' ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色');
         }
@@ -474,21 +514,15 @@ export const userService = {
         let payload = { ...dbUser };
 
         while (true) {
-          const primary = await supabase.from('users').update(payload).eq('user_id', id).select().maybeSingle();
+          const fallback: any = { error: null };
+          const primary = await supabase.from('users').update(payload).eq('id', targetRow.id).select().maybeSingle();
           if (!primary.error && primary.data) {
             const updatedUserId = primary.data?.user_id || primary.data?.id;
             if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
             return normalizeUser({ ...primary.data, role_ids: roleIds.length ? roleIds : undefined });
           }
 
-          const fallback = await supabase.from('users').update(payload).eq('id', id).select().maybeSingle();
-          if (!fallback.error && fallback.data) {
-            const updatedUserId = fallback.data?.user_id || fallback.data?.id;
-            if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
-            return normalizeUser({ ...fallback.data, role_ids: roleIds.length ? roleIds : undefined });
-          }
-
-          const missingColumn = getMissingColumnName(primary.error) || getMissingColumnName(fallback.error);
+          const missingColumn = getMissingColumnName(primary.error);
           if (missingColumn && Object.prototype.hasOwnProperty.call(payload, missingColumn)) {
             const nextPayload = { ...payload };
             delete nextPayload[missingColumn];
@@ -499,9 +533,7 @@ export const userService = {
 
           if (
             isMissingColumn(primary.error, 'type') ||
-            isMissingColumn(primary.error, 'user_type') ||
-            isMissingColumn(fallback.error, 'type') ||
-            isMissingColumn(fallback.error, 'user_type')
+            isMissingColumn(primary.error, 'user_type')
           ) {
             console.warn('更新用户类型字段不匹配，自动尝试兼容字段');
             break;

@@ -110,9 +110,19 @@ export const authService = {
 
       const token = generateSecureToken();
 
-      await userService.updateUser(currentUser.id, {
-        last_login_time: new Date().toISOString(),
-      });
+      try {
+        const updatedUser = await userService.updateUser(currentUser.id, {
+          last_login_time: new Date().toISOString(),
+        });
+        if (!updatedUser) {
+          console.warn('鏇存柊鐢ㄦ埛鏈€杩戠櫥褰曟椂闂村け璐ワ紝宸茬户缁櫥褰?:', { userId: currentUser.id });
+        }
+      } catch (updateError) {
+        console.warn('鏇存柊鐢ㄦ埛鏈€杩戠櫥褰曟椂闂村け璐ワ紝宸茬户缁櫥褰?:', {
+          userId: currentUser.id,
+          error: updateError,
+        });
+      }
 
       localStorage.setItem('ems_user', JSON.stringify(userInfo));
       localStorage.setItem('ems_token', token);
