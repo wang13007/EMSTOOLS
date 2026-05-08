@@ -70,7 +70,6 @@
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | 是 | Supabase 项目 URL |
 | `VITE_SUPABASE_ANON_KEY` | 是 | Supabase 匿名密钥 |
-| `VITE_SUPABASE_SERVICE_ROLE_KEY` | 否 | 高权限 Key（仅受控环境建议使用） |
 | `GEMINI_API_KEY` | 否 | AI 报告生成 Key；未配置时自动回退兜底报告 |
 
 建议写入 `.env.local`：
@@ -78,9 +77,10 @@
 ```env
 VITE_SUPABASE_URL="https://<your-project>.supabase.co"
 VITE_SUPABASE_ANON_KEY="<your-anon-key>"
-VITE_SUPABASE_SERVICE_ROLE_KEY="<optional>"
 GEMINI_API_KEY="<optional>"
 ```
+
+不要在前端环境变量中配置 Supabase service role key；高权限操作应放在后端或 Supabase Edge Functions。
 
 ## 7. 数据库初始化
 

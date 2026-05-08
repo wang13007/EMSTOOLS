@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ICONS } from '../constants';
+import { authService } from '../src/services/authService';
 
 export const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -24,7 +25,6 @@ export const ResetPassword: React.FC = () => {
       setError('重置密码链接无效或已过期');
     } else {
       // 这里应该调用后端 API 验证 token 是否有效
-      console.log('验证重置密码 token:', token);
     }
   }, [token]);
 
@@ -63,26 +63,20 @@ export const ResetPassword: React.FC = () => {
     setSuccess('');
 
     try {
-      // 模拟重置密码
-      console.log('重置密码请求:', { token, ...formData });
-
-      // 这里应该调用真实的后端 API
-      // const response = await authService.resetPassword(token, formData.password);
-
-      // 模拟重置成功
-      setTimeout(() => {
-        setLoading(false);
-        setSuccess('密码重置成功！正在跳转到登录页面...');
-
-        // 3秒后跳转到登录页面
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
-      }, 1500);
+      await authService.resetPassword({
+        token: token || '',
+        password: formData.password,
+        confirm_password: formData.confirm_password,
+      });
+      setSuccess('密码重置成功！正在跳转到登录页面...');
+      window.setTimeout(() => {
+        navigate('/login');
+      }, 3000);
     } catch (err) {
-      setLoading(false);
-      setError('重置密码失败，请稍后重试');
+      setError(err instanceof Error ? err.message : '重置密码失败，请稍后重试');
       console.error('重置密码失败:', err);
+    } finally {
+      setLoading(false);
     }
   };
 

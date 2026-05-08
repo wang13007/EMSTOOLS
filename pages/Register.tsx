@@ -60,8 +60,7 @@ export const Register: React.FC = () => {
     setSuccess('');
 
     try {
-      const registerResult = await authService.register(formData);
-      console.log('注册成功:', registerResult);
+      await authService.register(formData);
 
       setSuccess('注册成功，正在进入填写页面...');
       window.setTimeout(() => {

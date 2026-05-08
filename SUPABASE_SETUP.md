@@ -15,14 +15,13 @@
 ```env
 VITE_SUPABASE_URL="https://<your-project>.supabase.co"
 VITE_SUPABASE_ANON_KEY="<your-anon-key>"
-VITE_SUPABASE_SERVICE_ROLE_KEY="<optional>"
 GEMINI_API_KEY="<optional>"
 ```
 
 说明：
 
-- 若配置了 `VITE_SUPABASE_SERVICE_ROLE_KEY`，前端会优先使用它。
-- 生产环境不建议在浏览器端使用 service role key。
+- 前端只允许使用 anon/publishable key。
+- 不要在浏览器端配置或打包 service role key；高权限操作应放在后端或 Supabase Edge Functions。
 
 ## 3. 初始化数据库
 

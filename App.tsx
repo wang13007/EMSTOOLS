@@ -22,10 +22,24 @@ import { cachePermissionKeys, canAccessPathByPermissions, readPermissionKeySet }
 
 const getCurrentUserFromStorage = () => {
   try {
+    const sessionRaw = localStorage.getItem('ems_session');
+    const token = localStorage.getItem('ems_token');
+    if (!sessionRaw || !token) return null;
+    const session = JSON.parse(sessionRaw);
+    if (!session?.token || session.token !== token || !session.expiresAt || session.expiresAt <= Date.now()) {
+      clearAuthSession();
+      return null;
+    }
     const raw = localStorage.getItem('ems_user');
     if (!raw) return null;
-    return JSON.parse(raw);
+    const user = JSON.parse(raw);
+    if (user?.id !== session.userId) {
+      clearAuthSession();
+      return null;
+    }
+    return user;
   } catch {
+    clearAuthSession();
     return null;
   }
 };
@@ -35,6 +49,7 @@ const isExternalUser = (user: any) => user?.type === 'external' || user?.user_ty
 const clearAuthSession = () => {
   localStorage.removeItem('ems_user');
   localStorage.removeItem('ems_token');
+  localStorage.removeItem('ems_session');
   cachePermissionKeys([]);
 };
 
@@ -59,7 +74,8 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const hasClearedUnauthorizedRef = useRef(false);
-  const isLoggedIn = !!localStorage.getItem('ems_token');
+  const currentUser = getCurrentUserFromStorage();
+  const isLoggedIn = Boolean(currentUser);
   const redirect = encodeURIComponent(`${location.pathname}${location.search}`);
   if (!isLoggedIn) {
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
@@ -80,7 +96,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // 鍏叡璺敱缁勪欢锛堜笉闇€瑕佺櫥褰曪級
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const isLoggedIn = !!localStorage.getItem('ems_token');
+  const isLoggedIn = Boolean(getCurrentUserFromStorage());
   const params = new URLSearchParams(location.search);
   const redirect = params.get('redirect');
   return isLoggedIn ? <Navigate to={redirect || '/'} replace /> : <>{children}</>;

@@ -37,7 +37,7 @@
 | `user_name` | `varchar(50)` | NULL | 显示名/兼容字段 |
 | `user_realname` | `varchar(100)` | NULL | 真实姓名（兼容） |
 | `name` | `varchar(100)` | NULL | 姓名 |
-| `password_hash` | `varchar(255)` | NOT NULL, DEFAULT `'1234'` | 密码字段（当前实现） |
+| `password_hash` | `varchar(255)` | NOT NULL | 密码摘要字段；新写入使用 `sha256:<digest>`，历史明文记录需迁移 |
 | `type` | `varchar(20)` | NOT NULL, DEFAULT `external`, CHECK(`internal`,`external`) | 用户类型 |
 | `user_type` | `varchar(20)` | NOT NULL, DEFAULT `external`, CHECK(`internal`,`external`) | 兼容类型字段 |
 | `role_id` | `uuid` | FK -> `roles.id`, NULL | 主角色 |

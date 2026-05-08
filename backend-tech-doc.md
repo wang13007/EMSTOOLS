@@ -98,7 +98,7 @@ supabase-repair-existing.sql
 
 ## 7. 安全注意事项
 
-- 当前 `src/config/supabase.ts` 存在内置 service role 回退 key，仅适合受控开发环境
+- 前端 `src/config/supabase.ts` 只允许使用 anon/publishable key；service role key 必须保留在后端或 Supabase Edge Functions
 - 生产建议：
   - 移除内置密钥
   - 仅使用环境变量注入

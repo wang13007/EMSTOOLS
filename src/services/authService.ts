@@ -1,4 +1,5 @@
 ﻿import { cachePermissionKeys, resolvePermissionKeysByUserAndRoles } from '../auth/permissions';
+import { hashPassword, isHashedPassword, verifyPassword } from '../utils/passwordSecurity';
 import { validateRegisterInput } from '../utils/userValidation';
 
 export interface LoginRequest {
@@ -42,6 +43,14 @@ export interface UserInfo {
   permissions?: string[];
 }
 
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+
+type StoredSession = {
+  token: string;
+  userId: string;
+  expiresAt: number;
+};
+
 const generateSecureToken = (): string => {
   const timestamp = Date.now();
   const uuid =
@@ -49,6 +58,40 @@ const generateSecureToken = (): string => {
       ? crypto.randomUUID().replace(/-/g, '')
       : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   return `ems_${timestamp}_${uuid}`;
+};
+
+const createStoredSession = (user: UserInfo, token: string): StoredSession => ({
+  token,
+  userId: user.id,
+  expiresAt: Date.now() + SESSION_TTL_MS,
+});
+
+const persistSession = (user: UserInfo, token: string) => {
+  localStorage.setItem('ems_user', JSON.stringify(user));
+  localStorage.setItem('ems_token', token);
+  localStorage.setItem('ems_session', JSON.stringify(createStoredSession(user, token)));
+};
+
+const clearStoredSession = () => {
+  localStorage.removeItem('ems_user');
+  localStorage.removeItem('ems_token');
+  localStorage.removeItem('ems_session');
+  cachePermissionKeys([]);
+};
+
+const readStoredSession = (): StoredSession | null => {
+  try {
+    const raw = localStorage.getItem('ems_session');
+    const token = localStorage.getItem('ems_token');
+    if (!raw || !token) return null;
+    const session = JSON.parse(raw) as StoredSession;
+    if (!session?.token || session.token !== token || !session.expiresAt || session.expiresAt <= Date.now()) {
+      return null;
+    }
+    return session;
+  } catch {
+    return null;
+  }
 };
 
 export const authService = {
@@ -76,7 +119,7 @@ export const authService = {
         const createdUser = await userService.createUser({
           user_name: loginIdentifier,
           username: loginIdentifier,
-          password_hash: data.password,
+          password_hash: await hashPassword(data.password),
           type: 'external',
           user_type: 'external',
           role_id: customerRole.id,
@@ -86,8 +129,11 @@ export const authService = {
         currentUser = createdUser;
       }
 
-      const stored = String(currentUser.password_hash || '');
-      if (stored !== data.password) throw new Error('账号或密码错误');
+      if (String(currentUser.status || 'enabled') !== 'enabled') {
+        throw new Error('账号已停用，请联系管理员');
+      }
+
+      if (!(await verifyPassword(data.password, currentUser.password_hash))) throw new Error('账号或密码错误');
 
       const roles = await roleService.getRoles();
       const roleName = roles.find((r: any) => r.id === currentUser.role_id)?.name || '外部客户';
@@ -111,8 +157,14 @@ export const authService = {
       const token = generateSecureToken();
 
       try {
-        const updatedUser = await userService.updateUser(currentUser.id, {
+        const loginUpdatePayload: Record<string, string> = {
           last_login_time: new Date().toISOString(),
+        };
+        if (!isHashedPassword(currentUser.password_hash)) {
+          loginUpdatePayload.password_hash = await hashPassword(data.password);
+        }
+        const updatedUser = await userService.updateUser(currentUser.id, {
+          ...loginUpdatePayload,
         });
         if (!updatedUser) {
           console.warn('鏇存柊鐢ㄦ埛鏈€杩戠櫥褰曟椂闂村け璐ワ紝宸茬户缁櫥褰?:', { userId: currentUser.id });
@@ -124,8 +176,7 @@ export const authService = {
         });
       }
 
-      localStorage.setItem('ems_user', JSON.stringify(userInfo));
-      localStorage.setItem('ems_token', token);
+      persistSession(userInfo, token);
       cachePermissionKeys(permissionKeys);
       return { user: userInfo, token };
     } catch (error) {
@@ -159,7 +210,7 @@ export const authService = {
       const createdUser = await userService.createUser({
         user_name: normalizedData.name,
         username: normalizedData.username,
-        password_hash: normalizedData.password,
+        password_hash: await hashPassword(normalizedData.password),
         type: 'external',
         user_type: 'external',
         role_id: customerRole.id,
@@ -186,8 +237,7 @@ export const authService = {
       };
 
       const token = generateSecureToken();
-      localStorage.setItem('ems_user', JSON.stringify(userInfo));
-      localStorage.setItem('ems_token', token);
+      persistSession(userInfo, token);
       cachePermissionKeys(permissionKeys);
       return { user: userInfo, token };
     } catch (error) {
@@ -197,32 +247,45 @@ export const authService = {
   },
 
   async forgotPassword(_data: ForgotPasswordRequest): Promise<{ success: boolean }> {
-    return { success: true };
+    throw new Error('密码找回暂未启用，请联系管理员重置密码');
   },
 
   async resetPassword(_data: ResetPasswordRequest): Promise<{ success: boolean }> {
-    return { success: true };
+    throw new Error('密码重置链接暂未启用，请联系管理员重置密码');
   },
 
   async logout(): Promise<{ success: boolean }> {
-    localStorage.removeItem('ems_user');
-    localStorage.removeItem('ems_token');
-    cachePermissionKeys([]);
+    clearStoredSession();
     return { success: true };
   },
 
   async getCurrentUser(): Promise<UserInfo | null> {
     try {
+      const session = readStoredSession();
+      if (!session) {
+        clearStoredSession();
+        return null;
+      }
       const userStr = localStorage.getItem('ems_user');
       if (!userStr) return null;
-      return JSON.parse(userStr) as UserInfo;
+      const user = JSON.parse(userStr) as UserInfo;
+      if (user.id !== session.userId) {
+        clearStoredSession();
+        return null;
+      }
+      return user;
     } catch {
       return null;
     }
   },
 
   isLoggedIn(): boolean {
-    return !!localStorage.getItem('ems_token');
+    const session = readStoredSession();
+    if (!session) {
+      clearStoredSession();
+      return false;
+    }
+    return true;
   },
 };
 

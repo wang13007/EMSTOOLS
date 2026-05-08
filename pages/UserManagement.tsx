@@ -10,6 +10,7 @@ import {
   USERNAME_MIN_LENGTH,
   validateBasicUserInput,
 } from '../src/utils/userValidation';
+import { generateTemporaryPassword, hashPassword } from '../src/utils/passwordSecurity';
 
 type RoleLite = {
   id: string;
@@ -38,8 +39,6 @@ const DEFAULT_FORM: FormState = {
   type: UserType.EXTERNAL,
   roleIds: [],
 };
-
-const RESET_PASSWORD_DEFAULT = '1234';
 
 const normalizeRoleType = (value: any): UserType | null => {
   const raw = String(value ?? '').trim();
@@ -333,13 +332,14 @@ export const UserManagement: React.FC = () => {
       };
 
       if (modalMode === 'create') {
+        const temporaryPassword = generateTemporaryPassword();
         const created = await userService.createUser({
           ...payload,
-          password_hash: RESET_PASSWORD_DEFAULT,
+          password_hash: await hashPassword(temporaryPassword),
           status: UserStatus.ENABLED,
         });
         if (!created) throw new Error('用户创建失败');
-        showInfoDialog('创建成功', `新用户已创建成功，初始密码：${RESET_PASSWORD_DEFAULT}`, 'success');
+        showInfoDialog('创建成功', `新用户已创建成功，一次性临时密码：${temporaryPassword}`, 'success');
       } else {
         if (!editingUserId) throw new Error('编辑用户ID不存在');
         const updated = await userService.updateUser(editingUserId, {
@@ -385,12 +385,13 @@ export const UserManagement: React.FC = () => {
     if (!pendingResetUser || actionLoading) return;
     setActionLoading(true);
     try {
+      const temporaryPassword = generateTemporaryPassword();
       const updated = await userService.updateUser(pendingResetUser.id, {
         status: pendingResetUser.status,
-        password_hash: RESET_PASSWORD_DEFAULT,
+        password_hash: await hashPassword(temporaryPassword),
       });
       if (updated) {
-        showInfoDialog('重置成功', `用户 ${pendingResetUser.username} 的密码已重置为 ${RESET_PASSWORD_DEFAULT}`, 'success');
+        showInfoDialog('重置成功', `用户 ${pendingResetUser.username} 的一次性临时密码：${temporaryPassword}`, 'success');
       } else {
         showInfoDialog('重置失败', '重置密码失败，请稍后重试', 'danger');
       }
@@ -646,7 +647,7 @@ export const UserManagement: React.FC = () => {
       <ActionDialog
         open={Boolean(pendingResetUser)}
         title="重置密码确认"
-        message={pendingResetUser ? `确认将用户 ${pendingResetUser.username} 的密码重置为 ${RESET_PASSWORD_DEFAULT} 吗？` : ''}
+        message={pendingResetUser ? `确认为用户 ${pendingResetUser.username} 生成新的一次性临时密码吗？` : ''}
         confirmText="确认重置"
         cancelText="取消"
         variant="danger"

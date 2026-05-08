@@ -1,5 +1,6 @@
 import supabase from '../config/supabase';
 import { ReportStatus, SurveyForm, SurveyStatus, SurveyTemplate, SystemLog } from '../../types';
+import { hashPassword, isHashedPassword } from '../utils/passwordSecurity';
 
 const isMissingColumn = (error: any, column: string) => {
   return error?.code === 'PGRST204' && String(error?.message || '').includes(`'${column}'`);
@@ -393,11 +394,15 @@ export const userService = {
         throw new Error(userType === 'internal' ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色');
       }
 
+      const rawPassword = String(user.password_hash || user.password || '');
+      if (!rawPassword) {
+        throw new Error('创建用户失败：缺少初始密码');
+      }
       const baseUser: any = {
         user_name: user.username || user.user_name || user.name,
         name: user.name || user.user_name || user.username,
         username: user.username || user.user_name,
-        password_hash: user.password_hash || user.password,
+        password_hash: rawPassword && isHashedPassword(rawPassword) ? rawPassword : await hashPassword(rawPassword),
         role_id: roleId,
         role_ids: roleIds,
         status: user.status || 'enabled',
@@ -473,7 +478,7 @@ export const userService = {
         return null;
       }
 
-      const baseUser: any = { status: user.status || 'enabled' };
+      const baseUser: any = {};
       const roleIds = dedupeStringArray([...(user.role_ids || []), user.role_id]);
 
       if (user.username || user.user_name) {
@@ -483,13 +488,17 @@ export const userService = {
         baseUser.name = user.name || user.user_name || user.username;
       }
       if (user.password || user.password_hash) {
-        baseUser.password_hash = user.password || user.password_hash;
+        const rawPassword = String(user.password || user.password_hash);
+        baseUser.password_hash = isHashedPassword(rawPassword) ? rawPassword : await hashPassword(rawPassword);
       }
       if (user.phone) {
         baseUser.phone = user.phone;
       }
       if (user.email) {
         baseUser.email = user.email;
+      }
+      if (user.status) {
+        baseUser.status = user.status;
       }
       if (roleIds.length) {
         baseUser.role_id = roleIds[0];

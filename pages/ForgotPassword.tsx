@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
+import { authService } from '../src/services/authService';
 
 export const ForgotPassword: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -25,26 +26,16 @@ export const ForgotPassword: React.FC = () => {
     setSuccess('');
 
     try {
-      // 模拟发送重置密码邮件
-      console.log('发送重置密码邮件请求:', formData);
-      
-      // 这里应该调用真实的后端API
-      // const response = await authService.forgotPassword(formData.email);
-      
-      // 模拟发送成功
-      setTimeout(() => {
-        setLoading(false);
-        setSuccess('重置密码链接已发送到您的邮箱，请查收邮件并按照提示操作');
-        
-        // 3秒后跳转到登录页面
-        setTimeout(() => {
-          navigate('/login');
-        }, 3000);
-      }, 1500);
+      await authService.forgotPassword(formData);
+      setSuccess('重置密码链接已发送到您的邮箱，请查收邮件并按照提示操作');
+      window.setTimeout(() => {
+        navigate('/login');
+      }, 3000);
     } catch (err) {
-      setLoading(false);
-      setError('发送重置密码链接失败，请检查邮箱是否正确');
+      setError(err instanceof Error ? err.message : '发送重置密码链接失败，请检查邮箱是否正确');
       console.error('发送重置密码链接失败:', err);
+    } finally {
+      setLoading(false);
     }
   };
 

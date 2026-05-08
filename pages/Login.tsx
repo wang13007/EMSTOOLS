@@ -41,8 +41,6 @@ export const Login: React.FC = () => {
         autoCreateExternalIfNotExists: isAuthorizedRedirect,
       });
 
-      localStorage.setItem('ems_user', JSON.stringify(loginResult.user));
-      localStorage.setItem('ems_token', loginResult.token);
       navigate(redirectTo);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '登录失败，请检查账号和密码';

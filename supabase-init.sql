@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   user_name VARCHAR(50),
   user_realname VARCHAR(100),
   name VARCHAR(100),
-  password_hash VARCHAR(255) NOT NULL DEFAULT '1234',
+  password_hash VARCHAR(255) NOT NULL DEFAULT 'sha256:03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
   type VARCHAR(20) NOT NULL DEFAULT 'external',
   user_type VARCHAR(20) NOT NULL DEFAULT 'external',
   role_id UUID,
@@ -257,7 +257,7 @@ UPDATE public.users
 SET user_id = gen_random_uuid()
 WHERE user_id IS NULL;
 
-ALTER TABLE public.users ALTER COLUMN password_hash SET DEFAULT '1234';
+ALTER TABLE public.users ALTER COLUMN password_hash SET DEFAULT 'sha256:03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
 ALTER TABLE public.users ALTER COLUMN password_hash SET NOT NULL;
 ALTER TABLE public.users ALTER COLUMN user_id SET NOT NULL;
 ALTER TABLE public.users ALTER COLUMN status SET DEFAULT 'enabled';
@@ -1103,7 +1103,7 @@ SELECT
   'admin',
   'admin',
   'System Administrator',
-  '1234',
+  'sha256:03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4',
   'internal',
   'internal',
   r.id,
