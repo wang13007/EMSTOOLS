@@ -849,6 +849,12 @@ ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS content TEXT;
 ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);
 ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS result VARCHAR(20) DEFAULT '成功';
 ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS create_time TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS request_id UUID;
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS source VARCHAR(40) NOT NULL DEFAULT 'browser-fallback';
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS previous_hash TEXT;
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS integrity_hash TEXT;
 ALTER TABLE public.system_logs ALTER COLUMN id DROP DEFAULT;
 ALTER TABLE public.system_logs ALTER COLUMN operator_id DROP DEFAULT;
 
@@ -899,6 +905,9 @@ ALTER TABLE public.system_logs
 CREATE INDEX IF NOT EXISTS idx_system_logs_operator_id ON public.system_logs(operator_id);
 CREATE INDEX IF NOT EXISTS idx_system_logs_type ON public.system_logs(type);
 CREATE INDEX IF NOT EXISTS idx_system_logs_create_time ON public.system_logs(create_time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_system_logs_request_id ON public.system_logs(request_id) WHERE request_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_system_logs_integrity_hash ON public.system_logs(integrity_hash) WHERE integrity_hash IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_system_logs_source ON public.system_logs(source);
 
 CREATE TABLE IF NOT EXISTS public.messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

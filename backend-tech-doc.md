@@ -7,9 +7,10 @@
 - 前端：React + TypeScript + Vite
 - 路由：HashRouter（适配静态托管）
 - 数据层：Supabase JS 直连 PostgreSQL
+- 审计写入：Supabase Edge Function `audit-log`
 - AI：`@google/genai`（Gemini）
 
-不包含独立 Node/Nest 服务。
+不包含独立 Node/Nest 服务；生产审计由 Supabase Edge Function 承担服务端写入。
 
 ## 2. 代码结构
 
@@ -24,6 +25,8 @@ services/reportService.ts
 src/config/supabase.ts
 supabase-init.sql
 supabase-repair-existing.sql
+supabase-audit-hardening.sql
+supabase/functions/audit-log/index.ts
 ```
 
 ## 3. 核心模块
@@ -71,6 +74,14 @@ supabase-repair-existing.sql
 - 用户菜单和退出登录
 - 菜单折叠与高亮
 
+### 3.5 审计日志
+
+- 前端统一调用 `createAuditLog`。
+- 默认优先调用 Supabase Edge Function `audit-log`。
+- Edge Function 使用 `SUPABASE_SERVICE_ROLE_KEY` 写入 `system_logs`，从请求头提取真实 IP。
+- Edge Function 使用 `AUDIT_LOG_HMAC_SECRET` 生成 `integrity_hash`，并通过 `previous_hash` 形成哈希链。
+- 未部署函数且未启用严格模式时，开发环境会降级为浏览器直写；生产环境建议配置 `VITE_AUDIT_LOG_STRICT=true`。
+
 ## 4. 路由与访问控制
 
 `App.tsx` 采用 `ProtectedRoute` + `PublicRoute`：
@@ -95,6 +106,7 @@ supabase-repair-existing.sql
 
 - `supabase-init.sql`：全量初始化 + 兼容修复 + 索引 + RLS + 种子数据
 - `supabase-repair-existing.sql`：历史库修复（字段类型、外键、索引）
+- `supabase-audit-hardening.sql`：审计日志真实 IP、元数据和哈希链字段
 
 ## 7. 安全注意事项
 
@@ -103,3 +115,5 @@ supabase-repair-existing.sql
   - 移除内置密钥
   - 仅使用环境变量注入
   - 将高权限写操作收敛到服务端
+  - 部署 `audit-log` Edge Function 并开启 `VITE_AUDIT_LOG_STRICT=true`
+  - 后续将自定义 localStorage 会话迁移到服务端可验证认证，避免 `operator_id` 依赖前端上报

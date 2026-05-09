@@ -156,6 +156,12 @@
 | `content` | `text` | NOT NULL | 日志内容 |
 | `ip_address` | `varchar(64)` | NULL | IP地址 |
 | `result` | `varchar(20)` | NOT NULL, DEFAULT `成功`, CHECK(`成功`,`失败`) | 操作结果 |
+| `request_id` | `uuid` | NULL, UNIQUE WHERE NOT NULL | Edge Function 请求ID |
+| `user_agent` | `text` | NULL | 服务端采集的 User-Agent |
+| `source` | `varchar(40)` | NOT NULL, DEFAULT `browser-fallback` | 日志来源 |
+| `metadata` | `jsonb` | NOT NULL, DEFAULT `{}` | 审计扩展元数据 |
+| `previous_hash` | `text` | NULL | 前一条加固审计日志哈希 |
+| `integrity_hash` | `text` | NULL | 服务端 HMAC-SHA256 完整性哈希 |
 | `create_time` | `timestamptz` | NOT NULL, DEFAULT `now()` | 创建时间 |
 
 ### 2.11 `messages`

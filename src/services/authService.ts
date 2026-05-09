@@ -1,7 +1,8 @@
 ﻿import { cachePermissionKeys, resolvePermissionKeysByUserAndRoles } from '../auth/permissions';
 import { hashPassword, shouldUpgradePasswordHash, verifyPassword } from '../utils/passwordSecurity';
+import { LogType, OperationResult } from '../../types';
 import { validateRegisterInput } from '../utils/userValidation';
-import { roleService, userService } from './supabaseService';
+import { createAuditLog, roleService, userService } from './supabaseService';
 
 export interface LoginRequest {
   username: string;
@@ -178,9 +179,20 @@ export const authService = {
 
       persistSession(userInfo, token);
       cachePermissionKeys(permissionKeys);
+      await createAuditLog({
+        type: LogType.LOGIN,
+        content: `${userInfo.name || userInfo.username} 登录系统`,
+        result: OperationResult.SUCCESS,
+        operatorId: userInfo.id,
+      });
       return { user: userInfo, token };
     } catch (error) {
       const msg = error instanceof Error ? error.message : '登录失败，请检查账号和密码';
+      await createAuditLog({
+        type: LogType.LOGIN,
+        content: `登录失败：${String(data.username || '').trim() || '未知账号'}，${msg}`,
+        result: OperationResult.FAILURE,
+      });
       throw new Error(msg);
     }
   },
@@ -238,9 +250,20 @@ export const authService = {
       const token = generateSecureToken();
       persistSession(userInfo, token);
       cachePermissionKeys(permissionKeys);
+      await createAuditLog({
+        type: LogType.LOGIN,
+        content: `${userInfo.name || userInfo.username} 注册并登录系统`,
+        result: OperationResult.SUCCESS,
+        operatorId: userInfo.id,
+      });
       return { user: userInfo, token };
     } catch (error) {
       const msg = error instanceof Error ? error.message : '注册失败，请稍后重试';
+      await createAuditLog({
+        type: LogType.LOGIN,
+        content: `用户注册失败：${String(data.username || '').trim() || '未知账号'}，${msg}`,
+        result: OperationResult.FAILURE,
+      });
       throw new Error(msg);
     }
   },
@@ -254,6 +277,13 @@ export const authService = {
   },
 
   async logout(): Promise<{ success: boolean }> {
+    const currentUser = await authService.getCurrentUser();
+    await createAuditLog({
+      type: LogType.LOGIN,
+      content: `${currentUser?.name || currentUser?.username || '当前用户'} 退出登录`,
+      result: OperationResult.SUCCESS,
+      operatorId: currentUser?.id,
+    });
     clearStoredSession();
     return { success: true };
   },

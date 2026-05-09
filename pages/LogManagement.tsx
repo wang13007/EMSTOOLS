@@ -8,23 +8,36 @@ export const LogManagement: React.FC = () => {
   const [filter, setFilter] = useState<LogType | 'ALL'>('ALL');
 
   useEffect(() => {
-    // 从数据库获取系统日志列表
+    let mounted = true;
+
     const fetchLogs = async () => {
       const logList = await logService.getLogs();
-      // 转换数据格式以匹配前端类型
       const formattedLogs = logList.map(log => ({
         id: log.id,
-        operator: '系统用户', // 需要根据operator_id获取用户名
+        operator_id: log.operator_id,
+        operator: log.operator || '系统/未登录用户',
         type: log.type,
         content: log.content,
         time: log.create_time ? new Date(log.create_time).toLocaleString() : '',
-        ip: log.ip_address,
+        create_time: log.create_time,
+        ip: log.ip_address || 'browser',
+        ip_address: log.ip_address,
+        request_id: log.request_id,
+        source: log.source,
+        user_agent: log.user_agent,
+        previous_hash: log.previous_hash,
+        integrity_hash: log.integrity_hash,
+        metadata: log.metadata,
         result: log.result
       }));
+      if (!mounted) return;
       setLogs(formattedLogs);
     };
 
-    fetchLogs();
+    void fetchLogs();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const filteredLogs = filter === 'ALL' ? logs : logs.filter(l => l.type === filter);
@@ -56,6 +69,8 @@ export const LogManagement: React.FC = () => {
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">操作内容</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">结果</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">IP 地址</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">来源</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">完整性</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -77,6 +92,10 @@ export const LogManagement: React.FC = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-slate-400 text-xs font-mono">{log.ip}</td>
+                <td className="px-6 py-4 text-slate-400 text-xs">{log.source || 'browser-fallback'}</td>
+                <td className="px-6 py-4 text-slate-400 text-xs font-mono">
+                  {log.integrity_hash ? `${log.integrity_hash.slice(0, 12)}...` : '未加固'}
+                </td>
               </tr>
             ))}
           </tbody>

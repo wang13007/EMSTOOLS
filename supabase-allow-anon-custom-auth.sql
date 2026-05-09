@@ -68,10 +68,19 @@ CREATE POLICY p_product_capabilities_anon_all ON public.product_capabilities FOR
 USING (auth.role() IN ('anon', 'authenticated'))
 WITH CHECK (auth.role() IN ('anon', 'authenticated'));
 
+-- Audit logs are read from the browser but written by the audit-log Edge Function.
+-- This keeps anon clients from tampering with production audit trails after
+-- supabase-audit-hardening.sql is applied.
+REVOKE INSERT, UPDATE, DELETE ON public.system_logs FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON public.system_logs FROM authenticated;
+GRANT SELECT ON public.system_logs TO anon;
+GRANT SELECT ON public.system_logs TO authenticated;
+
+DROP POLICY IF EXISTS p_system_logs_all ON public.system_logs;
 DROP POLICY IF EXISTS p_system_logs_anon_all ON public.system_logs;
-CREATE POLICY p_system_logs_anon_all ON public.system_logs FOR ALL
-USING (auth.role() IN ('anon', 'authenticated'))
-WITH CHECK (auth.role() IN ('anon', 'authenticated'));
+DROP POLICY IF EXISTS p_system_logs_read ON public.system_logs;
+CREATE POLICY p_system_logs_read ON public.system_logs FOR SELECT
+USING (auth.role() IN ('anon', 'authenticated'));
 
 DROP POLICY IF EXISTS p_messages_anon_all ON public.messages;
 CREATE POLICY p_messages_anon_all ON public.messages FOR ALL

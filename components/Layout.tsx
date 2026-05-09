@@ -2,6 +2,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS } from '../constants';
 import { UserType } from '../types';
+import { authService } from '../src/services/authService';
 import { messageService, roleService, userService } from '../src/services/supabaseService';
 import {
   cachePermissionKeys,
@@ -227,11 +228,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
     navigate('/settings/messages');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('ems_user');
-    localStorage.removeItem('ems_token');
-    localStorage.removeItem('ems_session');
-    cachePermissionKeys([]);
+  const handleLogout = async () => {
+    await authService.logout();
     setCurrentUser(null);
     setMessagePanelOpen(false);
     setUserMenuOpen(false);

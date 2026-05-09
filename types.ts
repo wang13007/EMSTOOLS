@@ -209,12 +209,21 @@ export interface PreSalesAssignment {
 
 export interface SystemLog {
   id: string;
+  operator_id?: string;
   operator: string;
   type: LogType;
   content: string;
   time: string;
   ip: string;
+  ip_address?: string;
+  request_id?: string;
+  user_agent?: string;
+  source?: string;
+  metadata?: Record<string, any>;
+  previous_hash?: string;
+  integrity_hash?: string;
   result: OperationResult;
+  create_time?: string;
 }
 
 export interface Message {

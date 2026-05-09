@@ -1,0 +1,2 @@
+[functions.audit-log]
+verify_jwt = false

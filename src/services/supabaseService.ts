@@ -1,5 +1,5 @@
 ﻿import supabase from '../config/supabase';
-import { ReportStatus, SurveyForm, SurveyStatus, SurveyTemplate, SystemLog } from '../../types';
+import { LogType, OperationResult, ReportStatus, SurveyForm, SurveyStatus, SurveyTemplate, SystemLog } from '../../types';
 import { hashPassword, isHashedPassword } from '../utils/passwordSecurity';
 import { generateShareToken, hashShareToken } from '../utils/shareSecurity';
 
@@ -233,6 +233,99 @@ const getLocalUserContext = () => {
     return null;
   }
 };
+
+const getLocalUserDisplayName = () => {
+  if (!canUseLocalStorage()) return '';
+  try {
+    const raw = window.localStorage.getItem('ems_user');
+    if (!raw) return '';
+    const user = JSON.parse(raw);
+    return String(user?.name || user?.user_name || user?.username || '').trim();
+  } catch {
+    return '';
+  }
+};
+
+const getClientAddressHint = () => {
+  if (typeof window === 'undefined') return 'server';
+  return window.location?.hostname || 'browser';
+};
+
+const insertAuditLogDirectly = async (payload: {
+  operator_id: string | null;
+  type: LogType;
+  content: string;
+  ip_address: string;
+  result: OperationResult;
+}) => {
+  const { data, error } = await supabase.from('system_logs').insert(payload).select().maybeSingle();
+  if (error) {
+    console.error('写入审计日志失败:', error);
+    return null;
+  }
+  return data;
+};
+
+export const createAuditLog = async (params: {
+  type: LogType;
+  content: string;
+  result?: OperationResult;
+  operatorId?: string | null;
+  ipAddress?: string | null;
+}) => {
+  try {
+    const localUser = getLocalUserContext();
+    const operatorId = params.operatorId || localUser?.id || null;
+    const payload = {
+      operator_id: operatorId && isUuid(operatorId) ? operatorId : null,
+      type: params.type,
+      content: String(params.content || '').slice(0, 1000),
+      ip_address: params.ipAddress || getClientAddressHint(),
+      result: params.result || OperationResult.SUCCESS,
+    };
+
+    const { data, error } = await supabase.functions.invoke('audit-log', {
+      body: {
+        operator_id: payload.operator_id,
+        type: payload.type,
+        content: payload.content,
+        result: payload.result,
+        client_address_hint: payload.ip_address,
+        client_time: new Date().toISOString(),
+        location: typeof window === 'undefined'
+          ? undefined
+          : {
+              href: window.location.href,
+              pathname: window.location.pathname,
+              hash: window.location.hash,
+            },
+      },
+    });
+
+    if (!error) {
+      return data?.log || data || null;
+    }
+
+    const strictAudit = String(import.meta.env.VITE_AUDIT_LOG_STRICT || '').toLowerCase() === 'true';
+    console.error('调用审计 Edge Function 失败:', error);
+    if (strictAudit) {
+      return null;
+    }
+
+    return insertAuditLogDirectly(payload);
+  } catch (error) {
+    console.error('写入审计日志异常:', error);
+    return null;
+  }
+};
+
+const auditSuccess = (type: LogType, content: string, operatorId?: string | null) =>
+  createAuditLog({ type, content, result: OperationResult.SUCCESS, operatorId });
+
+const auditFailure = (type: LogType, content: string, operatorId?: string | null) =>
+  createAuditLog({ type, content, result: OperationResult.FAILURE, operatorId });
+
+const describeCurrentOperator = () => getLocalUserDisplayName() || '当前用户';
 
 const isExternalLocalUser = () => {
   const user = getLocalUserContext();
@@ -501,6 +594,7 @@ export const userService = {
           if (!error) {
             const createdUserId = data.user_id || data.id;
             cacheRoleIdsForUser(createdUserId, roleIds);
+            await auditSuccess(LogType.USER, `${describeCurrentOperator()} 创建用户：${baseUser.username || baseUser.user_name || createdUserId}`);
             return normalizeUser({ ...data, role_ids: roleIds });
           }
 
@@ -526,9 +620,11 @@ export const userService = {
 
       const readableMessage = formatSupabaseWriteError(lastError);
       console.error('创建用户失败:', lastError);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 创建用户失败：${baseUser.username || baseUser.user_name || '未知用户'}，${readableMessage}`);
       throw new Error(readableMessage);
     } catch (error) {
       console.error('创建用户过程中发生异常:', error);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 创建用户异常：${error instanceof Error ? error.message : '未知错误'}`);
       throw error instanceof Error ? error : new Error('创建用户失败，请稍后重试');
     }
   },
@@ -597,6 +693,9 @@ export const userService = {
           if (!primary.error && primary.data) {
             const updatedUserId = primary.data?.user_id || primary.data?.id;
             if (roleIds.length) cacheRoleIdsForUser(updatedUserId, roleIds);
+            if (!user.last_login_time || Object.keys(baseUser).some((key) => key !== 'last_login_time')) {
+              await auditSuccess(LogType.USER, `${describeCurrentOperator()} 更新用户：${primary.data?.username || primary.data?.user_name || updatedUserId}`);
+            }
             return normalizeUser({ ...primary.data, role_ids: roleIds.length ? roleIds : undefined });
           }
 
@@ -618,6 +717,7 @@ export const userService = {
           }
 
           console.error('更新用户失败:', fallback.error || primary.error);
+          await auditFailure(LogType.USER, `${describeCurrentOperator()} 更新用户失败：${targetId}`);
           return null;
         }
 
@@ -627,9 +727,11 @@ export const userService = {
       }
 
       console.error('更新用户失败：无法匹配 users 表的类型字段(type/user_type)');
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 更新用户失败：${targetId}`);
       return null;
     } catch (error) {
       console.error('更新用户过程中发生异常:', error);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 更新用户异常：${error instanceof Error ? error.message : id}`);
       return null;
     }
   },
@@ -684,6 +786,7 @@ export const userService = {
         } else {
           console.warn('鍒犻櫎鐢ㄦ埛鏈敓鏁? 鏈尮閰嶅埌鍙垹闄よ褰曟垨鍙桼LS绛栫暐闄愬埗', { id: targetId });
         }
+        await auditFailure(LogType.USER, `${describeCurrentOperator()} 删除用户失败：${targetId}`);
         return false;
       }
 
@@ -693,9 +796,11 @@ export const userService = {
         ...deletedRows.map((row) => row?.user_id),
       ]);
       cacheIds.forEach((cacheId) => removeCachedRoleIdsForUser(cacheId));
+      await auditSuccess(LogType.USER, `${describeCurrentOperator()} 删除用户：${targetId}`);
       return true;
     } catch (error) {
       console.error('鍒犻櫎鐢ㄦ埛杩囩▼涓彂鐢熷紓甯?', error);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 删除用户异常：${error instanceof Error ? error.message : id}`);
       return false;
     }
   },
@@ -785,9 +890,11 @@ export const surveyService = {
 
     if (updateError) {
       console.error('淇濆瓨澶栭儴鎺堟潈閾炬帴 token 澶辫触:', updateError);
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 生成外部授权链接失败：${id}`);
       return null;
     }
 
+    await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 生成外部授权链接：${updated?.name || id}`);
     return { token: shareToken, survey: normalizeSurveyRow(updated) };
   },
 
@@ -839,9 +946,11 @@ export const surveyService = {
 
     if (updateError) {
       console.error('鎺堟潈閾炬帴缁戝畾澶栭儴鐢ㄦ埛澶辫触:', updateError);
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 绑定外部授权链接失败：${id}`);
       return null;
     }
 
+    await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 通过外部授权链接访问调研表单：${data?.name || id}`);
     return normalizeSurveyRow(updated);
   },
 
@@ -865,8 +974,10 @@ export const surveyService = {
     const { data, error } = await supabase.from('survey_forms').insert(dbSurvey).select().single();
     if (error) {
       console.error('鍒涘缓琛ㄥ崟澶辫触:', error);
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 创建调研表单失败：${dbSurvey.name || dbSurvey.customer_name || '未命名'}`);
       return null;
     }
+    await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 创建调研表单：${data?.name || data?.customer_name || data?.id}`);
     return normalizeSurveyRow(data);
   },
 
@@ -876,6 +987,7 @@ export const surveyService = {
       const target = await surveyService.getSurveyById(id);
       if (!target) {
         console.warn('澶栭儴鐢ㄦ埛鏇存柊琛ㄥ崟琚嫤鎴?', { surveyId: id, userId: externalUser.id });
+        await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 更新调研表单被拒绝：${id}`);
         return null;
       }
       survey = pickExternalSurveyUpdatePayload(survey);
@@ -908,8 +1020,10 @@ export const surveyService = {
     const { data, error } = await supabase.from('survey_forms').update(dbSurvey).eq('id', id).select().single();
     if (error) {
       console.error('鏇存柊琛ㄥ崟澶辫触:', error);
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 更新调研表单失败：${id}`);
       return null;
     }
+    await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 更新调研表单：${data?.name || data?.customer_name || id}`);
     return normalizeSurveyRow(data);
   },
 
@@ -917,14 +1031,17 @@ export const surveyService = {
     const externalUser = isExternalLocalUser();
     if (externalUser?.id) {
       console.warn('外部用户无权删除调研表单:', { surveyId: id, userId: externalUser.id });
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 删除调研表单被拒绝：${id}`);
       return false;
     }
 
     const { error } = await supabase.from('survey_forms').delete().eq('id', id);
     if (error) {
       console.error('鍒犻櫎琛ㄥ崟澶辫触:', error);
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 删除调研表单失败：${id}`);
       return false;
     }
+    await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 删除调研表单：${id}`);
     return true;
   },
 };
@@ -935,7 +1052,6 @@ export const templateService = {
     if (error) {
       console.error('鑾峰彇妯℃澘鍒楄〃澶辫触:', error);
       return [];
-      survey = pickExternalSurveyUpdatePayload(survey);
     }
     return data;
   },
@@ -944,8 +1060,10 @@ export const templateService = {
     const { data, error } = await supabase.from('survey_templates').insert(template).select().single();
     if (error) {
       console.error('鍒涘缓妯℃澘澶辫触:', error);
+      await auditFailure(LogType.SYSTEM, `${describeCurrentOperator()} 创建调研模板失败：${template.name || '未命名模板'}`);
       return null;
     }
+    await auditSuccess(LogType.SYSTEM, `${describeCurrentOperator()} 创建调研模板：${data?.name || data?.id}`);
     return data;
   },
 
@@ -979,8 +1097,10 @@ export const templateService = {
 
       if (error) {
         console.error('鏇存柊妯℃澘琛屽け璐?', error);
+        await auditFailure(LogType.SYSTEM, `${describeCurrentOperator()} 更新导入模板失败：${name}`);
         throw error;
       }
+      await auditSuccess(LogType.SYSTEM, `${describeCurrentOperator()} 更新导入模板：${name}`);
       return data || null;
     }
 
@@ -995,8 +1115,10 @@ export const templateService = {
       .maybeSingle();
     if (error) {
       console.error('鏂板妯℃澘琛屽け璐?', error);
+      await auditFailure(LogType.SYSTEM, `${describeCurrentOperator()} 新增导入模板失败：${name}`);
       throw error;
     }
+    await auditSuccess(LogType.SYSTEM, `${describeCurrentOperator()} 新增导入模板：${name}`);
     return data || null;
   },
 
@@ -1007,8 +1129,10 @@ export const templateService = {
     const { error } = await supabase.from('survey_templates').delete().eq('name', name);
     if (error) {
       console.error('鍒犻櫎妯℃澘琛屽け璐?', error);
+      await auditFailure(LogType.SYSTEM, `${describeCurrentOperator()} 删除导入模板失败：${name}`);
       return false;
     }
+    await auditSuccess(LogType.SYSTEM, `${describeCurrentOperator()} 删除导入模板：${name}`);
     return true;
   },
 };
@@ -1034,13 +1158,14 @@ export const dictService = {
 };
 
 export const logService = {
-  async createLog(log: Omit<SystemLog, 'id' | 'create_time'>) {
-    const { data, error } = await supabase.from('system_logs').insert(log).select().single();
-    if (error) {
-      console.error('鍒涘缓鏃ュ織澶辫触:', error);
-      return null;
-    }
-    return data;
+  async createLog(log: Pick<SystemLog, 'type' | 'content'> & Partial<SystemLog>) {
+    return createAuditLog({
+      type: log.type,
+      content: log.content,
+      result: log.result,
+      operatorId: log.operator_id,
+      ipAddress: log.ip_address || log.ip,
+    });
   },
 
   async getLogs() {
@@ -1049,7 +1174,30 @@ export const logService = {
       console.error('鑾峰彇鏃ュ織鍒楄〃澶辫触:', error);
       return [];
     }
-    return data;
+    const logs = data || [];
+    const operatorIds = dedupeStringArray(logs.map((log: any) => log.operator_id)).filter(isUuid);
+    if (!operatorIds.length) return logs;
+
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id,user_id,username,user_name,name')
+      .or(`id.in.(${operatorIds.join(',')}),user_id.in.(${operatorIds.join(',')})`);
+    if (usersError) {
+      console.warn('补齐日志操作人失败:', usersError);
+      return logs;
+    }
+
+    const userMap = new Map<string, string>();
+    (users || []).forEach((user: any) => {
+      const label = user.user_name || user.name || user.username || '未知用户';
+      if (user.id) userMap.set(user.id, label);
+      if (user.user_id) userMap.set(user.user_id, label);
+    });
+
+    return logs.map((log: any) => ({
+      ...log,
+      operator: userMap.get(log.operator_id) || (log.operator_id ? '未知用户' : '系统/未登录用户'),
+    }));
   },
 };
 
@@ -1223,6 +1371,7 @@ export const messageService = {
         .select()
         .maybeSingle();
       if (!inserted.error) {
+        await auditSuccess(LogType.SYSTEM, `${describeCurrentOperator()} 标记消息已读：${id}`);
         return inserted.data || { id, read: true };
       }
       if (String(inserted.error?.code || '') !== '42P01') {
@@ -1233,8 +1382,10 @@ export const messageService = {
     const { data, error } = await supabase.from('messages').update({ read: true }).eq('id', id).select().single();
     if (error) {
       console.error('鏍囪娑堟伅宸茶澶辫触:', error);
+      await auditFailure(LogType.SYSTEM, `${describeCurrentOperator()} 标记消息已读失败：${id}`);
       return null;
     }
+    await auditSuccess(LogType.SYSTEM, `${describeCurrentOperator()} 标记消息已读：${id}`);
     return data;
   },
 };
@@ -1275,6 +1426,7 @@ export const surveyReportService = {
       .maybeSingle();
 
     if (!error) {
+      await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 保存调研报告：${targetId}`);
       return data || null;
     }
 
@@ -1285,6 +1437,7 @@ export const surveyReportService = {
 
     if (!conflictConstraintMissing) {
       console.error('淇濆瓨鎶ュ憡澶辫触:', error);
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 保存调研报告失败：${targetId}`);
       return null;
     }
 
@@ -1298,14 +1451,17 @@ export const surveyReportService = {
       .select()
       .maybeSingle();
     if (!updated.error && updated.data) {
+      await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 更新调研报告：${targetId}`);
       return updated.data;
     }
 
     const inserted = await supabase.from('survey_reports').insert(payload).select().maybeSingle();
     if (inserted.error) {
       console.error('淇濆瓨鎶ュ憡澶辫触(鍏煎璺緞):', inserted.error);
+      await auditFailure(LogType.SURVEY, `${describeCurrentOperator()} 保存调研报告失败：${targetId}`);
       return null;
     }
+    await auditSuccess(LogType.SURVEY, `${describeCurrentOperator()} 新增调研报告：${targetId}`);
     return inserted.data || null;
   },
 };
@@ -1336,8 +1492,10 @@ export const roleService = {
     const { data, error } = await supabase.from('roles').insert(role).select().single();
     if (error) {
       console.error('鍒涘缓瑙掕壊澶辫触:', error);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 创建角色失败：${role?.name || '未命名角色'}`);
       return null;
     }
+    await auditSuccess(LogType.USER, `${describeCurrentOperator()} 创建角色：${data?.name || data?.id}`);
     return data;
   },
 
@@ -1350,8 +1508,10 @@ export const roleService = {
     const { data, error } = await supabase.from('roles').update(payload).eq('id', id).select().single();
     if (error) {
       console.error('鏇存柊瑙掕壊澶辫触:', error);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 更新角色失败：${roleInfo?.name || id}`);
       return null;
     }
+    await auditSuccess(LogType.USER, `${describeCurrentOperator()} 更新角色：${data?.name || id}`);
     return data;
   },
 
@@ -1359,13 +1519,16 @@ export const roleService = {
     const { data: roleInfo } = await supabase.from('roles').select('name').eq('id', id).maybeSingle();
     if (isSystemPresetRoleName(roleInfo?.name)) {
       console.warn('棰勭疆瑙掕壊涓嶅彲鍒犻櫎:', roleInfo.name);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 删除预置角色被拒绝：${roleInfo.name}`);
       return false;
     }
     const { error } = await supabase.from('roles').delete().eq('id', id);
     if (error) {
       console.error('鍒犻櫎瑙掕壊澶辫触:', error);
+      await auditFailure(LogType.USER, `${describeCurrentOperator()} 删除角色失败：${roleInfo?.name || id}`);
       return false;
     }
+    await auditSuccess(LogType.USER, `${describeCurrentOperator()} 删除角色：${roleInfo?.name || id}`);
     return true;
   },
 };
