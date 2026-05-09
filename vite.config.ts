@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       manifest: true,
+      chunkSizeWarningLimit: 1000,
     },
     plugins: [react()],
     define: {

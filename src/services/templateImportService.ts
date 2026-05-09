@@ -1,6 +1,5 @@
 ﻿import { GoogleGenAI, Type } from '@google/genai';
 import JSZip from 'jszip';
-import mammoth from 'mammoth/mammoth.browser';
 import { ReportTemplate, SurveyField, SurveySection, SurveyTemplate } from '../../types';
 import { buildImportedTemplateId } from './templateStore';
 
@@ -121,6 +120,7 @@ const extractTextFromPdf = async (buffer: ArrayBuffer) => {
 };
 
 const extractTextFromDocx = async (buffer: ArrayBuffer) => {
+  const mammoth = (await import('mammoth/mammoth.browser')).default;
   const result = await mammoth.extractRawText({ arrayBuffer: buffer });
   return cleanText(result.value || '');
 };

@@ -1,4 +1,4 @@
-export enum UserType {
+﻿export enum UserType {
   INTERNAL = 'internal',
   EXTERNAL = 'external',
 }
@@ -14,7 +14,6 @@ export enum LogType {
   USER = 'user',
   SYSTEM = 'system',
 }
-
 export enum OperationResult {
   SUCCESS = '成功',
   FAILURE = '失败',

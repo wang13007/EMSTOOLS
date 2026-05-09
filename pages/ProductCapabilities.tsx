@@ -1,7 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ICONS } from '../constants';
-import * as XLSX from 'xlsx';
-import ExcelJS from 'exceljs';
 import { DictItem, DictType, ProductCapability, ProductType } from '../types';
 import { dictService } from '../src/services/supabaseService';
 import { INITIAL_DICT_ITEMS, INITIAL_DICT_TYPES } from '../constants/dictionaries';
@@ -555,6 +553,7 @@ export const ProductCapabilities: React.FC = () => {
   };
 
   const handleExport = async () => {
+    const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('产品能力');
     const optionsSheet = workbook.addWorksheet('下拉选项');
@@ -660,6 +659,7 @@ export const ProductCapabilities: React.FC = () => {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const XLSX = await import('xlsx');
       const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
       const firstSheetName = workbook.SheetNames[0];
       if (!firstSheetName) {

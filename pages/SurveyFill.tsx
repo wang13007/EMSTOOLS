@@ -8,6 +8,7 @@ import { applySurveyTemplateNameOverrides } from '../src/services/templateNameSt
 import { usePermission } from '../src/auth/usePermission';
 import { getAllSurveyTemplates, syncImportedTemplatesFromDatabase } from '../src/services/templateStore';
 import { ReportDetailContent } from './ReportDetail';
+import { appendShareTokenToHashUrl, SHARE_TOKEN_QUERY_PARAM } from '../src/utils/shareSecurity';
 
 const AUTO_SAVE_DELAY_MS = 1200;
 
@@ -150,6 +151,7 @@ export const SurveyFill: React.FC = () => {
       const fallbackId = localStorage.getItem('ems_last_created_survey_id') || '';
       const resolvedId = routeId || fallbackId;
       const fromAuthorizedLink = location.pathname.includes('/authorized/surveys/fill/');
+      const shareToken = new URLSearchParams(location.search).get(SHARE_TOKEN_QUERY_PARAM);
 
       if (!resolvedId) {
         setInitializing(false);
@@ -161,20 +163,20 @@ export const SurveyFill: React.FC = () => {
       setInitializing(true);
       let survey = await surveyService.getSurveyById(resolvedId);
       if (!survey && fromAuthorizedLink) {
-        survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId);
+        survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId, shareToken);
       }
       if (!survey) {
         await new Promise((resolve) => setTimeout(resolve, 250));
         survey = await surveyService.getSurveyById(resolvedId);
         if (!survey && fromAuthorizedLink) {
-          survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId);
+          survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId, shareToken);
         }
       }
       if (!survey) {
         await new Promise((resolve) => setTimeout(resolve, 400));
         survey = await surveyService.getSurveyById(resolvedId);
         if (!survey && fromAuthorizedLink) {
-          survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId);
+          survey = await surveyService.grantExternalAccessByAuthorizedLink(resolvedId, shareToken);
         }
       }
       if (!survey) {
@@ -194,7 +196,7 @@ export const SurveyFill: React.FC = () => {
     };
 
     loadSurvey();
-  }, [id, location.pathname, navigate]);
+  }, [id, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     return () => {
@@ -392,28 +394,19 @@ export const SurveyFill: React.FC = () => {
     }
     if (!form) return;
     try {
-      const nextData = {
-        ...(form.data || {}),
-        external_link_enabled: true,
-      };
-
-      if (!form.data?.external_link_enabled) {
-        const updated = await surveyService.updateSurvey(form.id, {
-          data: nextData,
-          status: form.status,
-          report_status: form.reportStatus,
-        });
-
-        if (updated) {
-          const mapped = toSurveyForm(updated);
-          setForm(mapped);
-          syncLocalSurvey(mapped);
-        }
+      const created = await surveyService.createAuthorizedLinkToken(form.id);
+      if (!created) {
+        throw new Error('生成授权链接失败');
       }
 
-      const link = `${window.location.origin}${window.location.pathname}#/authorized/surveys/fill/${form.id}`;
+      const mapped = toSurveyForm(created.survey);
+      setForm(mapped);
+      syncLocalSurvey(mapped);
+
+      const baseLink = `${window.location.origin}${window.location.pathname}#/authorized/surveys/fill/${form.id}`;
+      const link = appendShareTokenToHashUrl(baseLink, created.token);
       await navigator.clipboard.writeText(link);
-      alert('外链填写地址已复制，外部客户可通过该链接继续填写。');
+      alert('外链填写地址已复制，有效期 14 天。');
     } catch (error) {
       console.error('复制外链失败:', error);
       alert('复制失败，请稍后重试');

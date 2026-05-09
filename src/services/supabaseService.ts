@@ -1,6 +1,7 @@
-import supabase from '../config/supabase';
+﻿import supabase from '../config/supabase';
 import { ReportStatus, SurveyForm, SurveyStatus, SurveyTemplate, SystemLog } from '../../types';
 import { hashPassword, isHashedPassword } from '../utils/passwordSecurity';
+import { generateShareToken, hashShareToken } from '../utils/shareSecurity';
 
 const isMissingColumn = (error: any, column: string) => {
   return error?.code === 'PGRST204' && String(error?.message || '').includes(`'${column}'`);
@@ -60,7 +61,7 @@ const formatSupabaseWriteError = (error: any) => {
   }
 
   if (code === '22P02' || combined.includes('invalid input syntax for type uuid')) {
-    return '用户数据格式错误（UUID字段无效），请刷新页面后重试';
+    return '用户数据格式错误（UUID 字段无效），请刷新页面后重试';
   }
 
   if (code === '23514') {
@@ -86,10 +87,10 @@ const isUuid = (value: string | null | undefined) => Boolean(value && UUID_REGEX
 const normalizeUserType = (value: any): 'internal' | 'external' => {
   const raw = String(value ?? '').trim();
   const normalized = raw.toLowerCase();
-  if (normalized === 'internal' || normalized.includes('internal') || raw.includes('内部')) {
+  if (normalized === 'internal' || normalized.includes('internal') || raw.includes('鍐呴儴')) {
     return 'internal';
   }
-  if (normalized === 'external' || normalized.includes('external') || raw.includes('外部') || raw.includes('客户')) {
+  if (normalized === 'external' || normalized.includes('external') || raw.includes('澶栭儴') || raw.includes('瀹㈡埛')) {
     return 'external';
   }
   return 'external';
@@ -99,10 +100,10 @@ const normalizeRoleType = (value: any): 'internal' | 'external' | null => {
   const raw = String(value ?? '').trim();
   if (!raw) return null;
   const normalized = raw.toLowerCase();
-  if (normalized === 'internal' || normalized.includes('internal') || raw.includes('内部')) {
+  if (normalized === 'internal' || normalized.includes('internal') || raw.includes('鍐呴儴')) {
     return 'internal';
   }
-  if (normalized === 'external' || normalized.includes('external') || raw.includes('外部') || raw.includes('客户')) {
+  if (normalized === 'external' || normalized.includes('external') || raw.includes('澶栭儴') || raw.includes('瀹㈡埛')) {
     return 'external';
   }
   return null;
@@ -115,7 +116,7 @@ const inferRoleType = (role: any): 'internal' | 'external' => {
   }
 
   const source = `${role?.name || ''} ${role?.description || ''}`.toLowerCase();
-  const externalKeywords = ['外部', '客户', 'customer', 'client', 'external'];
+  const externalKeywords = ['澶栭儴', '瀹㈡埛', 'customer', 'client', 'external'];
   return externalKeywords.some((keyword) => source.includes(keyword)) ? 'external' : 'internal';
 };
 
@@ -203,7 +204,7 @@ const resolveSurveyUserRefToId = async (value: any): Promise<string | null | und
     .limit(1);
 
   if (error) {
-    console.warn('解析调研表单用户外键失败:', { candidate, error });
+    console.warn('瑙ｆ瀽璋冪爺琛ㄥ崟鐢ㄦ埛澶栭敭澶辫触:', { candidate, error });
     return null;
   }
 
@@ -252,6 +253,44 @@ const canExternalAccessSurvey = (survey: any, userIds: string | string[]) => {
 const isExternalLinkEnabled = (survey: any) => {
   const data = survey?.data && typeof survey.data === 'object' ? survey.data : {};
   return Boolean(data.external_link_enabled);
+};
+
+const getExternalShareTokens = (survey: any) => {
+  const data = survey?.data && typeof survey.data === 'object' ? survey.data : {};
+  return Array.isArray(data.external_share_tokens) ? data.external_share_tokens : [];
+};
+
+const isExternalShareTokenValid = async (survey: any, token?: string | null) => {
+  const tokens = getExternalShareTokens(survey);
+  if (!tokens.length) return false;
+  const tokenHash = await hashShareToken(String(token || ''));
+  if (!tokenHash) return false;
+  const now = Date.now();
+  return tokens.some((item: any) => {
+    if (!item || item.revoked_at) return false;
+    if (item.expires_at && new Date(item.expires_at).getTime() <= now) return false;
+    return item.token_hash === tokenHash;
+  });
+};
+
+const createExternalShareTokenRecord = async () => {
+  const token = generateShareToken();
+  return {
+    token,
+    record: {
+      token_hash: await hashShareToken(token),
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  };
+};
+
+const pickExternalSurveyUpdatePayload = (survey: any) => {
+  const payload: any = {};
+  if ('data' in survey) payload.data = survey.data;
+  if ('status' in survey) payload.status = survey.status;
+  if ('submitter_id' in survey) payload.submitter_id = survey.submitter_id;
+  return payload;
 };
 
 const readRoleCache = (): Record<string, string[]> => {
@@ -340,7 +379,7 @@ const resolveUserRowIdentifiers = async (id: string) => {
     .limit(1);
 
   if (error) {
-    console.error('鏌ユ壘鐢ㄦ埛鏇存柊鐩爣澶辫触:', { targetId, error });
+    console.error('閺屻儲澹橀悽銊﹀煕閺囧瓨鏌婇惄顔界垼婢惰精瑙?', { targetId, error });
     return null;
   }
 
@@ -361,12 +400,12 @@ export const userService = {
       const { data, error } = await supabase.from('users').select('*');
       if (error) {
         console.error('Failed to fetch users:', error);
-        throw new Error(formatSupabaseReadError('用户列表', error));
+        throw new Error(formatSupabaseReadError('鐢ㄦ埛鍒楄〃', error));
       }
       return (data || []).map(normalizeUser);
     } catch (error) {
       console.error('Unexpected error while fetching users:', error);
-      throw new Error(formatSupabaseReadError('用户列表', error));
+      throw new Error(formatSupabaseReadError('鐢ㄦ埛鍒楄〃', error));
     }
   },
 
@@ -379,13 +418,13 @@ export const userService = {
     if (!selectedRoleIds.length) return false;
     const validRoleIds = selectedRoleIds.filter((roleId) => isUuid(roleId));
     if (validRoleIds.length !== selectedRoleIds.length) {
-      console.warn('检测到非UUID角色ID，已拒绝校验:', selectedRoleIds.filter((roleId) => !isUuid(roleId)));
+      console.warn('妫€娴嬪埌闈濽UID瑙掕壊ID锛屽凡鎷掔粷鏍￠獙:', selectedRoleIds.filter((roleId) => !isUuid(roleId)));
       return false;
     }
 
     const { data, error } = await supabase.from('roles').select('*').in('id', validRoleIds);
     if (error || !data) {
-      console.error('校验用户角色失败:', error);
+      console.error('鏍￠獙鐢ㄦ埛瑙掕壊澶辫触:', error);
       return false;
     }
 
@@ -401,7 +440,7 @@ export const userService = {
     try {
       const { data: roles, error: rolesError } = await supabase.from('roles').select('*');
       if (rolesError) {
-        console.error('获取角色列表失败:', rolesError);
+        console.error('鑾峰彇瑙掕壊鍒楄〃澶辫触:', rolesError);
       }
 
       const userType = normalizeUserType(user.user_type || user.type);
@@ -472,7 +511,7 @@ export const userService = {
             const nextPayload = { ...payload };
             delete nextPayload[missingColumn];
             payload = nextPayload;
-            console.warn(`users表缺少字段 ${missingColumn}，已自动剔除后重试`);
+            console.warn(`users 表缺少字段 ${missingColumn}，已自动剔除后重试`);
             continue;
           }
 
@@ -498,13 +537,13 @@ export const userService = {
     try {
       const targetId = String(id || '').trim();
       if (!targetId) {
-        console.error('鏇存柊鐢ㄦ埛澶辫触: 鐢ㄦ埛ID涓虹┖');
+        console.error('更新用户失败：用户 ID 为空');
         return null;
       }
 
       const targetRow = await resolveUserRowIdentifiers(targetId);
       if (!targetRow?.id) {
-        console.error('鏇存柊鐢ㄦ埛澶辫触: 鏈壘鍒板尮閰嶇殑鐢ㄦ埛', { targetId });
+        console.error('閺囧瓨鏌婇悽銊﹀煕婢惰精瑙? 閺堫亝澹橀崚鏉垮爱闁板秶娈戦悽銊﹀煕', { targetId });
         return null;
       }
 
@@ -542,7 +581,7 @@ export const userService = {
       if (userType && roleIds.length) {
         const roleValidationPassed = await userService.validateUserRoles(targetRow.id, userType, roleIds);
         if (!roleValidationPassed) {
-          throw new Error(userType === 'internal' ? '内部用户只能选择内部角色' : '外部用户只能选择外部角色');
+          throw new Error(userType === 'internal' ? '鍐呴儴鐢ㄦ埛鍙兘閫夋嫨鍐呴儴瑙掕壊' : '澶栭儴鐢ㄦ埛鍙兘閫夋嫨澶栭儴瑙掕壊');
         }
       }
       const payloads: any[] = userType
@@ -566,7 +605,7 @@ export const userService = {
             const nextPayload = { ...payload };
             delete nextPayload[missingColumn];
             payload = nextPayload;
-            console.warn(`users表缺少字段 ${missingColumn}，已自动剔除后重试`);
+            console.warn(`users 表缺少字段 ${missingColumn}，已自动剔除后重试`);
             continue;
           }
 
@@ -587,7 +626,7 @@ export const userService = {
         }
       }
 
-      console.error('更新用户失败: 无法匹配 users 表的类型字段(type/user_type)');
+      console.error('更新用户失败：无法匹配 users 表的类型字段(type/user_type)');
       return null;
     } catch (error) {
       console.error('更新用户过程中发生异常:', error);
@@ -599,20 +638,20 @@ export const userService = {
     try {
       const targetId = String(id || '').trim();
       if (!targetId) {
-        console.error('删除用户失败: 用户ID为空');
+        console.error('删除用户失败：用户 ID 为空');
         return false;
       }
 
       const attemptedIds = dedupeStringArray([targetId]);
 
-      // 先查一遍，补齐 id/user_id 双键候选，避免只按单字段删除导致“0行删除”误判成功
+      // 先查询一次，补齐 id/user_id 双键候选，避免只按单字段删除导致误判。
       const lookup = await supabase
         .from('users')
         .select('id,user_id')
         .or(`id.eq.${targetId},user_id.eq.${targetId}`)
         .limit(1);
       if (lookup.error) {
-        console.warn('删除前查询用户失败，继续尝试删除:', lookup.error);
+        console.warn('鍒犻櫎鍓嶆煡璇㈢敤鎴峰け璐ワ紝缁х画灏濊瘯鍒犻櫎:', lookup.error);
       } else if (lookup.data?.length) {
         const row = lookup.data[0] as any;
         attemptedIds.push(...dedupeStringArray([row?.id, row?.user_id]));
@@ -641,9 +680,9 @@ export const userService = {
 
       if (!deletedRows.length) {
         if (lastError) {
-          console.error('删除用户失败:', lastError);
+          console.error('鍒犻櫎鐢ㄦ埛澶辫触:', lastError);
         } else {
-          console.warn('删除用户未生效: 未匹配到可删除记录或受RLS策略限制', { id: targetId });
+          console.warn('鍒犻櫎鐢ㄦ埛鏈敓鏁? 鏈尮閰嶅埌鍙垹闄よ褰曟垨鍙桼LS绛栫暐闄愬埗', { id: targetId });
         }
         return false;
       }
@@ -656,7 +695,7 @@ export const userService = {
       cacheIds.forEach((cacheId) => removeCachedRoleIdsForUser(cacheId));
       return true;
     } catch (error) {
-      console.error('删除用户过程中发生异常:', error);
+      console.error('鍒犻櫎鐢ㄦ埛杩囩▼涓彂鐢熷紓甯?', error);
       return false;
     }
   },
@@ -682,7 +721,7 @@ export const surveyService = {
 
       const allSharedErrored = sharedResults.length > 0 && sharedResults.every((result) => result.error);
       if (directResult.error && allSharedErrored) {
-        console.error('获取外部用户表单列表失败:', directResult.error, ...sharedResults.map((r) => r.error));
+        console.error('鑾峰彇澶栭儴鐢ㄦ埛琛ㄥ崟鍒楄〃澶辫触:', directResult.error, ...sharedResults.map((r) => r.error));
         return [];
       }
 
@@ -698,7 +737,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').select('*');
     if (error) {
-      console.error('获取表单列表失败:', error);
+      console.error('鑾峰彇琛ㄥ崟鍒楄〃澶辫触:', error);
       return [];
     }
     return (data || []).map(normalizeSurveyRow);
@@ -707,7 +746,7 @@ export const surveyService = {
   async getSurveyById(id: string) {
     const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
     if (error) {
-      console.error('获取表单详情失败:', error);
+      console.error('鑾峰彇琛ㄥ崟璇︽儏澶辫触:', error);
       return null;
     }
     const externalUser = isExternalLocalUser();
@@ -715,13 +754,44 @@ export const surveyService = {
       ? dedupeStringArray([externalUser.id, ...(Array.isArray((externalUser as any).ids) ? (externalUser as any).ids : [])])
       : [];
     if (externalUserIds.length && !canExternalAccessSurvey(data, externalUserIds)) {
-      console.warn('外部用户无权限访问该表单:', { surveyId: id, userIds: externalUserIds });
+      console.warn('澶栭儴鐢ㄦ埛鏃犳潈闄愯闂琛ㄥ崟:', { surveyId: id, userIds: externalUserIds });
       return null;
     }
     return normalizeSurveyRow(data);
   },
 
-  async grantExternalAccessByAuthorizedLink(id: string) {
+  async createAuthorizedLinkToken(id: string) {
+    const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
+    if (error || !data) {
+      console.error('鍒涘缓澶栭儴鎺堟潈閾炬帴澶辫触:', error);
+      return null;
+    }
+
+    const rawData = data.data && typeof data.data === 'object' ? data.data : {};
+    const existingTokens = Array.isArray(rawData.external_share_tokens) ? rawData.external_share_tokens : [];
+    const { token: shareToken, record } = await createExternalShareTokenRecord();
+    const { data: updated, error: updateError } = await supabase
+      .from('survey_forms')
+      .update({
+        data: {
+          ...rawData,
+          external_link_enabled: true,
+          external_share_tokens: [...existingTokens.filter((item: any) => !item?.revoked_at), record].slice(-10),
+        },
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (updateError) {
+      console.error('淇濆瓨澶栭儴鎺堟潈閾炬帴 token 澶辫触:', updateError);
+      return null;
+    }
+
+    return { token: shareToken, survey: normalizeSurveyRow(updated) };
+  },
+
+  async grantExternalAccessByAuthorizedLink(id: string, token?: string | null) {
     const externalUser = isExternalLocalUser();
     const externalUserIds = externalUser
       ? dedupeStringArray([externalUser.id, ...(Array.isArray((externalUser as any).ids) ? (externalUser as any).ids : [])])
@@ -732,7 +802,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').select('*').eq('id', id).single();
     if (error || !data) {
-      console.error('授权链接获取表单失败:', error);
+      console.error('鎺堟潈閾炬帴鑾峰彇琛ㄥ崟澶辫触:', error);
       return null;
     }
 
@@ -741,7 +811,12 @@ export const surveyService = {
     }
 
     if (!isExternalLinkEnabled(data)) {
-      console.warn('表单未开启外部授权链接访问:', { surveyId: id, userIds: externalUserIds });
+      console.warn('琛ㄥ崟鏈紑鍚閮ㄦ巿鏉冮摼鎺ヨ闂?', { surveyId: id, userIds: externalUserIds });
+      return null;
+    }
+
+    if (!(await isExternalShareTokenValid(data, token))) {
+      console.warn('外部授权链接 token 无效或已过期:', { surveyId: id, userIds: externalUserIds });
       return null;
     }
 
@@ -763,7 +838,7 @@ export const surveyService = {
       .single();
 
     if (updateError) {
-      console.error('授权链接绑定外部用户失败:', updateError);
+      console.error('鎺堟潈閾炬帴缁戝畾澶栭儴鐢ㄦ埛澶辫触:', updateError);
       return null;
     }
 
@@ -789,7 +864,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').insert(dbSurvey).select().single();
     if (error) {
-      console.error('创建表单失败:', error);
+      console.error('鍒涘缓琛ㄥ崟澶辫触:', error);
       return null;
     }
     return normalizeSurveyRow(data);
@@ -800,9 +875,10 @@ export const surveyService = {
     if (externalUser?.id) {
       const target = await surveyService.getSurveyById(id);
       if (!target) {
-        console.warn('外部用户更新表单被拦截:', { surveyId: id, userId: externalUser.id });
+        console.warn('澶栭儴鐢ㄦ埛鏇存柊琛ㄥ崟琚嫤鎴?', { surveyId: id, userId: externalUser.id });
         return null;
       }
+      survey = pickExternalSurveyUpdatePayload(survey);
     }
 
     const dbSurvey = {
@@ -831,7 +907,7 @@ export const surveyService = {
 
     const { data, error } = await supabase.from('survey_forms').update(dbSurvey).eq('id', id).select().single();
     if (error) {
-      console.error('更新表单失败:', error);
+      console.error('鏇存柊琛ㄥ崟澶辫触:', error);
       return null;
     }
     return normalizeSurveyRow(data);
@@ -840,16 +916,13 @@ export const surveyService = {
   async deleteSurvey(id: string) {
     const externalUser = isExternalLocalUser();
     if (externalUser?.id) {
-      const target = await surveyService.getSurveyById(id);
-      if (!target) {
-        console.warn('外部用户删除表单被拦截:', { surveyId: id, userId: externalUser.id });
-        return false;
-      }
+      console.warn('外部用户无权删除调研表单:', { surveyId: id, userId: externalUser.id });
+      return false;
     }
 
     const { error } = await supabase.from('survey_forms').delete().eq('id', id);
     if (error) {
-      console.error('删除表单失败:', error);
+      console.error('鍒犻櫎琛ㄥ崟澶辫触:', error);
       return false;
     }
     return true;
@@ -860,8 +933,9 @@ export const templateService = {
   async getTemplates() {
     const { data, error } = await supabase.from('survey_templates').select('*');
     if (error) {
-      console.error('获取模板列表失败:', error);
+      console.error('鑾峰彇妯℃澘鍒楄〃澶辫触:', error);
       return [];
+      survey = pickExternalSurveyUpdatePayload(survey);
     }
     return data;
   },
@@ -869,7 +943,7 @@ export const templateService = {
   async createTemplate(template: Omit<SurveyTemplate, 'id' | 'create_time'>) {
     const { data, error } = await supabase.from('survey_templates').insert(template).select().single();
     if (error) {
-      console.error('创建模板失败:', error);
+      console.error('鍒涘缓妯℃澘澶辫触:', error);
       return null;
     }
     return data;
@@ -878,7 +952,7 @@ export const templateService = {
   async upsertTemplateRowByName(params: { name: string; industry: string; sections: any }) {
     const name = String(params?.name || '').trim();
     if (!name) {
-      throw new Error('模板数据库行名称不能为空');
+      throw new Error('妯℃澘鏁版嵁搴撹鍚嶇О涓嶈兘涓虹┖');
     }
 
     const { data: existingRows, error: findError } = await supabase
@@ -887,7 +961,7 @@ export const templateService = {
       .eq('name', name)
       .limit(1);
     if (findError) {
-      console.error('查询模板行失败:', findError);
+      console.error('鏌ヨ妯℃澘琛屽け璐?', findError);
       throw findError;
     }
 
@@ -895,7 +969,7 @@ export const templateService = {
       const { data, error } = await supabase
         .from('survey_templates')
         .update({
-          industry: String(params.industry || '通用'),
+          industry: String(params.industry || '閫氱敤'),
           sections: params.sections,
           update_time: new Date().toISOString(),
         })
@@ -904,7 +978,7 @@ export const templateService = {
         .maybeSingle();
 
       if (error) {
-        console.error('更新模板行失败:', error);
+        console.error('鏇存柊妯℃澘琛屽け璐?', error);
         throw error;
       }
       return data || null;
@@ -914,13 +988,13 @@ export const templateService = {
       .from('survey_templates')
       .insert({
         name,
-        industry: String(params.industry || '通用'),
+        industry: String(params.industry || '閫氱敤'),
         sections: params.sections,
       })
       .select()
       .maybeSingle();
     if (error) {
-      console.error('新增模板行失败:', error);
+      console.error('鏂板妯℃澘琛屽け璐?', error);
       throw error;
     }
     return data || null;
@@ -932,7 +1006,7 @@ export const templateService = {
 
     const { error } = await supabase.from('survey_templates').delete().eq('name', name);
     if (error) {
-      console.error('删除模板行失败:', error);
+      console.error('鍒犻櫎妯℃澘琛屽け璐?', error);
       return false;
     }
     return true;
@@ -943,7 +1017,7 @@ export const dictService = {
   async getDictTypes() {
     const { data, error } = await supabase.from('dict_types').select('*');
     if (error) {
-      console.error('获取字典类型列表失败:', error);
+      console.error('鑾峰彇瀛楀吀绫诲瀷鍒楄〃澶辫触:', error);
       return [];
     }
     return data;
@@ -952,7 +1026,7 @@ export const dictService = {
   async getDictItems(typeId: string) {
     const { data, error } = await supabase.from('dict_items').select('*').eq('type_id', typeId);
     if (error) {
-      console.error('获取字典项列表失败:', error);
+      console.error('鑾峰彇瀛楀吀椤瑰垪琛ㄥけ璐?', error);
       return [];
     }
     return data;
@@ -963,7 +1037,7 @@ export const logService = {
   async createLog(log: Omit<SystemLog, 'id' | 'create_time'>) {
     const { data, error } = await supabase.from('system_logs').insert(log).select().single();
     if (error) {
-      console.error('创建日志失败:', error);
+      console.error('鍒涘缓鏃ュ織澶辫触:', error);
       return null;
     }
     return data;
@@ -972,7 +1046,7 @@ export const logService = {
   async getLogs() {
     const { data, error } = await supabase.from('system_logs').select('*').order('create_time', { ascending: false });
     if (error) {
-      console.error('获取日志列表失败:', error);
+      console.error('鑾峰彇鏃ュ織鍒楄〃澶辫触:', error);
       return [];
     }
     return data;
@@ -1021,7 +1095,7 @@ const queryMessagesByTargetUser = async (userId: string, limit?: number) => {
 
   const { data, error } = await query;
   if (error) {
-    console.error('按用户查询消息失败:', error);
+    console.error('鎸夌敤鎴锋煡璇㈡秷鎭け璐?', error);
     return [];
   }
   return data || [];
@@ -1041,7 +1115,7 @@ const queryMessagesByTargetRoles = async (roleIds: string[], limit?: number) => 
 
   const { data, error } = await query;
   if (error) {
-    console.error('按角色查询消息失败:', error);
+    console.error('鎸夎鑹叉煡璇㈡秷鎭け璐?', error);
     return [];
   }
   return data || [];
@@ -1061,10 +1135,40 @@ const queryBroadcastMessages = async (limit?: number) => {
 
   const { data, error } = await query;
   if (error) {
-    console.error('查询广播消息失败:', error);
+    console.error('鏌ヨ骞挎挱娑堟伅澶辫触:', error);
     return [];
   }
   return data || [];
+};
+
+const getMessageReadIdsForCurrentUser = async (messageIds: string[]) => {
+  const currentUser = getLocalUserContext();
+  const ids = dedupeStringArray(messageIds);
+  if (!currentUser?.id || !ids.length) return new Set<string>();
+
+  const { data, error } = await supabase
+    .from('message_reads')
+    .select('message_id')
+    .eq('user_id', currentUser.id)
+    .in('message_id', ids);
+
+  if (error) {
+    if (String(error?.code || '') !== '42P01') {
+      console.error('查询用户消息已读状态失败:', error);
+    }
+    return new Set<string>();
+  }
+
+  return new Set((data || []).map((item: any) => item.message_id).filter(Boolean));
+};
+
+const applyCurrentUserReadState = async (messages: any[]) => {
+  const readIds = await getMessageReadIdsForCurrentUser(messages.map((message: any) => message.id));
+  if (!readIds.size) return messages;
+  return messages.map((message: any) => ({
+    ...message,
+    read: Boolean(message.read) || readIds.has(message.id),
+  }));
 };
 
 export const messageService = {
@@ -1079,10 +1183,11 @@ export const messageService = {
     ]);
 
     const merged = mergeAndSortMessages([userMessages, roleMessages, broadcastMessages]);
+    const withReadState = await applyCurrentUserReadState(merged);
     if (typeof options?.limit === 'number') {
-      return merged.slice(0, options.limit);
+      return withReadState.slice(0, options.limit);
     }
-    return merged;
+    return withReadState;
   },
 
   async getCurrentUserMessages(limit?: number) {
@@ -1103,9 +1208,31 @@ export const messageService = {
   },
 
   async markAsRead(id: string) {
+    const currentUser = getLocalUserContext();
+    if (currentUser?.id) {
+      const inserted = await supabase
+        .from('message_reads')
+        .upsert(
+          {
+            message_id: id,
+            user_id: currentUser.id,
+            read_at: new Date().toISOString(),
+          },
+          { onConflict: 'message_id,user_id' },
+        )
+        .select()
+        .maybeSingle();
+      if (!inserted.error) {
+        return inserted.data || { id, read: true };
+      }
+      if (String(inserted.error?.code || '') !== '42P01') {
+        console.error('保存用户消息已读状态失败:', inserted.error);
+      }
+    }
+
     const { data, error } = await supabase.from('messages').update({ read: true }).eq('id', id).select().single();
     if (error) {
-      console.error('标记消息已读失败:', error);
+      console.error('鏍囪娑堟伅宸茶澶辫触:', error);
       return null;
     }
     return data;
@@ -1125,7 +1252,7 @@ export const surveyReportService = {
       .limit(1);
 
     if (error) {
-      console.error('获取报告详情失败:', error);
+      console.error('鑾峰彇鎶ュ憡璇︽儏澶辫触:', error);
       return null;
     }
     return data?.[0] || null;
@@ -1157,7 +1284,7 @@ export const surveyReportService = {
       || String(error?.message || '').toLowerCase().includes('on conflict');
 
     if (!conflictConstraintMissing) {
-      console.error('保存报告失败:', error);
+      console.error('淇濆瓨鎶ュ憡澶辫触:', error);
       return null;
     }
 
@@ -1176,7 +1303,7 @@ export const surveyReportService = {
 
     const inserted = await supabase.from('survey_reports').insert(payload).select().maybeSingle();
     if (inserted.error) {
-      console.error('保存报告失败(兼容路径):', inserted.error);
+      console.error('淇濆瓨鎶ュ憡澶辫触(鍏煎璺緞):', inserted.error);
       return null;
     }
     return inserted.data || null;
@@ -1195,20 +1322,20 @@ export const roleService = {
     try {
       const { data, error } = await supabase.from('roles').select('*');
       if (error) {
-        console.error('获取角色列表失败:', error);
-        throw new Error(formatSupabaseReadError('角色列表', error));
+        console.error('鑾峰彇瑙掕壊鍒楄〃澶辫触:', error);
+        throw new Error(formatSupabaseReadError('瑙掕壊鍒楄〃', error));
       }
       return (data || []).map(normalizeRole);
     } catch (error) {
       console.error('Unexpected error while fetching roles:', error);
-      throw new Error(formatSupabaseReadError('角色列表', error));
+      throw new Error(formatSupabaseReadError('瑙掕壊鍒楄〃', error));
     }
   },
 
   async createRole(role: any) {
     const { data, error } = await supabase.from('roles').insert(role).select().single();
     if (error) {
-      console.error('创建角色失败:', error);
+      console.error('鍒涘缓瑙掕壊澶辫触:', error);
       return null;
     }
     return data;
@@ -1222,7 +1349,7 @@ export const roleService = {
 
     const { data, error } = await supabase.from('roles').update(payload).eq('id', id).select().single();
     if (error) {
-      console.error('更新角色失败:', error);
+      console.error('鏇存柊瑙掕壊澶辫触:', error);
       return null;
     }
     return data;
@@ -1231,12 +1358,12 @@ export const roleService = {
   async deleteRole(id: string) {
     const { data: roleInfo } = await supabase.from('roles').select('name').eq('id', id).maybeSingle();
     if (isSystemPresetRoleName(roleInfo?.name)) {
-      console.warn('预置角色不可删除:', roleInfo.name);
+      console.warn('棰勭疆瑙掕壊涓嶅彲鍒犻櫎:', roleInfo.name);
       return false;
     }
     const { error } = await supabase.from('roles').delete().eq('id', id);
     if (error) {
-      console.error('删除角色失败:', error);
+      console.error('鍒犻櫎瑙掕壊澶辫触:', error);
       return false;
     }
     return true;

@@ -230,6 +230,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, hideSidebar = false })
   const handleLogout = () => {
     localStorage.removeItem('ems_user');
     localStorage.removeItem('ems_token');
+    localStorage.removeItem('ems_session');
+    cachePermissionKeys([]);
     setCurrentUser(null);
     setMessagePanelOpen(false);
     setUserMenuOpen(false);

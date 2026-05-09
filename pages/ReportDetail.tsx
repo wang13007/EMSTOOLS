@@ -12,8 +12,6 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { SurveyForm } from '../types';
 import { generateEnergyReport, ReportResult } from '../services/geminiService';
 import {
@@ -771,6 +769,10 @@ export const ReportDetailContent: React.FC<ReportDetailContentProps> = ({ embedd
 
     setExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
       const safeProjectName = (data.survey.projectName || ZH.defaultReportName).replace(/[\\/:*?"<>|]/g, '_');
       const safeTypeName = reportTypeLabel.replace(/[\\/:*?"<>|]/g, '_');
       const fileBaseName = `${safeProjectName}-${safeTypeName}`;

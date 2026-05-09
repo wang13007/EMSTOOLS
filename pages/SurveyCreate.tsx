@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ReportStatus, SurveyStatus } from '../types';
 import { INDUSTRIES, REGIONS } from '../constants';
 import { roleService, surveyService, userService } from '../src/services/supabaseService';
 import { applyReportTemplateNameOverrides, applySurveyTemplateNameOverrides } from '../src/services/templateNameStore';
 import { getAllReportTemplates, getAllSurveyTemplates, syncImportedTemplatesFromDatabase } from '../src/services/templateStore';
+import { appendShareTokenToHashUrl } from '../src/utils/shareSecurity';
+import { usePermission } from '../src/auth/usePermission';
 
 type UserOption = {
   id: string;
@@ -33,11 +35,12 @@ const getCurrentUserId = () => {
   }
 };
 
-const buildShareUrl = (surveyId: string) => {
-  return `${window.location.origin}${window.location.pathname}#/authorized/surveys/fill/${surveyId}`;
+const buildShareUrl = (surveyId: string, token: string) => {
+  return appendShareTokenToHashUrl(`${window.location.origin}${window.location.pathname}#/authorized/surveys/fill/${surveyId}`, token);
 };
 
 export const SurveyCreate: React.FC = () => {
+  const { guardPermission } = usePermission();
   const hasLoadedUsersRef = useRef(false);
 
   const [formData, setFormData] = useState({
@@ -110,7 +113,7 @@ export const SurveyCreate: React.FC = () => {
             const byRoleId = roleIds.some((roleId: string) => preSalesRoleIds.has(roleId));
             if (byRoleId) return true;
             const roleText = `${user.role || ''}`.toLowerCase();
-            return roleText.includes('售前工程师') || roleText.includes('presales');
+            return roleText.includes('售前工程师') || roleText.includes('presales') || roleText.includes('售前');
           })
           .map((user: any) => ({
             id: user.id || user.user_id,
@@ -146,6 +149,7 @@ export const SurveyCreate: React.FC = () => {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!guardPermission('survey_form:create', '新建表单')) return;
     setLoading(true);
     setGeneratedLink('');
 
@@ -194,7 +198,7 @@ export const SurveyCreate: React.FC = () => {
 
       const newSurvey = await surveyService.createSurvey(surveyData as any);
       if (!newSurvey) {
-        throw new Error('创建调研表单失败，请重试');
+        throw new Error('鍒涘缓璋冪爺琛ㄥ崟澶辫触锛岃閲嶈瘯');
       }
 
       let surveyId = newSurvey?.id;
@@ -217,10 +221,14 @@ export const SurveyCreate: React.FC = () => {
         return;
       }
 
-      const link = buildShareUrl(surveyId);
+      const tokenResult = await surveyService.createAuthorizedLinkToken(surveyId);
+      if (!tokenResult) {
+        throw new Error('鎺堟潈閾炬帴鐢熸垚澶辫触锛岃绋嶅悗閲嶈瘯');
+      }
+      const link = buildShareUrl(surveyId, tokenResult.token);
       setGeneratedLink(link);
     } catch (error) {
-      console.error('创建调研表单失败:', error);
+      console.error('创建调研表单失败:', error)
       alert(error instanceof Error ? error.message : '创建调研表单失败，请重试');
     } finally {
       setLoading(false);
@@ -350,7 +358,7 @@ export const SurveyCreate: React.FC = () => {
 
         {createMode === 'link' && (
           <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            该链接用于外部用户填写，访问后可自行注册/登录，系统会自动关联授权。
+            该链接用于外部用户填写，访问后可自行注册/登录，系统会通过一次性 token 关联授权。
           </div>
         )}
 
@@ -410,7 +418,7 @@ export const SurveyCreate: React.FC = () => {
             disabled={!canSubmit}
             className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg shadow-blue-200 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {loading ? '正在创建...' : createMode === 'direct' ? '创建并提交' : '创建并提交并生成链接'}
+            {loading ? '正在创建...' : createMode === 'direct' ? '创建并填写' : '创建并生成链接'}
           </button>
         </div>
       </form>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ICONS } from '../constants';
 import { Message } from '../types';
 import { messageService } from '../src/services/supabaseService';
+import { usePermission } from '../src/auth/usePermission';
 
 const formatRelativeTime = (createTime?: string) => {
   if (!createTime) return '刚刚';
@@ -14,6 +15,7 @@ const formatRelativeTime = (createTime?: string) => {
 };
 
 export const MessageCenter: React.FC = () => {
+  const { guardPermission } = usePermission();
   const [messages, setMessages] = useState<Message[]>([]);
 
   useEffect(() => {
@@ -43,6 +45,7 @@ export const MessageCenter: React.FC = () => {
   }, []);
 
   const markAllRead = async () => {
+    if (!guardPermission('message:mark_read', '标记消息已读')) return;
     const unread = messages.filter((msg) => !msg.read);
     await Promise.all(unread.map((msg) => messageService.markAsRead(msg.id)));
     setMessages(messages.map((m) => ({ ...m, read: true })));
@@ -51,6 +54,7 @@ export const MessageCenter: React.FC = () => {
   const toggleRead = async (id: string) => {
     const message = messages.find((m) => m.id === id);
     if (!message || message.read) return;
+    if (!guardPermission('message:mark_read', '标记消息已读')) return;
 
     await messageService.markAsRead(id);
     setMessages(messages.map((m) => (m.id === id ? { ...m, read: true } : m)));

@@ -3,6 +3,7 @@ import { ICONS } from '../constants';
 import { Role, UserStatus, UserType } from '../types';
 import Portal from '../src/components/Portal';
 import { roleService } from '../src/services/supabaseService';
+import { usePermission } from '../src/auth/usePermission';
 import {
   PERMISSION_GROUPS,
   getEnabledPermissionLabels,
@@ -39,6 +40,7 @@ const normalizeRoleRecord = (role: any): Role => {
 };
 
 export const RoleManagement: React.FC = () => {
+  const { hasPermission, guardPermission } = usePermission();
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,6 +82,7 @@ export const RoleManagement: React.FC = () => {
   };
 
   const openCreateModal = () => {
+    if (!guardPermission('role:create', '新增角色')) return;
     setEditingRole({
       name: '',
       description: '',
@@ -91,6 +94,7 @@ export const RoleManagement: React.FC = () => {
   };
 
   const openEditModal = (role: Role) => {
+    if (!guardPermission('role:edit', '编辑角色权限')) return;
     setEditingRole({
       ...role,
       permissions: normalizePermissionRecord(role.permissions || {}),
@@ -120,6 +124,8 @@ export const RoleManagement: React.FC = () => {
     setError('');
 
     try {
+      if (editingRole.id && !hasPermission('role:edit')) throw new Error('无权限：无法编辑角色');
+      if (!editingRole.id && !hasPermission('role:create')) throw new Error('无权限：无法新增角色');
       const normalizedPermissions = normalizePermissionRecord(editingRole.permissions || {});
       const payload = editingRole.id && editingRole.isSystemPreset
         ? {
@@ -157,6 +163,7 @@ export const RoleManagement: React.FC = () => {
 
   const handleDelete = async (role: Role) => {
     if (saving) return;
+    if (!guardPermission('role:delete', '删除角色')) return;
     if (isSystemPresetRoleName(role.name)) {
       setError('系统预置角色不可删除，仅可编辑权限。');
       return;
@@ -199,7 +206,7 @@ export const RoleManagement: React.FC = () => {
         </div>
         <button
           onClick={openCreateModal}
-          disabled={saving || loading}
+          disabled={saving || loading || !hasPermission('role:create')}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-100 transition-all active:scale-95 disabled:opacity-60"
         >
           <ICONS.Plus className="w-4 h-4" />
@@ -258,12 +265,12 @@ export const RoleManagement: React.FC = () => {
                 <div className="p-4 bg-slate-50 rounded-b-2xl border-t border-slate-100 flex justify-between items-center">
                   <span className="text-[10px] text-slate-400 font-medium">创建于 {role.createTime}</span>
                   <div className="flex gap-3">
-                    <button onClick={() => openEditModal(role)} disabled={saving} className="text-blue-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline">
+                    <button onClick={() => openEditModal(role)} disabled={saving || !hasPermission('role:edit')} className="text-blue-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline">
                       编辑权限
                     </button>
                     <button
                       onClick={() => void handleDelete(role)}
-                      disabled={saving || isSystemPreset}
+                      disabled={saving || isSystemPreset || !hasPermission('role:delete')}
                       className="text-rose-600 font-bold text-xs hover:underline disabled:text-slate-300 disabled:no-underline"
                       title={isSystemPreset ? '系统预置角色不可删除' : ''}
                     >

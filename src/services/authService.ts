@@ -1,6 +1,7 @@
 ﻿import { cachePermissionKeys, resolvePermissionKeysByUserAndRoles } from '../auth/permissions';
-import { hashPassword, isHashedPassword, verifyPassword } from '../utils/passwordSecurity';
+import { hashPassword, shouldUpgradePasswordHash, verifyPassword } from '../utils/passwordSecurity';
 import { validateRegisterInput } from '../utils/userValidation';
+import { roleService, userService } from './supabaseService';
 
 export interface LoginRequest {
   username: string;
@@ -97,7 +98,6 @@ const readStoredSession = (): StoredSession | null => {
 export const authService = {
   async login(data: LoginRequest, options?: LoginOptions): Promise<{ user: UserInfo; token: string }> {
     try {
-      const { userService, roleService } = await import('../services/supabaseService');
       const users = await userService.getUsers();
       const loginIdentifier = String(data.username || '').trim();
       const normalizedPhone = loginIdentifier.replace(/\s+/g, '');
@@ -160,7 +160,7 @@ export const authService = {
         const loginUpdatePayload: Record<string, string> = {
           last_login_time: new Date().toISOString(),
         };
-        if (!isHashedPassword(currentUser.password_hash)) {
+        if (shouldUpgradePasswordHash(currentUser.password_hash)) {
           loginUpdatePayload.password_hash = await hashPassword(data.password);
         }
         const updatedUser = await userService.updateUser(currentUser.id, {
@@ -198,7 +198,6 @@ export const authService = {
       const validationError = validateRegisterInput(normalizedData);
       if (validationError) throw new Error(validationError);
 
-      const { userService, roleService } = await import('../services/supabaseService');
       const users = await userService.getUsers();
       const existingUser = users.find((u: any) => u.username === normalizedData.username);
       if (existingUser) throw new Error('用户名已存在');

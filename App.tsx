@@ -1,24 +1,25 @@
 ﻿
-import React, { useRef } from 'react';
+import React, { lazy, Suspense, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { Dashboard } from './pages/Dashboard';
-import { SurveyCreate } from './pages/SurveyCreate';
-import { ReportDetail } from './pages/ReportDetail';
-import { SurveyList } from './pages/SurveyList';
-import { SurveyTemplates } from './pages/SurveyTemplates';
-import { SurveyFill } from './pages/SurveyFill';
-import { PreSalesConfig } from './pages/PreSalesConfig';
-import { UserManagement } from './pages/UserManagement';
-import { RoleManagement } from './pages/RoleManagement';
-import { ProductCapabilities } from './pages/ProductCapabilities';
-import { ReportTemplateManagement } from './pages/ReportTemplateManagement';
-import { MessageCenter } from './pages/MessageCenter';
-import { LogManagement } from './pages/LogManagement';
-import { Dictionaries } from './pages/Dictionaries';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
 import { cachePermissionKeys, canAccessPathByPermissions, readPermissionKeySet } from './src/auth/permissions';
+
+const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
+const SurveyCreate = lazy(() => import('./pages/SurveyCreate').then((module) => ({ default: module.SurveyCreate })));
+const ReportDetail = lazy(() => import('./pages/ReportDetail').then((module) => ({ default: module.ReportDetail })));
+const SurveyList = lazy(() => import('./pages/SurveyList').then((module) => ({ default: module.SurveyList })));
+const SurveyTemplates = lazy(() => import('./pages/SurveyTemplates').then((module) => ({ default: module.SurveyTemplates })));
+const SurveyFill = lazy(() => import('./pages/SurveyFill').then((module) => ({ default: module.SurveyFill })));
+const PreSalesConfig = lazy(() => import('./pages/PreSalesConfig').then((module) => ({ default: module.PreSalesConfig })));
+const UserManagement = lazy(() => import('./pages/UserManagement').then((module) => ({ default: module.UserManagement })));
+const RoleManagement = lazy(() => import('./pages/RoleManagement').then((module) => ({ default: module.RoleManagement })));
+const ProductCapabilities = lazy(() => import('./pages/ProductCapabilities').then((module) => ({ default: module.ProductCapabilities })));
+const ReportTemplateManagement = lazy(() => import('./pages/ReportTemplateManagement').then((module) => ({ default: module.ReportTemplateManagement })));
+const MessageCenter = lazy(() => import('./pages/MessageCenter').then((module) => ({ default: module.MessageCenter })));
+const LogManagement = lazy(() => import('./pages/LogManagement').then((module) => ({ default: module.LogManagement })));
+const Dictionaries = lazy(() => import('./pages/Dictionaries').then((module) => ({ default: module.Dictionaries })));
+const Login = lazy(() => import('./pages/Login').then((module) => ({ default: module.Login })));
+const Register = lazy(() => import('./pages/Register').then((module) => ({ default: module.Register })));
 
 const getCurrentUserFromStorage = () => {
   try {
@@ -70,6 +71,12 @@ const PlaceholderPage = ({ title }: { title: string }) => (
   </div>
 );
 
+const PageFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm font-semibold text-slate-500">
+    加载中...
+  </div>
+);
+
 // 璺敱淇濇姢缁勪欢
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
@@ -105,132 +112,134 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const App: React.FC = () => {
   return (
     <Router>
-      <Routes>
-        {/* 鍏叡璺敱 */}
-        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          {/* 鍏叡璺敱 */}
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-        {/* 鍙椾繚鎶ょ殑璺敱 */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Dashboard />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/dashboard" element={<Navigate to="/" replace />} />
+          {/* 鍙椾繚鎶ょ殑璺敱 */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Dashboard />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
-        {/* 涓€绾ц彍鍗? 瀹㈡埛璋冪爺绠＄悊 */}
-        <Route path="/customer-survey/list" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <SurveyList />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/customer-survey/templates" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <SurveyTemplates />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        
-        {/* 璋冪爺鍔熻兘鎵╁睍璺緞 */}
-        <Route path="/surveys/new" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <SurveyCreate />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/surveys/fill/:id" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <SurveyFill />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/authorized/surveys/fill/:id" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <SurveyFill />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        
-        {/* 涓€绾ц彍鍗? 浜у搧鏂规绠＄悊 */}
-        <Route path="/product-solution/capabilities" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ProductCapabilities />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        
-        {/* 鎶ュ憡璇︽儏 */}
-        <Route path="/product-solution/report-templates" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ReportTemplateManagement />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/reports/:id" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <ReportDetail />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
+          {/* 涓€绾ц彍鍗? 瀹㈡埛璋冪爺绠＄悊 */}
+          <Route path="/customer-survey/list" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SurveyList />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/customer-survey/templates" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SurveyTemplates />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* 璋冪爺鍔熻兘鎵╁睍璺緞 */}
+          <Route path="/surveys/new" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SurveyCreate />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/surveys/fill/:id" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SurveyFill />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/authorized/surveys/fill/:id" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <SurveyFill />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* 涓€绾ц彍鍗? 浜у搧鏂规绠＄悊 */}
+          <Route path="/product-solution/capabilities" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ProductCapabilities />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* 鎶ュ憡璇︽儏 */}
+          <Route path="/product-solution/report-templates" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ReportTemplateManagement />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/reports/:id" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <ReportDetail />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
 
-        {/* 涓€绾ц彍鍗? 绯荤粺璁剧疆 */}
-        <Route path="/settings/users" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <UserManagement />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/settings/roles" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <RoleManagement />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/settings/pre-sales" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <PreSalesConfig />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/settings/dictionaries" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Dictionaries />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/settings/messages" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <MessageCenter />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
-        <Route path="/settings/logs" element={
-          <ProtectedRoute>
-            <AppLayout>
-              <LogManagement />
-            </AppLayout>
-          </ProtectedRoute>
-        } />
+          {/* 涓€绾ц彍鍗? 绯荤粺璁剧疆 */}
+          <Route path="/settings/users" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <UserManagement />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/roles" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <RoleManagement />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/pre-sales" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <PreSalesConfig />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/dictionaries" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <Dictionaries />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/messages" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <MessageCenter />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/logs" element={
+            <ProtectedRoute>
+              <AppLayout>
+                <LogManagement />
+              </AppLayout>
+            </ProtectedRoute>
+          } />
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 };
