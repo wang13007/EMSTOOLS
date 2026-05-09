@@ -13,6 +13,36 @@ const getMissingColumnName = (error: any): string | null => {
   return match?.[1] || null;
 };
 
+const formatSupabaseReadError = (resourceName: string, error: any) => {
+  const message = String(error?.message || error?.name || error || '').trim();
+  const code = String(error?.code || error?.status || '').trim();
+  const combined = `${message} ${code}`.toLowerCase();
+
+  if (message.startsWith(`${resourceName}加载失败`)) {
+    return message;
+  }
+
+  if (
+    combined.includes('failed to fetch') ||
+    combined.includes('networkerror') ||
+    combined.includes('err_connection_closed') ||
+    combined.includes('connection') ||
+    combined.includes('fetcherror')
+  ) {
+    return `无法连接 Supabase，${resourceName}加载失败。请检查网络、代理/VPN、防火墙，以及 VITE_SUPABASE_URL 是否可访问。`;
+  }
+
+  if (code === '401' || code === '403' || combined.includes('jwt') || combined.includes('apikey')) {
+    return `Supabase 密钥无效或权限不足，${resourceName}加载失败。请检查 VITE_SUPABASE_ANON_KEY / VITE_SUPABASE_PUBLISHABLE_KEY。`;
+  }
+
+  if (code === '42501' || combined.includes('permission denied')) {
+    return `${resourceName}加载失败：Supabase RLS/表权限拒绝访问，请执行 anon 访问策略修复脚本或改用 Supabase Auth。`;
+  }
+
+  return `${resourceName}加载失败${message ? `：${message}` : ''}`;
+};
+
 const formatSupabaseWriteError = (error: any) => {
   if (!error) return '未知错误';
   const code = String(error.code || '');
@@ -331,12 +361,12 @@ export const userService = {
       const { data, error } = await supabase.from('users').select('*');
       if (error) {
         console.error('Failed to fetch users:', error);
-        return [];
+        throw new Error(formatSupabaseReadError('用户列表', error));
       }
       return (data || []).map(normalizeUser);
     } catch (error) {
       console.error('Unexpected error while fetching users:', error);
-      return [];
+      throw new Error(formatSupabaseReadError('用户列表', error));
     }
   },
 
@@ -1162,12 +1192,17 @@ const isSystemPresetRoleName = (roleName: string | undefined | null) => {
 
 export const roleService = {
   async getRoles() {
-    const { data, error } = await supabase.from('roles').select('*');
-    if (error) {
-      console.error('获取角色列表失败:', error);
-      return [];
+    try {
+      const { data, error } = await supabase.from('roles').select('*');
+      if (error) {
+        console.error('获取角色列表失败:', error);
+        throw new Error(formatSupabaseReadError('角色列表', error));
+      }
+      return (data || []).map(normalizeRole);
+    } catch (error) {
+      console.error('Unexpected error while fetching roles:', error);
+      throw new Error(formatSupabaseReadError('角色列表', error));
     }
-    return (data || []).map(normalizeRole);
   },
 
   async createRole(role: any) {
