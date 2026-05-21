@@ -105,4 +105,3 @@ GEMINI_API_KEY="<optional>"
 | 用户操作手册 | [docs/guides/用户操作手册.md](./docs/guides/用户操作手册.md) | 使用说明 |
 | 系统运维手册 | [docs/guides/系统运维手册.md](./docs/guides/系统运维手册.md) | 运维流程 |
 
-联系作者：+86 18130362581
