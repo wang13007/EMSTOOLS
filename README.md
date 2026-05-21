@@ -101,3 +101,5 @@ GEMINI_API_KEY="<optional>"
 | Cloudflare 部署指南 | [CLOUDFLARE_DEPLOY_GUIDE.md](./CLOUDFLARE_DEPLOY_GUIDE.md) | 部署详版 |
 | 用户操作手册 | [用户操作手册.md](./用户操作手册.md) | 使用说明 |
 | 系统运维手册 | [系统运维手册.md](./系统运维手册.md) | 运维流程 |
+
+联系作者：+86 18130362581
