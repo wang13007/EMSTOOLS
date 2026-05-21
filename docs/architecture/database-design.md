@@ -1,4 +1,4 @@
-﻿# 数据库设计（基于 `supabase-init.sql`）
+# 数据库设计（基于 [`supabase-init.sql`](../../supabase/sql/supabase-init.sql)）
 
 更新时间：2026-03-11
 
@@ -7,7 +7,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | 数据库 | Supabase PostgreSQL |
-| 结构来源 | `supabase-init.sql`（并兼容 `supabase-repair-existing.sql`） |
+| 结构来源 | [`supabase-init.sql`](../../supabase/sql/supabase-init.sql)（并兼容 [`supabase-repair-existing.sql`](../../supabase/sql/supabase-repair-existing.sql)） |
 | 兼容策略 | 兼容历史字段、历史状态值、中英文字段差异 |
 | 安全策略 | 主要业务表已启用 RLS（Authenticated 基础策略） |
 
@@ -242,5 +242,5 @@
 
 | 场景 | 脚本 | 作用 |
 | --- | --- | --- |
-| 新环境部署 | `supabase-init.sql` | 一次性建表、约束、RLS、种子数据 |
-| 老环境修复 | `supabase-repair-existing.sql` | 历史字段修复、UUID转型、外键重建、脏数据清理、索引补齐 |
+| 新环境部署 | [`supabase-init.sql`](../../supabase/sql/supabase-init.sql) | 一次性建表、约束、RLS、种子数据 |
+| 老环境修复 | [`supabase-repair-existing.sql`](../../supabase/sql/supabase-repair-existing.sql) | 历史字段修复、UUID转型、外键重建、脏数据清理、索引补齐 |

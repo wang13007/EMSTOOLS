@@ -1,6 +1,6 @@
 -- Incremental hardening for the current frontend-only custom auth flow.
 --
--- Apply after supabase-init.sql and supabase-allow-anon-custom-auth.sql.
+-- Apply after supabase/sql/supabase-init.sql and supabase/sql/supabase-allow-anon-custom-auth.sql.
 -- This does not replace the recommended long-term migration to Supabase Auth
 -- or backend/Edge Function guarded writes, but it supports the safer client
 -- behavior added in this project revision.

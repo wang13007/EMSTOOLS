@@ -211,7 +211,7 @@ Deno.serve(async (request) => {
 
     return toJson({
       log: fallback.data,
-      warning: 'Audit hardening columns are missing. Run supabase-audit-hardening.sql.',
+      warning: 'Audit hardening columns are missing. Run supabase/sql/supabase-audit-hardening.sql.',
     });
   } catch (error) {
     console.error('audit-log unexpected error', error);

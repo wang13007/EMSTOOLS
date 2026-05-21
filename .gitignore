@@ -3,3 +3,10 @@ dist/
 .env.local 
 .env 
 *.log 
+.DS_Store
+Thumbs.db
+.vite/
+.cache/
+coverage/
+tmp/
+temp/

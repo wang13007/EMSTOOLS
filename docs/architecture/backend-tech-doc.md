@@ -1,4 +1,4 @@
-﻿# 技术方案（当前代码同步）
+# 技术方案（当前代码同步）
 
 ## 1. 架构概览
 
@@ -23,9 +23,9 @@ src/services/supabaseService.ts
 services/geminiService.ts
 services/reportService.ts
 src/config/supabase.ts
-supabase-init.sql
-supabase-repair-existing.sql
-supabase-audit-hardening.sql
+supabase/sql/supabase-init.sql
+supabase/sql/supabase-repair-existing.sql
+supabase/sql/supabase-audit-hardening.sql
 supabase/functions/audit-log/index.ts
 ```
 
@@ -104,9 +104,9 @@ supabase/functions/audit-log/index.ts
 
 ## 6. 数据库脚本策略
 
-- `supabase-init.sql`：全量初始化 + 兼容修复 + 索引 + RLS + 种子数据
-- `supabase-repair-existing.sql`：历史库修复（字段类型、外键、索引）
-- `supabase-audit-hardening.sql`：审计日志真实 IP、元数据和哈希链字段
+- `supabase/sql/supabase-init.sql`：全量初始化 + 兼容修复 + 索引 + RLS + 种子数据
+- `supabase/sql/supabase-repair-existing.sql`：历史库修复（字段类型、外键、索引）
+- `supabase/sql/supabase-audit-hardening.sql`：审计日志真实 IP、元数据和哈希链字段
 
 ## 7. 安全注意事项
 

@@ -4,7 +4,7 @@
 -- - The app uses a publishable/anon Supabase key directly from the browser.
 -- - The app stores its own session in localStorage and does not sign in with Supabase Auth.
 -- - Therefore PostgREST sees every request as role "anon", even after app login.
--- - supabase-init.sql revokes anon access and only allows auth.role() = 'authenticated',
+-- - supabase/sql/supabase-init.sql revokes anon access and only allows auth.role() = 'authenticated',
 --   so reads like public.users select fail with 401 / 42501 permission denied.
 --
 -- Security note:
@@ -70,7 +70,7 @@ WITH CHECK (auth.role() IN ('anon', 'authenticated'));
 
 -- Audit logs are read from the browser but written by the audit-log Edge Function.
 -- This keeps anon clients from tampering with production audit trails after
--- supabase-audit-hardening.sql is applied.
+-- supabase/sql/supabase-audit-hardening.sql is applied.
 REVOKE INSERT, UPDATE, DELETE ON public.system_logs FROM anon;
 REVOKE INSERT, UPDATE, DELETE ON public.system_logs FROM authenticated;
 GRANT SELECT ON public.system_logs TO anon;

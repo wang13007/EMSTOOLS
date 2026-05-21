@@ -86,20 +86,23 @@ GEMINI_API_KEY="<optional>"
 
 | 场景 | SQL 脚本 |
 | --- | --- |
-| 新环境初始化 | `supabase-init.sql` |
-| 旧环境修复/兼容升级 | `supabase-repair-existing.sql` |
+| 新环境初始化 | [supabase-init.sql](./supabase/sql/supabase-init.sql) |
+| 旧环境修复/兼容升级 | [supabase-repair-existing.sql](./supabase/sql/supabase-repair-existing.sql) |
+| 匿名授权兼容 | [supabase-allow-anon-custom-auth.sql](./supabase/sql/supabase-allow-anon-custom-auth.sql) |
+| 业务安全加固 | [supabase-business-hardening.sql](./supabase/sql/supabase-business-hardening.sql) |
+| 审计日志加固 | [supabase-audit-hardening.sql](./supabase/sql/supabase-audit-hardening.sql) |
 
 ## 8. 文档目录
 
 | 文档 | 路径 | 说明 |
 | --- | --- | --- |
-| 需求开发文档 | [需求开发文档.md](./需求开发文档.md) | 功能需求与设计 |
-| 服务接口 | [api-design.md](./api-design.md) | 前端 Service 接口 |
-| 数据库设计 | [database-design.md](./database-design.md) | 表结构、约束、RLS |
-| 技术方案 | [backend-tech-doc.md](./backend-tech-doc.md) | 技术实现说明 |
-| Supabase 配置 | [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Supabase 接入流程 |
-| Cloudflare 部署指南 | [CLOUDFLARE_DEPLOY_GUIDE.md](./CLOUDFLARE_DEPLOY_GUIDE.md) | 部署详版 |
-| 用户操作手册 | [用户操作手册.md](./用户操作手册.md) | 使用说明 |
-| 系统运维手册 | [系统运维手册.md](./系统运维手册.md) | 运维流程 |
+| 需求开发文档 | [docs/product/需求开发文档.md](./docs/product/需求开发文档.md) | 功能需求与设计 |
+| 服务接口 | [docs/architecture/api-design.md](./docs/architecture/api-design.md) | 前端 Service 接口 |
+| 数据库设计 | [docs/architecture/database-design.md](./docs/architecture/database-design.md) | 表结构、约束、RLS |
+| 技术方案 | [docs/architecture/backend-tech-doc.md](./docs/architecture/backend-tech-doc.md) | 技术实现说明 |
+| Supabase 配置 | [docs/guides/SUPABASE_SETUP.md](./docs/guides/SUPABASE_SETUP.md) | Supabase 接入流程 |
+| Cloudflare 部署指南 | [docs/guides/CLOUDFLARE_DEPLOY_GUIDE.md](./docs/guides/CLOUDFLARE_DEPLOY_GUIDE.md) | 部署详版 |
+| 用户操作手册 | [docs/guides/用户操作手册.md](./docs/guides/用户操作手册.md) | 使用说明 |
+| 系统运维手册 | [docs/guides/系统运维手册.md](./docs/guides/系统运维手册.md) | 运维流程 |
 
 联系作者：+86 18130362581

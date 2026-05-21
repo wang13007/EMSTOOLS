@@ -1,4 +1,4 @@
-﻿# Supabase 配置指南（同步当前代码）
+# Supabase 配置指南（同步当前代码）
 
 ## 1. 创建 Supabase 项目
 
@@ -27,9 +27,9 @@ GEMINI_API_KEY="<optional>"
 
 在 Supabase SQL Editor 执行：
 
-1. `supabase-init.sql`
-2. （可选）`supabase-repair-existing.sql`，用于旧库修复
-3. （生产审计加固）`supabase-audit-hardening.sql`，用于补齐审计哈希链字段与索引
+1. [`supabase-init.sql`](../../supabase/sql/supabase-init.sql)
+2. （可选）[`supabase-repair-existing.sql`](../../supabase/sql/supabase-repair-existing.sql)，用于旧库修复
+3. （生产审计加固）[`supabase-audit-hardening.sql`](../../supabase/sql/supabase-audit-hardening.sql)，用于补齐审计哈希链字段与索引
 
 ## 4. 验证点
 
@@ -56,7 +56,7 @@ GEMINI_API_KEY="<optional>"
 
 ## 5. RLS 说明
 
-`supabase-init.sql` 已启用 RLS 并创建基础策略（authenticated 全放行）。
+[`supabase-init.sql`](../../supabase/sql/supabase-init.sql) 已启用 RLS 并创建基础策略（authenticated 全放行）。
 
 上线建议：
 
@@ -99,7 +99,7 @@ VITE_AUDIT_LOG_STRICT=true
 
 ### 7.2 UUID 类型错误
 
-执行 `supabase-repair-existing.sql` 修复历史字符串字段。
+执行 [`supabase-repair-existing.sql`](../../supabase/sql/supabase-repair-existing.sql) 修复历史字符串字段。
 
 ### 7.3 调研状态显示异常
 
@@ -107,7 +107,7 @@ VITE_AUDIT_LOG_STRICT=true
 
 ### 7.4 日志仍显示未加固
 
-- 确认已执行 `supabase-audit-hardening.sql`
+- 确认已执行 [`supabase-audit-hardening.sql`](../../supabase/sql/supabase-audit-hardening.sql)
 - 确认 `audit-log` Edge Function 已部署
 - 确认 `AUDIT_LOG_HMAC_SECRET` 已配置
 - 若前端未启用 `VITE_AUDIT_LOG_STRICT=true`，函数失败时会降级为浏览器直写，来源会显示 `browser-fallback`
