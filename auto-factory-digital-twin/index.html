@@ -7,13 +7,13 @@
   <meta name="description" content="整车制造工厂真实 GLB 设备模型与实时动效数字孪生平台" />
   <title>AutoTwin · 整车工厂数字孪生</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307111f'/%3E%3Cpath d='M12 40h40l-5-15H19z' fill='%2300d7ff'/%3E%3Ccircle cx='21' cy='43' r='5' fill='%23fff'/%3E%3Ccircle cx='43' cy='43' r='5' fill='%23fff'/%3E%3C/svg%3E" />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://raw.githack.com" />
   <link rel="stylesheet" href="./styles.css" />
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
+        "three": "https://raw.githack.com/mrdoob/three.js/r185/build/three.module.min.js",
+        "three/addons/": "https://raw.githack.com/mrdoob/three.js/r185/examples/jsm/"
       }
     }
   </script>
@@ -118,6 +118,15 @@
       <div class="loading-track"><i></i></div>
     </div>
   </div>
-  <script type="module" src="./ui.js"></script>
+  <script>
+    window.__autotwinWatchdog=setTimeout(()=>{
+      const box=document.querySelector('#loading');
+      if(box&&!box.classList.contains('hidden')){
+        box.querySelector('strong').textContent='3D 引擎连接超时';
+        box.querySelector('small').textContent='请刷新页面，或使用最新版 Chrome / Edge 并确认已开启 WebGL';
+      }
+    },15000);
+  </script>
+  <script type="module" src="./ui.js?v=20260710-3"></script>
 </body>
 </html>
