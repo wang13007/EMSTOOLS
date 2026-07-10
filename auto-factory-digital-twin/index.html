@@ -1,29 +1,123 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AutoTwin · 整车工厂数字孪生</title>
-<style>
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#040a12;color:#eef8ff;font-family:Inter,"Microsoft YaHei",sans-serif}canvas{position:fixed;inset:0;width:100%;height:100%}.glass{background:linear-gradient(145deg,rgba(10,26,44,.88),rgba(5,14,25,.76));border:1px solid rgba(88,191,255,.17);box-shadow:0 18px 45px rgba(0,0,0,.28);backdrop-filter:blur(15px);border-radius:13px}.top{position:fixed;z-index:5;left:16px;right:16px;top:14px;height:72px;padding:0 18px;display:flex;align-items:center}.logo{width:39px;height:39px;border:1px solid #18d9ff;border-radius:10px;transform:rotate(45deg);margin-right:15px;box-shadow:0 0 25px #18d9ff22;position:relative}.logo:after,.logo:before{content:"";position:absolute;width:18px;height:2px;background:#18d9ff;left:10px;top:13px;box-shadow:0 0 10px #18d9ff}.logo:after{top:23px}.ey{font-size:9px;color:#62849e;letter-spacing:.18em}.top h1{font-size:19px;margin:4px 0 0}.headstats{margin-left:auto;display:flex;gap:30px}.hs span{display:block;color:#7794aa;font-size:9px}.hs b{font-size:12px}.live{color:#37efa9}.live:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#37efa9;margin-right:7px;box-shadow:0 0 10px #37efa9}.left{position:fixed;z-index:5;left:16px;top:101px;bottom:77px;width:245px;padding:16px}.left h2,.right h2{font-size:14px;margin:5px 0 14px}.station{width:100%;height:55px;border:0;border-radius:8px;background:transparent;color:#d9ecf8;text-align:left;padding:0 8px;display:grid;grid-template-columns:29px 1fr auto;align-items:center;gap:8px;cursor:pointer}.station:hover,.station.on{background:linear-gradient(90deg,#15d8ff20,transparent);box-shadow:inset 2px 0 #15d8ff}.station i{width:27px;height:27px;border:1px solid #15d8ff66;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:9px;color:#15d8ff}.station strong{font-size:11px}.station small{display:block;color:#65849a;font-size:8px;margin-top:3px}.station em{font-style:normal;font-size:9px;color:#3be8bb}.plan{position:absolute;left:15px;right:15px;bottom:15px;padding:11px;border:1px solid #68baff17;border-radius:8px;background:#28587912;font-size:9px;color:#7492a8}.plan b{float:right;color:#f1fbff;font-size:13px}.bar{height:4px;background:#6ca8cc1d;border-radius:4px;margin:12px 0 7px;overflow:hidden}.bar:after{content:"";display:block;width:64%;height:100%;background:linear-gradient(90deg,#187ca2,#15d8ff);box-shadow:0 0 9px #15d8ff}.right{position:fixed;z-index:5;right:16px;top:101px;bottom:77px;width:324px;display:flex;flex-direction:column;gap:9px}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}.metric{height:95px;padding:12px;position:relative;overflow:hidden}.metric span{color:#7995aa;font-size:9px}.metric strong{display:block;font-size:21px;margin:6px 0}.metric small{color:#658195;font-size:8px}.metric:after{content:"";position:absolute;right:-22px;top:-26px;width:72px;height:72px;border-radius:50%;background:currentColor;opacity:.07}.cyan{color:#15d8ff}.green{color:#39efaa}.amber{color:#ffbd4a}.violet{color:#a883ff}.detail{flex:1;padding:15px;min-height:0}.detail p{color:#7d99ad;font-size:9px;line-height:1.7}.kpis{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #6eb8e519;border-bottom:1px solid #6eb8e519;padding:10px 0}.kpi{text-align:center;border-right:1px solid #6eb8e519}.kpi:last-child{border:0}.kpi span{display:block;color:#718ca0;font-size:8px}.kpi b{font-size:13px}.events{height:116px;padding:13px}.event{display:grid;grid-template-columns:37px 1fr auto;font-size:7px;color:#7793a7;margin:7px 0}.event b{color:#b7ccd9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tag{color:#39efaa;border:1px solid #39efaa66;border-radius:3px;padding:1px 4px}.bottom{position:fixed;z-index:5;left:278px;right:356px;bottom:16px;height:48px;display:flex;align-items:center;padding:0 12px;gap:13px}.bottom button{border:1px solid #15d8ff55;background:#15d8ff16;color:#dffaff;border-radius:6px;height:31px;padding:0 12px;cursor:pointer}.bottom label{font-size:8px;color:#7995aa}.bottom input{accent-color:#15d8ff;vertical-align:middle}.hint{margin-left:auto;color:#5e7b91;font-size:8px}.tip{position:fixed;z-index:9;display:none;pointer-events:none;transform:translate(-50%,-130%);padding:6px 8px;border:1px solid #15d8ff66;border-radius:5px;background:#05101bea;color:#d7f5ff;font-size:8px}.loading{position:fixed;z-index:20;inset:0;background:radial-gradient(circle,#092238,#03080e 65%);display:grid;place-items:center;transition:.7s}.loading.hide{opacity:0;visibility:hidden}.loading b{letter-spacing:.12em;font-size:13px}.loading b:after{content:"";display:block;width:190px;height:2px;margin-top:16px;background:linear-gradient(90deg,transparent,#15d8ff,transparent);animation:load 1.2s infinite}@keyframes load{from{transform:scaleX(.1)}to{transform:scaleX(1)}}@media(max-width:850px){.headstats{display:none}.left{width:190px}.right{width:220px}.bottom{left:218px;right:252px}.metrics{grid-template-columns:1fr}.metric:nth-child(n+3){display:none}.hint{display:none}}@media(max-width:620px){.top{left:7px;right:7px;top:7px;height:57px}.top h1{font-size:12px}.ey{display:none}.left{left:7px;right:7px;bottom:66px;top:auto;width:auto;height:72px;padding:5px;display:flex;overflow:auto}.left>div:first-child,.plan{display:none}.station{min-width:105px;height:60px}.right{right:7px;top:70px;bottom:145px;width:165px}.detail{display:none}.bottom{left:7px;right:7px;bottom:7px}.bottom label{display:none}}
-</style>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"}}</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#07111f" />
+  <meta name="description" content="整车制造工厂真实 GLB 设备模型与实时动效数字孪生平台" />
+  <title>AutoTwin · 整车工厂数字孪生</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2307111f'/%3E%3Cpath d='M12 40h40l-5-15H19z' fill='%2300d7ff'/%3E%3Ccircle cx='21' cy='43' r='5' fill='%23fff'/%3E%3Ccircle cx='43' cy='43' r='5' fill='%23fff'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
-<canvas id="c"></canvas>
-<header class="top glass"><div class="logo"></div><div><div class="ey">AUTO MANUFACTURING DIGITAL TWIN</div><h1>整车工厂 · 3D 数字孪生</h1></div><div class="headstats"><div class="hs"><span>工厂状态</span><b class="live">正常运行</b></div><div class="hs"><span>当前班次</span><b>B 班 · 14:00–22:00</b></div><div class="hs"><span>系统时间</span><b id="clock">--:--:--</b></div></div></header>
-<aside class="left glass"><div><div class="ey">PROCESS FLOW</div><h2>生产工艺流程</h2></div><div id="nav"></div><div class="plan">今日计划 <b>1,280 辆</b><div class="bar"></div>已完成 816 辆 · 达成率 63.8%</div></aside>
-<aside class="right"><div class="metrics"><div class="metric glass cyan"><span>综合 OEE</span><strong id="oee">91.6%</strong><small>较昨日 +1.8%</small></div><div class="metric glass green"><span>当前节拍</span><strong id="takt">58.4s</strong><small>目标 60.0s</small></div><div class="metric glass amber"><span>实时能耗</span><strong id="power">8.42MW</strong><small>412 kWh / 辆</small></div><div class="metric glass violet"><span>一次合格率</span><strong id="quality">99.24%</strong><small>目标 ≥99.00%</small></div></div><section class="detail glass"><div class="ey">LIVE STATION</div><h2 id="title">焊装车间</h2><p id="desc"></p><div class="kpis" id="kpis"></div></section><section class="events glass"><div class="ey">EVENT STREAM</div><div id="events"></div></section></aside>
-<section class="bottom glass"><button id="play">Ⅱ 暂停仿真</button><label>倍速 <input id="speed" type="range" min=".25" max="3" step=".25" value="1"> <span id="sv">1.0×</span></label><label><input id="tour" type="checkbox"> 自动巡检</label><div class="hint">拖拽旋转 · 滚轮缩放 · 点击工艺区</div></section>
-<div class="tip" id="tip"></div><div class="loading" id="loading"><b>正在初始化数字孪生引擎</b></div>
-<script type="module">
-import * as THREE from 'three';import{OrbitControls}from'three/addons/controls/OrbitControls.js';import{EffectComposer}from'three/addons/postprocessing/EffectComposer.js';import{RenderPass}from'three/addons/postprocessing/RenderPass.js';import{UnrealBloomPass}from'three/addons/postprocessing/UnrealBloomPass.js';import{OutputPass}from'three/addons/postprocessing/OutputPass.js';
-const S=[['stamping','冲压车间','STAMPING',0x3fa9ff,-34,-17,'钢板开卷、落料与大型冲压线成形，监测压力、振动、模具温度与板料缺陷。',[['线速','14.2 件/min'],['压力','2,380 t'],['良率','99.61%']]],['welding','焊装车间','BODY SHOP',0x15d8ff,-11,-17,'车身骨架自动拼装与机器人点焊，监测焊点质量、机器人负载与安全区域。',[['节拍','56.8 s'],['焊点','4,862 个'],['在线率','100%']]],['painting','涂装车间','PAINT SHOP',0xa883ff,13,-17,'前处理、电泳、喷涂与烘干全过程，监测温湿度、膜厚、VOC 与色差。',[['膜厚','118 μm'],['VOC','18.6 mg/m³'],['色差','0.42 ΔE']]],['assembly','总装车间','ASSEMBLY',0x39efaa,36,-17,'内饰、底盘、动力总成与整车合装，监测扭矩、物料齐套率与人机协同。',[['节拍','59.1 s'],['齐套率','99.4%'],['扭矩OK','99.96%']]],['quality','质量检测','QUALITY GATE',0xffbd4a,25,14,'四轮定位、灯光、ADAS、淋雨与动态路试，聚合视觉、尺寸和电气检测。',[['一次通过','99.24%'],['检测项','326 项'],['待复检','3 辆']]],['logistics','智能物流','INTRALOGISTICS',0xff657a,-21,14,'AGV、立体库与线边配送联动，监测拥堵、电量、库存与配送准时率。',[['AGV在线','32 台'],['准时率','99.1%'],['周转','7.8 次/月']]]];
-const c=document.querySelector('#c'),scene=new THREE.Scene();scene.background=new THREE.Color(0x040a12);scene.fog=new THREE.FogExp2(0x07111f,.012);const cam=new THREE.PerspectiveCamera(47,innerWidth/innerHeight,.1,250);cam.position.set(0,45,67);const r=new THREE.WebGLRenderer({canvas:c,antialias:true,powerPreference:'high-performance'});r.setPixelRatio(Math.min(devicePixelRatio,2));r.setSize(innerWidth,innerHeight);r.shadowMap.enabled=true;r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.05;const ctl=new OrbitControls(cam,c);ctl.enableDamping=true;ctl.target.set(0,1,0);ctl.maxPolarAngle=1.5;ctl.minDistance=17;ctl.maxDistance=110;const comp=new EffectComposer(r);comp.addPass(new RenderPass(scene,cam));comp.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),.65,.6,.8));comp.addPass(new OutputPass());scene.add(new THREE.HemisphereLight(0x9de2ff,0x07111f,2.5));const sun=new THREE.DirectionalLight(0xd8efff,3);sun.position.set(-20,45,30);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);scene.add(sun);
-const W=new THREE.Group;scene.add(W);const click=[],robots=[],cars=[],agvs=[],presses=[];let run=true,speed=1,time=0,selected=1,tour=0;const M=(col,e=0)=>new THREE.MeshStandardMaterial({color:col,metalness:.68,roughness:.33,emissive:col,emissiveIntensity:e});function add(g,m,p=[0,0,0],q=[0,0,0],par=W){let o=new THREE.Mesh(g,m);o.position.set(...p);o.rotation.set(...q);o.castShadow=o.receiveShadow=true;par.add(o);return o}add(new THREE.PlaneGeometry(125,80),M(0x081522),[0,0,0],[-Math.PI/2,0,0]);let grid=new THREE.GridHelper(125,60,0x1e7190,0x173b50);grid.material.opacity=.28;grid.material.transparent=true;W.add(grid);for(let x=-52;x<=52;x+=21)for(let z of[-32,32])add(new THREE.BoxGeometry(.45,8,.45),M(0x355162),[x,4,z]);for(let z=-30;z<=30;z+=15)add(new THREE.BoxGeometry(106,.18,.35),M(0x294553),[0,8.2,z]);
-function conveyor(par){add(new THREE.BoxGeometry(16,.2,.16),M(0x49606d),[0,.45,-1.1],[],par);add(new THREE.BoxGeometry(16,.2,.16),M(0x49606d),[0,.45,1.1],[],par);for(let x=-7.5;x<8;x+=.7)add(new THREE.CylinderGeometry(.08,.08,2.1,8),M(0x607582),[x,.45,0],[Math.PI/2,0,0],par)}function robot(par,x,z,flip,id,col){let g=new THREE.Group;g.position.set(x,0,z);g.rotation.y=flip?Math.PI:0;par.add(g);add(new THREE.CylinderGeometry(.55,.7,.4,14),M(0x263a46),[0,.2,0],[],g);add(new THREE.CylinderGeometry(.45,.52,1.2,14),M(col),[0,1,0],[],g);let a=new THREE.Group;a.position.y=1.65;g.add(a);add(new THREE.BoxGeometry(.48,2,.5),M(col),[0,1,0],[0,0,-.35],a);let b=new THREE.Group;b.position.set(.67,1.9,0);a.add(b);add(new THREE.BoxGeometry(.4,1.6,.42),M(col),[.5,.6,0],[0,0,-.75],b);g.traverse(o=>{if(o.isMesh){o.userData.id=id;click.push(o)}});robots.push([a,b,Math.random()*6])}function car(col=.8){let g=new THREE.Group;add(new THREE.BoxGeometry(3.6,.55,1.65),M(col),[0,.7,0],[],g);add(new THREE.BoxGeometry(1.6,.68,1.4),new THREE.MeshStandardMaterial({color:0x173448,metalness:.7,roughness:.12,transparent:true,opacity:.88}),[-.3,1.2,0],[],g);for(let x of[-1.15,1.15])for(let z of[-.87,.87])add(new THREE.CylinderGeometry(.32,.32,.17,14),M(0x171d22),[x,.43,z],[Math.PI/2,0,0],g);return g}function agv(){let g=new THREE.Group;add(new THREE.BoxGeometry(1.9,.38,1.15),M(0x26343d),[0,.22,0],[],g);add(new THREE.BoxGeometry(1.5,.1,.9),M(0xff657a,.7),[0,.47,0],[],g);return g}
-S.forEach((s,i)=>{let g=new THREE.Group;g.position.set(s[4],0,s[5]);g.userData.id=s[0];W.add(g);let base=add(new THREE.BoxGeometry(19,.2,15),M(0x102638,.04),[0,.1,0],[],g);base.material.emissive.set(s[3]);base.userData.id=s[0];click.push(base);let edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(19.2,.24,15.2)),new THREE.LineBasicMaterial({color:s[3],transparent:true,opacity:.45}));edge.position.y=.13;g.add(edge);conveyor(g);if(i===0){for(let x of[-5,0,5]){let p=add(new THREE.BoxGeometry(3.4,4.4,3),M(0x33566b),[x,2.3,-1.3],[],g),h=add(new THREE.BoxGeometry(3,1.1,2.6),M(s[3],.12),[x,4.3,-1.3],[],g);h.userData.id=s[0];click.push(h);presses.push([h,i+x])}}else if(i<4){for(let x of[-6,-2,2,6])robot(g,x,(x/2)%2?2.7:-2.7,x%4===0,s[0],s[3]);let ca=car(i===2?0x6236c7:0xc1cbd0);ca.position.set(0,.5,0);g.add(ca)}else if(i===4){let ca=car(0x2c85cf);ca.position.set(0,.5,0);g.add(ca);for(let x of[-5,0,5]){add(new THREE.BoxGeometry(.28,4.7,.28),M(0x4b5962),[x,2.35,-2.5],[],g);add(new THREE.BoxGeometry(.28,4.7,.28),M(0x4b5962),[x,2.35,2.5],[],g);let beam=add(new THREE.BoxGeometry(.04,4,4.6),new THREE.MeshStandardMaterial({color:s[3],emissive:s[3],emissiveIntensity:1.7,transparent:true,opacity:.16}),[x,2.25,0],[],g);presses.push([beam,20+x])}}else{for(let j=0;j<4;j++){let a=agv();a.position.set(-6+j*4,.3,0);g.add(a);a.traverse(o=>{if(o.isMesh){o.userData.id=s[0];click.push(o)}});agvs.push([a,j/4])}for(let x of[-5,0,5])for(let z of[-3,3])for(let y=1;y<4;y++)add(new THREE.BoxGeometry(3.2,.15,1.1),M(0x415864),[x,y,z],[],g)}});
-let pts=[[-49,-4],[-30,-4],[-10,-4],[10,-4],[31,-4],[48,10],[27,25],[-15,25],[-43,16],[-49,-4]].map(p=>new THREE.Vector3(p[0],.12,p[1])),curve=new THREE.CatmullRomCurve3(pts,true);add(new THREE.TubeGeometry(curve,180,.09,7,true),M(0x15d8ff,.7));for(let i=0;i<6;i++){let ca=car([0x2386ca,0xe1e5e7,0x7f39ca,0x2fa577,0xc85061][i%5]);ca.scale.setScalar(.42);W.add(ca);cars.push([ca,i/6])}
-const nav=document.querySelector('#nav');S.forEach((s,i)=>{let b=document.createElement('button');b.className='station'+(i===1?' on':'');b.innerHTML=`<i>${String(i+1).padStart(2,'0')}</i><span><strong>${s[1]}</strong><small>${s[2]}</small></span><em>${[96.8,94.2,91.7,93.5,99.2,97.9][i]}%</em>`;b.onclick=()=>select(i,true);nav.appendChild(b)});function select(i,focus){selected=i;[...nav.children].forEach((x,j)=>x.classList.toggle('on',i===j));let s=S[i];document.querySelector('#title').textContent=s[1];document.querySelector('#desc').textContent=s[6];document.querySelector('#kpis').innerHTML=s[7].map(x=>`<div class="kpi"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('');if(focus){cam.position.set(s[4]-13,22,s[5]+20);ctl.target.set(s[4],2,s[5])}}select(1,false);let ev=['焊装主拼线车型切换完成','AGV-17 到达总装线边区','涂装烘干炉温度波动 +1.4℃','质量门完成第 816 辆检测'];document.querySelector('#events').innerHTML=ev.map((e,i)=>`<div class="event"><span>18:${42-i*3}</span><b>${e}</b><span class="tag">${i===2?'关注':'正常'}</span></div>`).join('');
-const ray=new THREE.Raycaster,mouse=new THREE.Vector2,tip=document.querySelector('#tip');function hit(e){let q=c.getBoundingClientRect();mouse.x=(e.clientX/q.width)*2-1;mouse.y=-(e.clientY/q.height)*2+1;ray.setFromCamera(mouse,cam);return ray.intersectObjects(click,true).find(x=>x.object.userData.id)}c.onpointermove=e=>{let h=hit(e);if(h){let i=S.findIndex(s=>s[0]===h.object.userData.id);tip.textContent=S[i][1]+' · 点击查看';tip.style.left=e.clientX+'px';tip.style.top=e.clientY+'px';tip.style.display='block';c.style.cursor='pointer'}else{tip.style.display='none';c.style.cursor='grab'}};c.onclick=e=>{let h=hit(e);if(h)select(S.findIndex(s=>s[0]===h.object.userData.id),true)};
-let prev=performance.now();function loop(n){requestAnimationFrame(loop);let dt=Math.min(.05,(n-prev)/1000);prev=n;if(run)time+=dt*speed;robots.forEach((x,i)=>{x[0].rotation.z=-.2+Math.sin(time*1.2+x[2])*.3;x[1].rotation.y=Math.sin(time*1.7+x[2])*.65});presses.forEach((x,i)=>{if(i<3)x[0].position.y=4+Math.max(0,Math.sin(time*1.8+x[1]))*1.3;else x[0].material.opacity=.08+Math.abs(Math.sin(time*2+x[1]))*.25});cars.forEach(x=>{let u=(time*.012+x[1])%1,p=curve.getPointAt(u),p2=curve.getPointAt((u+.002)%1);x[0].position.copy(p);x[0].position.y=.48;x[0].lookAt(p2);x[0].rotation.y+=Math.PI/2});agvs.forEach(x=>{let u=(time*.055+x[1])%1;x[0].position.set(Math.sin(u*Math.PI*2)*7,.3,Math.cos(u*Math.PI*2)*2);x[0].rotation.y=-u*Math.PI*2});document.querySelector('#oee').textContent=(91.6+Math.sin(time*.2)*.4).toFixed(1)+'%';document.querySelector('#takt').textContent=(58.4+Math.sin(time*.3)*.6).toFixed(1)+'s';document.querySelector('#power').textContent=(8.42+Math.sin(time*.25)*.16).toFixed(2)+'MW';document.querySelector('#quality').textContent=(99.24+Math.sin(time*.12)*.04).toFixed(2)+'%';if(document.querySelector('#tour').checked){tour+=dt;if(tour>8){tour=0;select((selected+1)%6,true)}}ctl.update();comp.render()}requestAnimationFrame(loop);document.querySelector('#play').onclick=e=>{run=!run;e.currentTarget.textContent=run?'Ⅱ 暂停仿真':'▶ 继续仿真'};document.querySelector('#speed').oninput=e=>{speed=+e.target.value;document.querySelector('#sv').textContent=speed.toFixed(1)+'×'};setInterval(()=>document.querySelector('#clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false}),1000);onresize=()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight);comp.setSize(innerWidth,innerHeight)};setTimeout(()=>document.querySelector('#loading').classList.add('hide'),1300);
-</script></body></html>
+  <div id="app">
+    <canvas id="scene" aria-label="整车工厂三维数字孪生场景"></canvas>
+    <div class="scanlines" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+
+    <header class="topbar glass-panel">
+      <div class="brand">
+        <div class="brand-mark"><span></span><span></span><span></span></div>
+        <div>
+          <div class="eyebrow">AUTO MANUFACTURING DIGITAL TWIN</div>
+          <h1>整车工厂 · 3D 数字孪生</h1>
+        </div>
+      </div>
+      <div class="header-stats">
+        <div class="header-stat"><span>工厂状态</span><strong class="status-live"><i></i>正常运行</strong></div>
+        <div class="header-stat"><span>当前班次</span><strong>B 班 · 14:00–22:00</strong></div>
+        <div class="header-stat"><span>系统时间</span><strong id="clock">--:--:--</strong></div>
+      </div>
+      <div class="top-actions">
+        <button class="icon-button" id="fullscreenBtn" title="全屏">⛶</button>
+        <button class="icon-button" id="resetBtn" title="重置视角">⌂</button>
+      </div>
+    </header>
+
+    <aside class="left-panel glass-panel">
+      <div class="panel-heading">
+        <div><span class="eyebrow">PROCESS FLOW</span><h2>生产工艺流程</h2></div>
+        <span class="badge">8 个真实模型</span>
+      </div>
+      <nav id="processList" class="process-list" aria-label="生产工艺"></nav>
+      <div class="flow-summary">
+        <div class="flow-line"><span>今日计划</span><strong>1,280 <small>辆</small></strong></div>
+        <div class="flow-line"><span>已完成</span><strong id="completeCount">816 <small>辆</small></strong></div>
+        <div class="progress"><span id="planProgress"></span></div>
+        <div class="flow-foot"><span>达成率 <b id="completionRate">63.8%</b></span><span>预计完成 21:46</span></div>
+      </div>
+    </aside>
+
+    <aside class="right-panel">
+      <section class="metric-grid">
+        <article class="metric-card glass-panel accent-cyan">
+          <span>综合 OEE</span><strong id="oeeValue">91.6%</strong><small>较昨日 <b>+1.8%</b></small>
+          <div class="sparkline"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </article>
+        <article class="metric-card glass-panel accent-green">
+          <span>当前节拍</span><strong id="taktValue">58.4s</strong><small>目标节拍 <b>60.0s</b></small>
+          <div class="mini-ring"><span>97</span></div>
+        </article>
+        <article class="metric-card glass-panel accent-amber">
+          <span>实时能耗</span><strong id="energyValue">8.42MW</strong><small>单位能耗 <b>412 kWh/辆</b></small>
+          <div class="energy-bars"><i></i><i></i><i></i><i></i><i></i></div>
+        </article>
+        <article class="metric-card glass-panel accent-violet">
+          <span>一次合格率</span><strong id="qualityValue">99.24%</strong><small>目标值 <b>≥ 99.00%</b></small>
+          <div class="quality-dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </article>
+      </section>
+
+      <section class="detail-card glass-panel">
+        <div class="panel-heading compact">
+          <div><span class="eyebrow">LIVE STATION</span><h2 id="stationTitle">焊装车间</h2></div>
+          <span id="stationStatus" class="status-chip ok"><i></i>运行中</span>
+        </div>
+        <div id="stationDescription" class="station-description">车身骨架自动拼装与机器人点焊，实时监测焊点质量、机器人负载与安全区域。</div>
+        <div class="station-kpis" id="stationKpis"></div>
+        <div class="equipment-row">
+          <div class="equipment-title"><span>关键设备状态</span><span id="equipmentOnline">18 / 18 在线</span></div>
+          <div id="equipmentGrid" class="equipment-grid"></div>
+        </div>
+      </section>
+
+      <section class="alerts-card glass-panel">
+        <div class="panel-heading compact"><div><span class="eyebrow">EVENT STREAM</span><h2>实时事件流</h2></div><button id="clearEvents" class="text-button">清除</button></div>
+        <div id="eventList" class="event-list"></div>
+      </section>
+    </aside>
+
+    <section class="bottom-controls glass-panel">
+      <div class="control-group">
+        <button id="playBtn" class="primary-control"><span id="playIcon">Ⅱ</span><span id="playText">暂停仿真</span></button>
+        <label class="speed-control"><span>仿真倍速</span><input id="speedSlider" type="range" min="0.25" max="3" step="0.25" value="1" /><output id="speedOutput">1.0×</output></label>
+      </div>
+      <div class="control-group toggles">
+        <label><input id="labelsToggle" type="checkbox" checked /><span></span>工位标签</label>
+        <label><input id="heatToggle" type="checkbox" /><span></span>能耗热力</label>
+        <label><input id="tourToggle" type="checkbox" /><span></span>自动巡检</label>
+      </div>
+      <div class="scene-hint"><kbd>鼠标左键</kbd> 旋转 <kbd>右键</kbd> 平移 <kbd>滚轮</kbd> 缩放 <kbd>点击设备</kbd> 查看工艺</div>
+    </section>
+
+    <div id="tooltip" class="tooltip" role="status"></div>
+    <div id="toast" class="toast"></div>
+    <div id="loading" class="loading-screen">
+      <div class="loader-mark"><span></span><span></span><span></span></div>
+      <strong>正在初始化数字孪生引擎</strong>
+      <small>构建真实设备模型、产线与实时数据通道…</small>
+      <div class="loading-track"><i></i></div>
+    </div>
+  </div>
+  <script type="module" src="./ui.js"></script>
+</body>
+</html>
